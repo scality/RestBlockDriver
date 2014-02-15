@@ -1,0 +1,62 @@
+MODE D'EMPLOI
+=============
+
+Prérequis
+---------
+
+Système supporté Ubuntu 12.04.4 LTS
+
+Le fichier à utiliser doit exister sur le serveur dewpoint
+Pour le créer:
+# truncate /mnt/fuse/0/myfile --size 50M
+
+Le serveur apache doit être configuré avec la socket à keepalive 
+Rajouter dans apache2.conf
+-----------------------
+KeepAliveTimeout  3600
+MaxKeepAliveRequests 0
+----------------------
+
+Installation du driver
+----------------------
+
+# insmod dewb
+
+Ajout d'un nouveau device
+-------------------------
+
+Il suffit ensuite de créer un block driver pointant dessus comme suit:
+# echo "http://<ip>[:port]/<path_and_filename>" > /sys/class/dewb/add
+
+Une entreée dans /dev est créé:
+* /dev/dewba pour le 1er ajout
+* /dev/dewbb pour le 2e
+Et ainsi de suite ...
+
+Suppression d'un device
+-----------------------
+
+Le dernier device monté peut être supprimé par la commande suivante:
+# echo "1" > /sys/class/dewb/remove
+
+Partitionnement d'un device
+---------------------------
+
+Les devices peuvent être partitionnés comme des disques classiques,
+par exemple:
+
+# fdisk /dev/dewb
+
+Une fois partitionné, les fichiers associés dans /dev sont créés par ex
+* /dev/dewba1
+* /dev/dewba2
+Et ainsi de suite ...
+
+
+Reste à faore:
+* Mise en conformité interface /sys
+* Tolérance aux pannes quand plus de serveur (reset ou timeout).
+* Tolérance de panne sur socket sans keepalive.
+* Optimiser la taille des secteurs.
+* Mettre le device en non rotational
+* Support de DKMS
