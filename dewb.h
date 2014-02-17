@@ -75,6 +75,6 @@ int dewb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 int dewb_http_mktruncate(char *buff, int len, char *host, char *page, unsigned long size);
 int dewb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value);
 int dewb_http_skipheader(char **buff, int *len);
-
+int dewb_http_mkmetadata(char *buff, int len, char *host, char *page);
 
 #endif

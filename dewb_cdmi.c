@@ -297,6 +297,8 @@ int dewb_cdmi_flush(struct dewb_cdmi_desc_s *desc, unsigned long flush_size)
 	return 0;
 }
 
+/* HACK: due to a bug in HTTP HEAD from scality,using metadata instead */
+#if 0
 int dewb_cdmi_getsize(struct dewb_cdmi_desc_s *desc, uint64_t *size)
 {
 	char *buff = desc->xmit_buff;
@@ -322,6 +324,37 @@ int dewb_cdmi_getsize(struct dewb_cdmi_desc_s *desc, uint64_t *size)
 		return -EIO;
 
 	return 0;
+}
+#endif
+
+int dewb_cdmi_getsize(struct dewb_cdmi_desc_s *desc, uint64_t *size)
+{
+	char *buff = desc->xmit_buff;
+
+	int ret, len;
+
+	/* Construct a GET (?metadata) command */
+	len = dewb_http_mkmetadata(buff, DEWB_XMIT_BUFFER_SIZE, 
+			desc->ip_addr, desc->filename);
+	if (len <= 0) return len;
+
+
+	ret = sock_xmit(desc, 1, buff, len, 0);
+	if (ret != len)
+		return -EIO;
+
+	/* Get response */
+	len = sock_xmit(desc, 0, buff, DEWB_XMIT_BUFFER_SIZE, 0);
+	if (len < 0)
+		return -EIO;
+
+	buff[len] = 0;
+	ret = dewb_http_header_get_uint64(buff, len, "\"cdmi_size\"", size);
+	if (ret)
+		return -EIO;
+
+	return 0;
+
 }
 
 /* dewb_cdmi_putrange(desc, buff, start, end)

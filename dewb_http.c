@@ -6,6 +6,8 @@
 
 #define HTTP_VER	"HTTP/1.1"
 #define HTTP_OK		"HTTP/1.1 200 OK"
+#define HTTP_METADATA	"?metadata"
+
 #define HTTP_KEEPALIVE	"Connection: keep-alive" CRLF \
 	                "Keep-Alive: timeout=3600 "
 #define HTTP_TRUNCATE	"X-Scal-Truncate"
@@ -144,6 +146,48 @@ int dewb_http_mktruncate(char *buff, int len, char *host, char *page, unsigned l
 	return (len - mylen);
 }
 
+int dewb_http_mkmetadata(char *buff, int len, char *host, char *page)
+{
+	char *bufp = buff;
+	int mylen = len;
+	int ret;
+
+	*buff = 0;
+	ret = add_buffer(&bufp, &mylen, "GET ");
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, page);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_METADATA " " HTTP_VER CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_KEEPALIVE CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_USER_AGENT CRLF);
+	if (ret)
+		return -ENOMEM;
+	
+	ret = add_buffer(&bufp, &mylen, "Host: ");
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, host);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, CRLF CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	return (len - mylen);
+}
+
 int dewb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page, 
 		uint64_t start, uint64_t end)
 {
@@ -232,7 +276,9 @@ int dewb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
 		return -EIO;
 
 	pos = strstr(buff, key);
-	
+	if (!pos)
+		return -EIO;
+
 	/* Skip the key and the ' :' */
 	pos += strlen(key) + 2;
 	ret = sscanf(pos, "%lu", (unsigned long *)value);
