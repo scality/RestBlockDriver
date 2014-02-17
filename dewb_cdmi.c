@@ -426,7 +426,7 @@ int dewb_cdmi_getrange(struct dewb_cdmi_desc_s *desc, char *buff,
 		uint64_t offset, int size)
 {
 	char *xmit_buff = desc->xmit_buff;
-	int len;
+	int len, rcv;
 	int ret = -EIO;
 	uint64_t start, end;
 
@@ -449,7 +449,7 @@ int dewb_cdmi_getrange(struct dewb_cdmi_desc_s *desc, char *buff,
 		goto out;
 	}
 
-	len = sock_xmit(desc, 0, xmit_buff, DEWB_XMIT_BUFFER_SIZE, 0);
+	rcv = len = sock_xmit(desc, 0, xmit_buff, DEWB_XMIT_BUFFER_SIZE, 0);
 	if (len < size) {
 		DEWB_DEBUG("getrange: Unabe to get response: %d", len);
 		ret = -EIO;
@@ -463,8 +463,19 @@ int dewb_cdmi_getrange(struct dewb_cdmi_desc_s *desc, char *buff,
 		goto out;
 	}
 
+	// More bytes may have to be read
+	if (len < size) {
+		DEWB_DEBUG("Have to read more [read=%d, toread=%d]\n",
+			len, size - len);
+		ret = sock_xmit(desc, 0, xmit_buff + rcv, size - len, 0);
+		if (ret < 0)
+			return -EIO;
+
+		len += ret;
+	}
+
 	if (len != size) {
-		DEWB_DEBUG("getrange: skipheader failed: %d", ret);
+		DEWB_DEBUG("getrange: len: %d size:%d", len, size);
 		ret = -EIO;
 		goto out;
 	}

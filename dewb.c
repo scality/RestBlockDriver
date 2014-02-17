@@ -77,18 +77,18 @@ static void dewb_xmit_range(struct dewb_device_s *dev, char *buf,
 	}
 
 	if (write) {
-		for (i = 0; i < size / 512UL; i++)
+//		for (i = 0; i < size / 512UL; i++)
 			dewb_cdmi_putrange(&dev->cdmi_desc, 
-					buf + ( i * 512UL),
-					range_start + ( i * 512UL), 
-					512UL);
+					buf,
+					range_start +  4096UL, 
+					4096UL);
 	}
 	else {
-		for (i = 0; i < size / 512UL; i++)
+//		for (i = 0; i < size / 512UL; i++)
 			dewb_cdmi_getrange(&dev->cdmi_desc,
-					buf + ( i * 512UL),
-					range_start + ( i * 512UL), 
-					512UL);
+					buf,
+					range_start + ( i * 4096UL), 
+					4096UL);
 	}
 }
 
