@@ -69,26 +69,25 @@ static void dewb_xmit_range(struct dewb_device_s *dev, char *buf,
 			unsigned long range_start, unsigned long size, int write)
 
 {
-	int i;
-
 	if ((range_start + size) > dev->disk_size) {
 		DEWB_INFO("Beyond-end write (%lu %lu)", range_start, size);
 		return;
 	}
 
+	if (size != 4096)
+		DEWB_INFO("Wrote size of %lu", size);
+
 	if (write) {
-//		for (i = 0; i < size / 512UL; i++)
-			dewb_cdmi_putrange(&dev->cdmi_desc, 
-					buf,
-					range_start +  4096UL, 
-					4096UL);
+		dewb_cdmi_putrange(&dev->cdmi_desc, 
+				buf,
+				range_start, 
+				size);
 	}
 	else {
-//		for (i = 0; i < size / 512UL; i++)
-			dewb_cdmi_getrange(&dev->cdmi_desc,
-					buf,
-					range_start + ( i * 4096UL), 
-					4096UL);
+		dewb_cdmi_getrange(&dev->cdmi_desc,
+				buf,
+				range_start, 
+				size);
 	}
 }
 
@@ -164,7 +163,7 @@ static int dewb_thread(void *data)
 		}
 		
 		/* No IO error testing for the moment */
-		__blk_end_request_all(req, 0);
+		blk_end_request_all(req, 0);
 	
 	}
 	return 0;
@@ -230,6 +229,7 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	}
 
 	ret = dewb_cdmi_getsize(&dev->cdmi_desc, &dev->disk_size);
+
 	set_capacity(disk, dev->disk_size / 512ULL);
 
 	dev->thread = kthread_create(dewb_thread, dev, "%s", 

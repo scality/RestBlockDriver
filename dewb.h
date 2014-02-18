@@ -21,12 +21,12 @@
 #define DEV_SECTORSIZE		4096
 
 /* Dewpoint server related constants */
-#define DEWB_HTTP_HEADER_SIZE	256
+#define DEWB_HTTP_HEADER_SIZE	1024
 #define DEWB_URL_SIZE		64
 
 #define DEWB_XMIT_BUFFER_SIZE	(DEWB_HTTP_HEADER_SIZE + DEV_SECTORSIZE)
 
-#define DEWB_DEBUG
+//#define DEWB_DEBUG
 #ifdef DEWB_DEBUG
 #undef DEWB_DEBUG
 #define DEWB_DEBUG(fmt, a...) \

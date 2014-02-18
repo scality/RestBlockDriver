@@ -391,6 +391,7 @@ int dewb_cdmi_putrange(struct dewb_cdmi_desc_s *desc, char *buff,
 
 	ret = sock_xmit(desc, 1, desc->xmit_buff, header_size + size, 0);
 	if (ret != (header_size + size)) {
+		DEWB_ERROR("Unable to send data ret = %d", ret);
 		ret = -EIO;
 		goto out;
 	}
@@ -408,6 +409,7 @@ int dewb_cdmi_putrange(struct dewb_cdmi_desc_s *desc, char *buff,
 	}
 
 	if (strcmp(desc->xmit_buff, "HTTP/1.1 204 No Content")) {
+		DEWB_ERROR("Unable to get back HTTP confirmation buffer");
 		ret = -EIO;
 		goto out;
 	}
@@ -467,7 +469,7 @@ int dewb_cdmi_getrange(struct dewb_cdmi_desc_s *desc, char *buff,
 	if (len < size) {
 		DEWB_DEBUG("Have to read more [read=%d, toread=%d]\n",
 			len, size - len);
-		ret = sock_xmit(desc, 0, xmit_buff + rcv, size - len, 0);
+		ret = sock_xmit(desc, 0, desc->xmit_buff + rcv, size - len, 0);
 		if (ret < 0)
 			return -EIO;
 
