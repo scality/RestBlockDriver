@@ -13,7 +13,7 @@
 
 #include <linux/module.h>    // included for all kernel modules
 #include <linux/kernel.h>    // included for KERN_INFO
-#include <linux/init.h>        // included for __init and __exit macros
+#include <linux/init.h>      // included for __init and __exit macros
 #include <linux/device.h>
 #include <linux/spinlock.h>
 #include <linux/wait.h>
@@ -22,39 +22,13 @@
 #include <linux/blkdev.h>
 #include <linux/slab.h>
 #include <linux/kthread.h>
+#include <linux/blkdev.h>
 
 #include "dewb.h"
 
 MODULE_LICENSE("GPL");
 
-typedef struct dewb_device_s {
-
-	/* Device subsystem related data */
-	int			id;		/* device ID */
-	int			major;		/* blkdev assigned major */
-	char			name[32];	/* blkdev name, e.g. dewba */
-	struct gendisk		*disk;
-	uint64_t		disk_size;
-
-	struct request_queue	*q;
-	spinlock_t		rq_lock;	/* request queue lock */
-
-	struct task_struct	*thread; 
-	/* 
-	** List of requests received by the drivers, but still to be
-	** processed. This due to network latency.
-	*/
-	spinlock_t		waiting_lock;	/* request queue lock */
-	wait_queue_head_t	waiting_wq;
-	struct list_head	waiting_queue; /* Requests to be sent */
-	
-	/* Dewpoint specific data */
-	struct dewb_cdmi_desc_s cdmi_desc;
-	
-} dewb_device_t;
-
 static dewb_device_t	devtab[DEV_MAX];
-static int		allocated_devices = 0;
 static DEFINE_SPINLOCK(devtab_lock);
 
 static const struct block_device_operations dewb_fops =
@@ -75,16 +49,16 @@ static void dewb_xmit_range(struct dewb_device_s *dev, char *buf,
 	}
 
 	if (size != 4096)
-		DEWB_INFO("Wrote size of %lu", size);
+		DEWB_DEBUG("Wrote size of %lu", size);
 
 	if (write) {
-		dewb_cdmi_putrange(&dev->cdmi_desc, 
+		dewb_cdmi_putrange(dev, 
 				buf,
 				range_start, 
 				size);
 	}
 	else {
-		dewb_cdmi_getrange(&dev->cdmi_desc,
+		dewb_cdmi_getrange(dev,
 				buf,
 				range_start, 
 				size);
@@ -103,9 +77,10 @@ static int dewb_xfer_bio(struct dewb_device_s *dev, struct bio *bio)
 	*/
 	if (bio->bi_rw & REQ_FLUSH) {
 		DEWB_DEBUG("[Flush(REG_FLUSH)]");
-		dewb_cdmi_flush(&dev->cdmi_desc, dev->disk_size);
+		dewb_cdmi_flush(dev, dev->disk_size);
 	}
 
+	
 	bio_for_each_segment(bvec, bio, i) {
 		char *buffer = kmap(bvec->bv_page);
 		unsigned int nbsect = bvec->bv_len / 512UL;
@@ -128,7 +103,7 @@ static int dewb_xfer_bio(struct dewb_device_s *dev, struct bio *bio)
 	*/
 	if (bio->bi_rw & REQ_FUA) {
 		DEWB_DEBUG("[Flush(REG_FUA)]");
-		dewb_cdmi_flush(&dev->cdmi_desc, dev->disk_size);
+		dewb_cdmi_flush(dev, dev->disk_size);
 	}
 
 	return 0;
@@ -157,10 +132,15 @@ static int dewb_thread(void *data)
 				queuelist);
 		list_del_init(&req->queuelist);
 		spin_unlock_irqrestore(&dev->waiting_lock, flags);
-
+		
+		DEWB_DEBUG("NEW REQUEST");
 		__rq_for_each_bio(bio, req) {
+			DEWB_DEBUG("New bio sector:%lu", bio->bi_sector);
 			dewb_xfer_bio(dev, bio);
+			DEWB_DEBUG("End bio sector:%lu", bio->bi_sector);
+
 		}
+		DEWB_DEBUG("END REQUEST");
 		
 		/* No IO error testing for the moment */
 		blk_end_request_all(req, 0);
@@ -215,22 +195,25 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 		put_disk(disk);
 		return -ENOMEM;
 	}
-	q->queuedata	= dev;
 
+	//blk_queue_max_hw_sectors(q, DEV_SECTORSIZE / 512ULL);
+	q->queuedata	= dev;
+	
 	dev->disk	= disk;
 	dev->q		= disk->queue = q;
 
 	blk_queue_flush(q, REQ_FLUSH | REQ_FUA);
 	
-	if ((ret = dewb_cdmi_connect(&dev->cdmi_desc))) {
+	if ((ret = dewb_cdmi_connect(dev))) {
 		DEWB_ERROR("Unable to connect to CDMI endpoint : %d", ret);
 		put_disk(disk);
 		return -EIO;
 	}
 
-	ret = dewb_cdmi_getsize(&dev->cdmi_desc, &dev->disk_size);
+	ret = dewb_cdmi_getsize(dev, &dev->disk_size);
 
 	set_capacity(disk, dev->disk_size / 512ULL);
+	
 
 	dev->thread = kthread_create(dewb_thread, dev, "%s", 
 				dev->disk->disk_name);
@@ -250,74 +233,142 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 
 	return 0;
 }
+#define device_free_slot(X) ((X)->name[0] == 0)
 
-/********************************************************************
- * /sys/class/dewp/
- *                   add	Create a new dewp device
- *                   remove	Remove the last created device
- *******************************************************************/
 
-static struct class *class_dewp;		/* /sys/class/dewp */
-
-static void class_dewp_release(struct class *cls)
+/* This function gets the next free slot in device tab (devtab)
+** and sets its name and id.
+** Note : all the remaining fields states are undefived, it is
+** the caller responsability to set them.
+*/
+static dewb_device_t *dewb_device_new(void)
 {
-	kfree(cls);
+	dewb_device_t *dev = NULL;
+	int i;
+
+	/* Lock table to protect against concurrent devices
+	 * creation */
+	spin_lock(&devtab_lock);
+
+	/* find next empty slot in tab */
+	for (i = 0; i < DEV_MAX; i++)
+		if (device_free_slot(&devtab[i])) {
+			dev = &devtab[i];
+			break;
+		}
+	
+	/* If no room left, return NULL*/
+	if (!dev)
+		goto out;
+
+	dev->id = i;
+	sprintf(dev->name, DEV_NAME "%c", (char)(i + 'a'));
+
+out:
+	spin_unlock(&devtab_lock);
+	return dev;
 }
 
-
-static ssize_t class_dewp_add(struct class *c,
-			struct class_attribute *attr,
-			const char *buf, size_t count)
+/* This helper marks the given device slot as empty 
+** CAUTION: the devab lock must be held 
+*/
+static void __dewb_device_free(dewb_device_t *dev)
 {
+	dev->name[0] = 0;
+}
+
+static void dewb_device_free(dewb_device_t *dev)
+{
+	spin_lock(&devtab_lock);
+	__dewb_device_free(dev);
+	spin_unlock(&devtab_lock);
+}
+
+static int __dewb_device_remove(dewb_device_t *dev)
+{
+
+	if (device_free_slot(dev)) {
+		DEWB_ERROR("Unable to remove: aldready freed");
+		return -EINVAL;
+	}
+
+	if (!dev->disk)
+		return -EINVAL;
+	
+	DEWB_INFO("%s: Removing", dev->disk->disk_name);
+	
+	kthread_stop(dev->thread);
+
+	if (dev->disk->flags & GENHD_FL_UP)
+		del_gendisk(dev->disk);
+
+	if (dev->disk->queue)
+		blk_cleanup_queue(dev->disk->queue);
+
+	put_disk(dev->disk);
+	
+	/* Remove device */
+	unregister_blkdev(dev->major, dev->name);
+
+	/* Mark slot as empty */
+	__dewb_device_free(dev);
+
+	return 0;
+}
+
+int dewb_device_remove(dewb_device_t *dev)
+{
+	int ret;
+
+	spin_lock(&devtab_lock);	
+
+	ret = __dewb_device_remove(dev);
+
+	spin_unlock(&devtab_lock);
+
+	return ret;	
+}
+
+int dewb_device_remove_by_id(int dev_id)
+{
+	dewb_device_t *dev;
+	int ret;
+
+	spin_lock(&devtab_lock);
+
+	dev = &devtab[dev_id];
+	ret = __dewb_device_remove(dev);
+
+	spin_unlock(&devtab_lock);
+
+	return ret;
+}
+
+int dewb_device_add(char *url)
+{
+	dewb_device_t *dev;
 	ssize_t rc;
 	int irc;
-	int dev_id;
-	dewb_device_t *dev;
-	char url[DEWB_URL_SIZE + 1];
 
-	/* Get module reference */
-	if (!try_module_get(THIS_MODULE))
-		return -ENODEV;
-
-	/* Sanity check URL size */
-	if ((count == 0) || (count > DEWB_URL_SIZE)) {
-		rc=  -ENOMEM;
-		goto err_out_mod;
-	}
-	
-	memcpy(url, buf, count);
-	if (url[count - 1] == '\n')
-		url[count - 1] = 0;
-	else
-		url[count] = 0;
-	
 	/* Allocate dev structure */
-	spin_lock(&devtab_lock);
-	if (allocated_devices == DEV_MAX) {
+	dev = dewb_device_new();
+	if (!dev) {
 		rc=  -ENOMEM;
 		goto err_out_mod;
 	}
 
-	dev_id   = allocated_devices;
-	dev	 = &devtab[allocated_devices];
-	allocated_devices++;
-	dev->id  = dev_id;
+	dev->debug = DEWB_DEBUG_LEVEL;
 	init_waitqueue_head(&dev->waiting_wq);
 	INIT_LIST_HEAD(&dev->waiting_queue);
 	spin_lock_init(&dev->waiting_lock);
 
-	spin_unlock(&devtab_lock);
-
 	/* Parse add command */
-	if (dewb_cdmi_init(&dev->cdmi_desc, url)) {
+	if (dewb_cdmi_init(dev, url)) {
 		DEWB_ERROR("Invalid URL : %s", url);
 		rc = -EINVAL;
 		goto err_out_dev;
 	}
 		
-	/* initialize rest of new object */
-	sprintf(dev->name, DEV_NAME "%c", (char)(dev_id + 'a'));
-	
 	irc = register_blkdev(0, dev->name);
 	if (irc < 0) {
 		rc = irc;
@@ -329,94 +380,19 @@ static ssize_t class_dewp_add(struct class *c,
 	rc = dewb_init_disk(dev);
 	if (rc < 0)
 		goto err_out_unregister;
-	DEWB_DEBUG("Added device %s (major:%d)", dev->name, dev->major);
 
-	return count;
+	dewb_sysfs_device_init(dev);
+	
+	DEWB_DEBUG("Added device (major:%d)", dev->major);
+
+	return rc;
 err_out_unregister:
 	unregister_blkdev(dev->major, dev->name);
 err_out_dev:
-	allocated_devices--;
+	dewb_device_free(dev);
 err_out_mod:
-	DEWB_DEBUG("Error adding device %s", buf);
-	module_put(THIS_MODULE);
+	DEWB_ERROR("Error adding device %s", url);
 	return rc;
-}
-
-static ssize_t class_dewp_remove(struct class *c,
-				struct class_attribute *attr,
-				const char *buf,
-				size_t count)
-{
-	dewb_device_t *dev;
-	int dev_id = allocated_devices - 1;
-
-	spin_lock(&devtab_lock);
-	if (allocated_devices == 0)
-		goto out;
-
-	allocated_devices--;
-
-	dev = &devtab[dev_id];
-
-	if (!dev->disk)
-		return count;
-	
-	kthread_stop(dev->thread);
-
-	if (dev->disk->flags & GENHD_FL_UP)
-		del_gendisk(dev->disk);
-
-	if (dev->disk->queue)
-		blk_cleanup_queue(dev->disk->queue);
-
-	DEWB_INFO("%s: Removing",
-		dev->disk->disk_name);
-
-	put_disk(dev->disk);
-	
-	/* Remove device */
-	unregister_blkdev(dev->major, dev->name);
-
-	/* release module ref */
-	module_put(THIS_MODULE);
-
-out:
-	spin_unlock(&devtab_lock);
-	return count;
-}
-
-static struct class_attribute class_dewp_attrs[] = {
-	__ATTR(add,	0200, NULL, class_dewp_add),
-	__ATTR(remove,	0200, NULL, class_dewp_remove),
-	__ATTR_NULL
-};
-
-static int dewp_sysfs_init(void)
-{
-	int ret = 0;
-
-	/*
-	 * create control files in sysfs
-	 * /sys/class/dewp/...
-	 */
-	class_dewp = kzalloc(sizeof(*class_dewp), GFP_KERNEL);
-	if (!class_dewp)
-		return -ENOMEM;
-
-	class_dewp->name	  = DEV_NAME;
-	class_dewp->owner         = THIS_MODULE;
-	class_dewp->class_release = class_dewp_release;
-	class_dewp->class_attrs   = class_dewp_attrs;
-
-	ret = class_register(class_dewp);
-	if (ret) {
-		kfree(class_dewp);
-		class_dewp = NULL;
-		DEWB_ERROR("failed to create class dewp");
-		return ret;
-	}
-
-	return 0;
 }
 
 static int __init dewblock_init(void)
@@ -424,7 +400,11 @@ static int __init dewblock_init(void)
 	int rc;
 	
 	DEWB_INFO("Installing dewblock module");
-	rc = dewp_sysfs_init();
+
+	/* Zeroing device tab */
+	memset(devtab, 0, sizeof(devtab));
+
+	rc = dewb_sysfs_init();
 	if (rc)
 		return rc;
 	
@@ -433,11 +413,10 @@ static int __init dewblock_init(void)
  
 static void __exit dewblock_cleanup(void)
 {
-	DEWB_INFO("Cleaning up module");
+	DEWB_INFO("Cleaning up module");	
+	dewb_sysfs_cleanup();
 
-	if (class_dewp)
-		class_destroy(class_dewp);
-	class_dewp = NULL;
+	return ;
 }
 
 module_init(dewblock_init);

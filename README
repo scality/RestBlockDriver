@@ -10,13 +10,6 @@ Le fichier à utiliser doit exister sur le serveur dewpoint
 Pour le créer:
 # truncate /mnt/fuse/0/myfile --size 50M
 
-Le serveur apache doit être configuré avec la socket à keepalive 
-Rajouter dans apache2.conf
------------------------
-KeepAliveTimeout  3600
-MaxKeepAliveRequests 0
-----------------------
-
 Installation du driver
 ----------------------
 
@@ -36,8 +29,10 @@ Et ainsi de suite ...
 Suppression d'un device
 -----------------------
 
-Le dernier device monté peut être supprimé par la commande suivante:
-# echo "1" > /sys/class/dewb/remove
+Un device créé à l'étape précédente peut être supprimé par la commande
+suivante: 
+# echo "device" > /sys/class/dewb/remove
+device peut être par exemple dewba, dewbb, dewbc ...
 
 Partitionnement d'un device
 ---------------------------
@@ -52,11 +47,36 @@ Une fois partitionné, les fichiers associés dans /dev sont créés par ex
 * /dev/dewba2
 Et ainsi de suite ...
 
+Interface sysfs
+---------------
 
-Reste à faore:
-* Mise en conformité interface /sys
+Pour chaque device, une entrée est créée dans /sys/block
+* /sys/block/dewba pour le device dewba
+* /sys/block/dewbb pour le device dewbb
+Et ainsi de suite
+
+
+Traces de debug
+---------------
+
+Il est possible d'activer/désactiver les traces de debug avec la commande suivante:
+
+Activer:
+# echo 1 > /sys/dewb?/dewb_debug
+Désactiver:
+# echo 0 > /sys/dewb?/dewb_debug
+
+Lire les informations relatives au device
+-----------------------------------------
+
+L'URL CDMI associée:
+# cat /sys/dewb?/dewb_urls
+La taille du disque:
+# cat /sys/dewb?/dewb_size
+
+Reste à faire:
+
 * Tolérance aux pannes quand plus de serveur (reset ou timeout).
-* Tolérance de panne sur socket sans keepalive.
 * Optimiser la taille des secteurs.
 * Mettre le device en non rotational
 * Support de DKMS
