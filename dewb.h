@@ -72,6 +72,8 @@ typedef struct dewb_device_s {
 	char			name[32];	/* blkdev name, e.g. dewba */
 	struct gendisk		*disk;
 	uint64_t		disk_size;	/* Size in bytes */
+	int			users;		/* Number of users who
+						 * opened dev*/
 
 	struct request_queue	*q;
 	spinlock_t		rq_lock;	/* request queue lock */

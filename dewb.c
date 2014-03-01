@@ -31,11 +31,6 @@ MODULE_LICENSE("GPL");
 static dewb_device_t	devtab[DEV_MAX];
 static DEFINE_SPINLOCK(devtab_lock);
 
-static const struct block_device_operations dewb_fops =
-{
-	.owner =	THIS_MODULE,
-};
-
 /*
  * Handle an I/O request.
  */
@@ -172,6 +167,39 @@ static void dewb_rq_fn(struct request_queue *q)
 	}
 }
 
+static int dewb_open(struct block_device *bdev, fmode_t mode)
+{
+	dewb_device_t *dev = bdev->bd_disk->private_data;
+
+	spin_lock(&devtab_lock);
+
+	dev->users++;
+
+	spin_unlock(&devtab_lock);
+
+	return 0;
+}
+
+static int dewb_release(struct gendisk *disk, fmode_t mode)
+{
+	dewb_device_t *dev = disk->private_data;
+
+	spin_lock(&devtab_lock);
+
+	dev->users--;
+
+	spin_unlock(&devtab_lock);
+
+	return 0;
+}
+
+static const struct block_device_operations dewb_fops =
+{
+	.owner   =	THIS_MODULE,
+	.open    =	dewb_open,
+	.release =	dewb_release,
+};
+
 static int dewb_init_disk(struct dewb_device_s *dev)
 {
 	struct gendisk *disk;
@@ -262,6 +290,8 @@ static dewb_device_t *dewb_device_new(void)
 		goto out;
 
 	dev->id = i;
+	dev->debug = DEWB_DEBUG_LEVEL;
+	dev->users = 0;
 	sprintf(dev->name, DEV_NAME "%c", (char)(i + 'a'));
 
 out:
@@ -286,7 +316,11 @@ static void dewb_device_free(dewb_device_t *dev)
 
 static int __dewb_device_remove(dewb_device_t *dev)
 {
-
+	if (dev->users) {
+		DEWB_ERROR("%s: Unable to remove, device still opened", dev->name);
+		return -EBUSY;
+	}
+		
 	if (device_free_slot(dev)) {
 		DEWB_ERROR("Unable to remove: aldready freed");
 		return -EINVAL;
@@ -357,7 +391,6 @@ int dewb_device_add(char *url)
 		goto err_out_mod;
 	}
 
-	dev->debug = DEWB_DEBUG_LEVEL;
 	init_waitqueue_head(&dev->waiting_wq);
 	INIT_LIST_HEAD(&dev->waiting_queue);
 	spin_lock_init(&dev->waiting_lock);
