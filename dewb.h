@@ -34,6 +34,8 @@
 
 #define DEWB_XMIT_BUFFER_SIZE	(DEWB_HTTP_HEADER_SIZE + DEV_SECTORSIZE)
 
+#define DEWB_THREAD_POOL_SIZE	8
+
 #define DEWB_DEBUG(fmt, a...) \
 	do { if (dev->debug)  \
               printk(KERN_NOTICE "%s @%s:%d: " fmt "\n" ,       \
@@ -78,7 +80,11 @@ typedef struct dewb_device_s {
 	struct request_queue	*q;
 	spinlock_t		rq_lock;	/* request queue lock */
 
-	struct task_struct	*thread;
+	struct task_struct	*thread[DEWB_THREAD_POOL_SIZE];
+
+	/* Dewpoint specific data */
+	struct dewb_cdmi_desc_s	thread_cdmi_desc[DEWB_THREAD_POOL_SIZE];
+
 	/* 
 	** List of requests received by the drivers, but still to be
 	** processed. This due to network latency.
@@ -89,9 +95,6 @@ typedef struct dewb_device_s {
 
 	/* Debug traces */
 	int			debug;
-	
-	/* Dewpoint specific data */
-	struct dewb_cdmi_desc_s cdmi_desc;
 	
 } dewb_device_t;
 
@@ -106,16 +109,20 @@ void dewb_sysfs_device_init(dewb_device_t *dev);
 void dewb_sysfs_cleanup(void);
 
 /* dewb_cdmi.c */
-int dewb_cdmi_init(dewb_device_t *dev, const char *url);
-int dewb_cdmi_connect(dewb_device_t *dev);
-int dewb_cdmi_disconnect(dewb_device_t *dev);
+int dewb_cdmi_init(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc,
+		const char *url);
+int dewb_cdmi_connect(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc);
+int dewb_cdmi_disconnect(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc);
 int dewb_cdmi_getsize(dewb_device_t *dev, uint64_t *size);
-int dewb_cdmi_getrange(dewb_device_t *dev, char *buff,
-		uint64_t offset, int size);
 
-int dewb_cdmi_putrange(dewb_device_t *dev, char *buff,
-		uint64_t offset, int size);
-int dewb_cdmi_flush(dewb_device_t *dev, unsigned long size);
+int dewb_cdmi_getrange(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc,
+		char *buff, uint64_t offset, int size);
+
+int dewb_cdmi_putrange(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc,
+		char *buff, uint64_t offset, int size);
+
+int dewb_cdmi_flush(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc, 
+		unsigned long flush_size);
 
 /* dewb_http.c */
 int dewb_http_mkhead(char *buff, int len, char *host, char *page);

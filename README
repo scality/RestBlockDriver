@@ -80,3 +80,4 @@ Reste à faire:
 * Optimiser la taille des secteurs.
 * Mettre le device en non rotational
 * Support de DKMS
+* Rollback si pas de connexions 

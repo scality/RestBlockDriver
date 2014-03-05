@@ -29,12 +29,15 @@
 MODULE_LICENSE("GPL");
 
 static dewb_device_t	devtab[DEV_MAX];
+static int		nb_threads = 0;
 static DEFINE_SPINLOCK(devtab_lock);
 
 /*
  * Handle an I/O request.
  */
-static void dewb_xmit_range(struct dewb_device_s *dev, char *buf, 
+static void dewb_xmit_range(struct dewb_device_s *dev, 
+			struct dewb_cdmi_desc_s *desc,
+			char *buf, 
 			unsigned long range_start, unsigned long size, int write)
 
 {
@@ -47,20 +50,24 @@ static void dewb_xmit_range(struct dewb_device_s *dev, char *buf,
 		DEWB_DEBUG("Wrote size of %lu", size);
 
 	if (write) {
-		dewb_cdmi_putrange(dev, 
+		dewb_cdmi_putrange(dev,
+				desc,
 				buf,
 				range_start, 
 				size);
 	}
 	else {
 		dewb_cdmi_getrange(dev,
+				desc,
 				buf,
 				range_start, 
 				size);
 	}
 }
 
-static int dewb_xfer_bio(struct dewb_device_s *dev, struct bio *bio)
+static int dewb_xfer_bio(struct dewb_device_s *dev, 
+			struct dewb_cdmi_desc_s *desc,
+			struct bio *bio)
 {
 	int i;
 	struct bio_vec *bvec;
@@ -72,7 +79,7 @@ static int dewb_xfer_bio(struct dewb_device_s *dev, struct bio *bio)
 	*/
 	if (bio->bi_rw & REQ_FLUSH) {
 		DEWB_DEBUG("[Flush(REG_FLUSH)]");
-		dewb_cdmi_flush(dev, dev->disk_size);
+		dewb_cdmi_flush(dev, desc, dev->disk_size);
 	}
 
 	
@@ -84,7 +91,7 @@ static int dewb_xfer_bio(struct dewb_device_s *dev, struct bio *bio)
 			(unsigned long) sector, nbsect, 
 			bio_data_dir(bio) == WRITE);
 		
-		dewb_xmit_range(dev, buffer + bvec->bv_offset, 
+		dewb_xmit_range(dev, desc, buffer + bvec->bv_offset,
 				sector * 512UL, nbsect * 512UL,
 				bio_data_dir(bio) == WRITE);
 
@@ -98,7 +105,7 @@ static int dewb_xfer_bio(struct dewb_device_s *dev, struct bio *bio)
 	*/
 	if (bio->bi_rw & REQ_FUA) {
 		DEWB_DEBUG("[Flush(REG_FUA)]");
-		dewb_cdmi_flush(dev, dev->disk_size);
+		dewb_cdmi_flush(dev, desc, dev->disk_size);
 	}
 
 	return 0;
@@ -110,6 +117,13 @@ static int dewb_thread(void *data)
 	struct request *req;
 	unsigned long flags;
 	struct bio *bio;
+	int th_id;
+	
+	/* Init thread specific values */
+	spin_lock(&devtab_lock);
+	th_id = nb_threads;
+	nb_threads++;
+	spin_unlock(&devtab_lock);
 
 	set_user_nice(current, -20);
 	while (!kthread_should_stop() || !list_empty(&dev->waiting_queue)) {
@@ -118,24 +132,25 @@ static int dewb_thread(void *data)
 					kthread_should_stop() ||
 					!list_empty(&dev->waiting_queue));
 
-		/* extract request */
-		if (list_empty(&dev->waiting_queue))
-			continue;
-
 		spin_lock_irqsave(&dev->waiting_lock, flags);
+		/* extract request */
+		if (list_empty(&dev->waiting_queue)) {
+			spin_unlock_irqrestore(&dev->waiting_lock, flags);
+			continue;
+		}
 		req = list_entry(dev->waiting_queue.next, struct request,
 				queuelist);
 		list_del_init(&req->queuelist);
 		spin_unlock_irqrestore(&dev->waiting_lock, flags);
 		
-		DEWB_DEBUG("NEW REQUEST");
+		DEWB_DEBUG("NEW REQUEST [tid:%d]", th_id);
 		__rq_for_each_bio(bio, req) {
 			DEWB_DEBUG("New bio sector:%lu", bio->bi_sector);
-			dewb_xfer_bio(dev, bio);
+			dewb_xfer_bio(dev, &dev->thread_cdmi_desc[th_id], bio);
 			DEWB_DEBUG("End bio sector:%lu", bio->bi_sector);
 
 		}
-		DEWB_DEBUG("END REQUEST");
+		DEWB_DEBUG("END REQUEST [tid:%d]", th_id);
 		
 		/* No IO error testing for the moment */
 		blk_end_request_all(req, 0);
@@ -162,7 +177,7 @@ static void dewb_rq_fn(struct request_queue *q)
 		list_add_tail(&req->queuelist, &dev->waiting_queue);
 		spin_unlock_irqrestore(&dev->waiting_lock, flags);
 
-		wake_up(&dev->waiting_wq);
+		wake_up_nr(&dev->waiting_wq, 1);
 
 	}
 }
@@ -204,6 +219,7 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 {
 	struct gendisk *disk;
 	struct request_queue *q;
+	int i;
 	int ret;
 
 	/* create gendisk info */
@@ -232,28 +248,34 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 
 	blk_queue_flush(q, REQ_FLUSH | REQ_FUA);
 	
-	if ((ret = dewb_cdmi_connect(dev))) {
-		DEWB_ERROR("Unable to connect to CDMI endpoint : %d", ret);
-		put_disk(disk);
-		return -EIO;
-	}
+	for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++) {
 
+		if ((ret = dewb_cdmi_connect(dev, &dev->thread_cdmi_desc[i]))) {
+			DEWB_ERROR("Unable to connect to CDMI endpoint : %d",
+				ret);
+			put_disk(disk);
+			return -EIO;
+		}
+
+	}
+	/* Caution: be sure to call this before spawning threads */
 	ret = dewb_cdmi_getsize(dev, &dev->disk_size);
 
 	set_capacity(disk, dev->disk_size / 512ULL);
-	
 
-	dev->thread = kthread_create(dewb_thread, dev, "%s", 
-				dev->disk->disk_name);
+	for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++) {
+		
+		dev->thread[i] = kthread_create(dewb_thread, dev, "%s", 
+						dev->disk->disk_name);
+		
+		if (IS_ERR(dev->thread[i])) {
+			DEWB_ERROR("Unable to create worker thread");
+			put_disk(disk);
+			return -EIO;
+		}
+		wake_up_process(dev->thread[i]);
 
-	wake_up_process(dev->thread);
-	
-	if (IS_ERR(dev->thread)) {
-		DEWB_ERROR("Unable to create worker thread");
-		put_disk(disk);
-		return -EIO;
 	}
-
 	add_disk(disk);
 
 	DEWB_INFO("%s: Added of size 0x%llx",
@@ -316,6 +338,8 @@ static void dewb_device_free(dewb_device_t *dev)
 
 static int __dewb_device_remove(dewb_device_t *dev)
 {
+	int i;
+
 	if (dev->users) {
 		DEWB_ERROR("%s: Unable to remove, device still opened", dev->name);
 		return -EBUSY;
@@ -331,7 +355,8 @@ static int __dewb_device_remove(dewb_device_t *dev)
 	
 	DEWB_INFO("%s: Removing", dev->disk->disk_name);
 	
-	kthread_stop(dev->thread);
+	for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++)
+		kthread_stop(dev->thread[i]);
 
 	if (dev->disk->flags & GENHD_FL_UP)
 		del_gendisk(dev->disk);
@@ -383,6 +408,7 @@ int dewb_device_add(char *url)
 	dewb_device_t *dev;
 	ssize_t rc;
 	int irc;
+	int i;
 
 	/* Allocate dev structure */
 	dev = dewb_device_new();
@@ -396,12 +422,13 @@ int dewb_device_add(char *url)
 	spin_lock_init(&dev->waiting_lock);
 
 	/* Parse add command */
-	if (dewb_cdmi_init(dev, url)) {
-		DEWB_ERROR("Invalid URL : %s", url);
-		rc = -EINVAL;
-		goto err_out_dev;
+	for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++) {
+		if (dewb_cdmi_init(dev, &dev->thread_cdmi_desc[i], url)) {
+			DEWB_ERROR("Invalid URL : %s", url);
+			rc = -EINVAL;
+			goto err_out_dev;
+		}
 	}
-		
 	irc = register_blkdev(0, dev->name);
 	if (irc < 0) {
 		rc = irc;

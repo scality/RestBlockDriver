@@ -38,7 +38,7 @@ static ssize_t attr_urls_show(struct device *dv,
 	struct gendisk *disk	  = dev_to_disk(dv);
 	struct dewb_device_s *dev = disk->private_data;
 	
-	snprintf(buff, PAGE_SIZE, "%s\n", dev->cdmi_desc.url);
+	snprintf(buff, PAGE_SIZE, "%s\n", dev->thread_cdmi_desc[0].url);
 
 	return strlen(buff);
 }
@@ -120,7 +120,7 @@ static ssize_t class_dewb_remove(struct class *c,
 	/* dewba\0\n */
 	if (count < 6) {
 		DEWB_ERROR("Unable to remove :unknown device");
-		return count;
+		return -EINVAL;
 	}
 
 	/* Determine device ID to remove */
@@ -128,7 +128,7 @@ static ssize_t class_dewb_remove(struct class *c,
 	if ((dev_id < 0) || (dev_id >= DEV_MAX)) {
 
 		DEWB_ERROR("Unable to remove: unknown device dewb%c ", buf[4]);
-		return count;
+		return -EINVAL;
 	}	
 
 	ret = dewb_device_remove_by_id(dev_id);
