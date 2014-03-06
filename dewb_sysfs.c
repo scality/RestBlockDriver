@@ -32,6 +32,18 @@ static ssize_t attr_debug_store(struct device *dv,
 	return count;
 }
 
+static ssize_t attr_debug_show(struct device *dv, 
+			struct device_attribute *attr, char *buff)
+{
+	struct gendisk *disk	  = dev_to_disk(dv);
+	struct dewb_device_s *dev = disk->private_data;
+	
+	snprintf(buff, PAGE_SIZE, "%d\n", dev->debug);
+
+	return strlen(buff);	
+}
+
+
 static ssize_t attr_urls_show(struct device *dv, 
 			struct device_attribute *attr, char *buff)
 {
@@ -54,8 +66,7 @@ static ssize_t attr_disk_size_show(struct device *dv,
 	return strlen(buff);
 }
 
-
-static DEVICE_ATTR(dewb_debug, S_IWUSR | S_IRUGO, NULL, &attr_debug_store);
+static DEVICE_ATTR(dewb_debug, S_IWUSR | S_IRUGO, &attr_debug_show, &attr_debug_store);
 static DEVICE_ATTR(dewb_urls, S_IWUSR | S_IRUGO, &attr_urls_show, NULL);
 static DEVICE_ATTR(dewb_size, S_IWUSR | S_IRUGO, &attr_disk_size_show, NULL);
 

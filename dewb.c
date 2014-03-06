@@ -247,7 +247,8 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	dev->q		= disk->queue = q;
 
 	blk_queue_flush(q, REQ_FLUSH | REQ_FUA);
-	
+	blk_queue_max_segments(q, 1);
+
 	for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++) {
 
 		if ((ret = dewb_cdmi_connect(dev, &dev->thread_cdmi_desc[i]))) {
