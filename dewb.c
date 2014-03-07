@@ -29,12 +29,12 @@
 MODULE_LICENSE("GPL");
 
 static dewb_device_t	devtab[DEV_MAX];
-static int		nb_threads = 0;
 static DEFINE_SPINLOCK(devtab_lock);
 
 /*
  * Handle an I/O request.
  */
+#if 0
 static void dewb_xmit_range(struct dewb_device_s *dev, 
 			struct dewb_cdmi_desc_s *desc,
 			char *buf, 
@@ -52,7 +52,7 @@ static void dewb_xmit_range(struct dewb_device_s *dev,
 	if (write) {
 		dewb_cdmi_putrange(dev,
 				desc,
-				buf,
+
 				range_start, 
 				size);
 	}
@@ -64,7 +64,6 @@ static void dewb_xmit_range(struct dewb_device_s *dev,
 				size);
 	}
 }
-
 static int dewb_xfer_bio(struct dewb_device_s *dev, 
 			struct dewb_cdmi_desc_s *desc,
 			struct bio *bio)
@@ -110,6 +109,28 @@ static int dewb_xfer_bio(struct dewb_device_s *dev,
 
 	return 0;
 }
+#endif 
+
+void dewb_xfer_scl(struct dewb_device_s *dev, 
+		struct dewb_cdmi_desc_s *desc, 
+		struct request *req)
+{
+
+	int ret;
+	if (rq_data_dir(req) == WRITE) {
+		ret = dewb_cdmi_putrange(dev, desc,
+					blk_rq_pos(req) * 512ULL, 
+					blk_rq_sectors(req) * 512ULL);
+	}
+	else {
+		ret = dewb_cdmi_getrange(dev, desc,
+					blk_rq_pos(req) * 512ULL, 
+					blk_rq_sectors(req) * 512ULL);
+	}
+	if (ret)
+		DEWB_ERROR("IO failed: %d", ret);
+	
+}
 
 static int dewb_thread(void *data)
 {
@@ -121,8 +142,8 @@ static int dewb_thread(void *data)
 	
 	/* Init thread specific values */
 	spin_lock(&devtab_lock);
-	th_id = nb_threads;
-	nb_threads++;
+	th_id = dev->nb_threads;
+	dev->nb_threads++;
 	spin_unlock(&devtab_lock);
 
 	set_user_nice(current, -20);
@@ -143,13 +164,25 @@ static int dewb_thread(void *data)
 		list_del_init(&req->queuelist);
 		spin_unlock_irqrestore(&dev->waiting_lock, flags);
 		
-		DEWB_DEBUG("NEW REQUEST [tid:%d]", th_id);
-		__rq_for_each_bio(bio, req) {
-			DEWB_DEBUG("New bio sector:%lu", bio->bi_sector);
-			dewb_xfer_bio(dev, &dev->thread_cdmi_desc[th_id], bio);
-			DEWB_DEBUG("End bio sector:%lu", bio->bi_sector);
+		if (blk_rq_sectors(req) == 0)
+			continue;
 
-		}
+		DEWB_DEBUG("NEW REQUEST [tid:%d]", th_id);
+		/* Create scatterlist */
+		sg_init_table(dev->thread_cdmi_desc[th_id].sgl, DEV_NB_PHYS_SEGS);
+	        dev->thread_cdmi_desc[th_id].sgl_size = 
+			blk_rq_map_sg(dev->q, req, 
+				dev->thread_cdmi_desc[th_id].sgl);
+
+		DEWB_DEBUG("Scatterlist size = %d", 
+			dev->thread_cdmi_desc[th_id].sgl_size);
+
+		DEWB_DEBUG("[sector = %lu, nr_sectors=%u w=%d]",
+			blk_rq_pos(req), blk_rq_sectors(req),
+			rq_data_dir(req) == WRITE);
+
+		/* Call scatter function */
+		dewb_xfer_scl(dev, &dev->thread_cdmi_desc[th_id], req);
 		DEWB_DEBUG("END REQUEST [tid:%d]", th_id);
 		
 		/* No IO error testing for the moment */
@@ -240,14 +273,14 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 		return -ENOMEM;
 	}
 
-	//blk_queue_max_hw_sectors(q, DEV_SECTORSIZE / 512ULL);
+	blk_queue_max_hw_sectors(q, DEV_NB_PHYS_SEGS);
 	q->queuedata	= dev;
 	
 	dev->disk	= disk;
 	dev->q		= disk->queue = q;
-
-	blk_queue_flush(q, REQ_FLUSH | REQ_FUA);
-	blk_queue_max_segments(q, 1);
+	dev->nb_threads = 0;
+	//blk_queue_flush(q, REQ_FLUSH | REQ_FUA);
+	///blk_queue_max_phys_segments(q, DEV_NB_PHYS_SEGS);
 
 	for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++) {
 

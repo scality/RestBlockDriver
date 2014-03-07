@@ -6,7 +6,7 @@
 #include <linux/net.h>	     // for in_aton()
 #include <linux/in.h>
 #include <linux/net.h>
-
+#include <linux/scatterlist.h>
 #include <net/sock.h>
 /* Constants */
 
@@ -18,7 +18,8 @@
 #define DEV_MINORS		256
 #define DEV_DEFAULT_DISKSIZE	(50 * MB)
 #define DEV_MAX			16
-#define DEV_SECTORSIZE		8192
+#define DEV_SECTORSIZE		65535
+#define DEV_NB_PHYS_SEGS	64
 
 /* Dewpoint server related constants */
 #define DEWB_HTTP_HEADER_SIZE	1024
@@ -34,7 +35,7 @@
 
 #define DEWB_XMIT_BUFFER_SIZE	(DEWB_HTTP_HEADER_SIZE + DEV_SECTORSIZE)
 
-#define DEWB_THREAD_POOL_SIZE	8
+#define DEWB_THREAD_POOL_SIZE	1
 
 #define DEWB_DEBUG(fmt, a...) \
 	do { if (dev->debug)  \
@@ -61,6 +62,8 @@ struct dewb_cdmi_desc_s {
 	uint64_t		nb_requests; /* Number of HTTP
 					      * requests already sent
 					      * through this socket */ 
+	struct scatterlist	sgl[DEV_NB_PHYS_SEGS];
+	int			sgl_size;
 	struct socket		*socket;
 	struct sockaddr_in      sockaddr;
 };
@@ -81,6 +84,7 @@ typedef struct dewb_device_s {
 	spinlock_t		rq_lock;	/* request queue lock */
 
 	struct task_struct	*thread[DEWB_THREAD_POOL_SIZE];
+	int			nb_threads;
 
 	/* Dewpoint specific data */
 	struct dewb_cdmi_desc_s	thread_cdmi_desc[DEWB_THREAD_POOL_SIZE];
@@ -116,10 +120,10 @@ int dewb_cdmi_disconnect(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc);
 int dewb_cdmi_getsize(dewb_device_t *dev, uint64_t *size);
 
 int dewb_cdmi_getrange(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc,
-		char *buff, uint64_t offset, int size);
+		uint64_t offset, int size);
 
 int dewb_cdmi_putrange(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc,
-		char *buff, uint64_t offset, int size);
+		uint64_t offset, int size);
 
 int dewb_cdmi_flush(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc, 
 		unsigned long flush_size);

@@ -247,7 +247,7 @@ static int sock_xmit(dewb_device_t *dev,
 		} else
 			result = kernel_recvmsg(desc->socket, &msg, &iov, 1, size,
 						msg.msg_flags);
-
+		DEWB_DEBUG("Result = %d", result);
 		if (signal_pending(current)) {
 			siginfo_t info;
 			DEWB_INFO("nbd (pid %d: %s) got signal %d\n",
@@ -262,6 +262,7 @@ static int sock_xmit(dewb_device_t *dev,
 			break;
 
 		if (result == 0)  {
+			DEWB_DEBUG("HERE size was %d", size);
 			result = -EPIPE;
 			break;
 		}
@@ -327,6 +328,88 @@ xmit_again:
 
 	return ret;
 }
+
+static int sock_send_sglist_receive(dewb_device_t *dev,
+				struct dewb_cdmi_desc_s *desc,
+				int send_size, int rcv_size)
+{
+	char *buff = desc->xmit_buff;
+	int strict_rcv = (rcv_size) ? 1 : 0;
+	int i;
+	int ret;
+	if (rcv_size == 0)
+		rcv_size = DEWB_XMIT_BUFFER_SIZE;
+
+	/* Check if the connection needs to be restarted */
+	/* Reconnect the socket after a predefined number of HTTP
+	 * requests sent.
+	 */
+	if (desc->nb_requests == DEWB_REUSE_LIMIT) {
+		DEWB_DEBUG("Limit of %u requests reached reconnecting socket", DEWB_REUSE_LIMIT);
+		dewb_cdmi_disconnect(dev, desc);
+		ret = dewb_cdmi_connect(dev, desc);
+		if (ret) return ret;
+	}
+	else
+		desc->nb_requests++;
+
+	/* Send buffer */
+xmit_again:
+	ret = sock_xmit(dev, desc, 1, buff, send_size, 0);
+	if (ret == -EPIPE) {
+		dewb_cdmi_disconnect(dev, desc);
+		ret = dewb_cdmi_connect(dev, desc);
+		if (ret) return ret;
+		goto xmit_again;
+	}
+	if (ret != send_size)
+		return -EIO;
+
+
+	/* Now iterate through the sglist */
+	for (i = 0; i < desc->sgl_size; i++) {
+		char *buff = sg_virt(&desc->sgl[i]);
+		int length = desc->sgl[i].length;
+
+		ret = sock_xmit(dev, desc, 1, buff, length, 0);
+		if (ret == -EPIPE) {
+			dewb_cdmi_disconnect(dev, desc);
+			ret = dewb_cdmi_connect(dev, desc);
+			if (ret) return ret;
+			goto xmit_again;
+		}
+		if (ret != length) {
+			DEWB_ERROR("Unable to send all : %d instead of %d bytes",
+				ret, length);
+			return -EIO;
+		}
+	}
+	
+	ret = sock_xmit(dev, desc, 1, "\r\n", 2, 0);
+	if (ret == -EPIPE) {
+		dewb_cdmi_disconnect(dev, desc);
+		ret = dewb_cdmi_connect(dev, desc);
+		if (ret) return ret;
+		goto xmit_again;
+	}
+	if (ret != 2)
+		return -EIO;
+	
+
+	/* Receive response */
+	ret = sock_xmit(dev, desc, 0, buff, rcv_size, strict_rcv);
+	/* Is the connection to be reopened ? */
+	if (ret == -EPIPE) {
+		dewb_cdmi_disconnect(dev, desc);
+		ret = dewb_cdmi_connect(dev, desc);
+		if (ret) return ret;
+		goto xmit_again;
+	}
+
+	return ret;
+}
+
+
 
 int dewb_cdmi_flush(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc, 
 		unsigned long flush_size)
@@ -411,7 +494,7 @@ int dewb_cdmi_getsize(dewb_device_t *dev, uint64_t *size)
  */
 int dewb_cdmi_putrange(dewb_device_t *dev, 
 		struct dewb_cdmi_desc_s *desc,
-		char *buff, uint64_t offset, int size)
+		uint64_t offset, int size)
 {
 	char *xmit_buff = desc->xmit_buff;
 	int header_size;
@@ -432,21 +515,21 @@ int dewb_cdmi_putrange(dewb_device_t *dev,
 	xmit_buff += ret;
 	header_size = ret;
 
-	/* TODO: remove this memcpy and send directly the buffer */
-	memcpy(xmit_buff, buff, size);
-	xmit_buff += size;
-	memcpy(xmit_buff, "\r\n", 2);
+	len = sock_send_sglist_receive(dev, desc, header_size, 0);
+	if (len < 0) {
+		DEWB_ERROR("ERROR sending sglist: %d", len);
+		return len;
+	}
 
-	len = sock_send_receive(dev, desc, header_size + size, 0);
-	if (len < 0) return len;	
-
-	if (len > 255) {/* Shall not get more than that */
+	if (len > 512) {/* Shall not get more than that */
+		DEWB_ERROR("Incorrect response size: %d", len);
 		ret = -EIO;
 		goto out;
 	}
 
-	if (strcmp(desc->xmit_buff, "HTTP/1.1 204 No Content")) {
-		DEWB_ERROR("Unable to get back HTTP confirmation buffer");
+	if (strncmp(desc->xmit_buff, "HTTP/1.1 204 No Content",
+			strlen("HTTP/1.1 204 No Content"))) {
+			DEWB_ERROR("Unable to get back HTTP confirmation buffer");
 		ret = -EIO;
 		goto out;
 	}
@@ -463,12 +546,13 @@ out:
  */
 int dewb_cdmi_getrange(dewb_device_t *dev, 
 		struct dewb_cdmi_desc_s *desc,
-		char *buff, uint64_t offset, int size)
+		uint64_t offset, int size)
 {
 	char *xmit_buff = desc->xmit_buff;
 	int len, rcv;
 	int ret = -EIO;
 	uint64_t start, end;
+	int i;
 
 	/* Calculate start, end */
 	start = offset;
@@ -493,23 +577,31 @@ int dewb_cdmi_getrange(dewb_device_t *dev,
 	}
 
 	// More bytes may have to be read
-	if (len < size) {
-		DEWB_DEBUG("Have to read more [read=%d, toread=%d]\n",
+	while (len < size) {
+		DEWB_DEBUG("Have to read more [read=%d, toread=%d]",
 			len, size - len);
-		ret = sock_xmit(dev, desc, 0, desc->xmit_buff + rcv, size - len, 1);
-		if (ret < 0)
+		ret = sock_xmit(dev, desc, 0, desc->xmit_buff + rcv, size - len, 0);
+		if (ret < 0) {
+			DEWB_ERROR("ERROR sock xmit ret = %d", ret);
 			return -EIO;
-
+		}
 		len += ret;
+		rcv += ret;
 	}
 
 	if (len != size) {
-		DEWB_DEBUG("getrange: len: %d size:%d", len, size);
+		DEWB_DEBUG("getrange error: len: %d size:%d", len, size);
 		ret = -EIO;
 		goto out;
 	}
 
-	memcpy(buff, xmit_buff, size);
+	for (i = 0; i < desc->sgl_size; i++) {
+		char *buff = sg_virt(&desc->sgl[i]);
+		int length = desc->sgl[i].length;
+
+		memcpy(buff, xmit_buff, length);
+		xmit_buff += length;
+	}
 	ret = 0;
 out:
 	return ret;
