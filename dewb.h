@@ -18,8 +18,8 @@
 #define DEV_MINORS		256
 #define DEV_DEFAULT_DISKSIZE	(50 * MB)
 #define DEV_MAX			16
-#define DEV_SECTORSIZE		65535
-#define DEV_NB_PHYS_SEGS	64
+#define DEV_SECTORSIZE		1 * MB
+#define DEV_NB_PHYS_SEGS	512
 
 /* Dewpoint server related constants */
 #define DEWB_HTTP_HEADER_SIZE	1024
@@ -35,7 +35,7 @@
 
 #define DEWB_XMIT_BUFFER_SIZE	(DEWB_HTTP_HEADER_SIZE + DEV_SECTORSIZE)
 
-#define DEWB_THREAD_POOL_SIZE	1
+#define DEWB_THREAD_POOL_SIZE	8
 
 #define DEWB_DEBUG(fmt, a...) \
 	do { if (dev->debug)  \
