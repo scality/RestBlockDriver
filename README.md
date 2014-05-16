@@ -1,4 +1,4 @@
-CdmiBlockDriver
+RestBlockDriver
 ===============
 
-CdmiBlockDriver
+RestBlockDriver
