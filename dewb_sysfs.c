@@ -85,7 +85,21 @@ static void class_dewb_release(struct class *cls)
 	kfree(cls);
 }
 
-static ssize_t class_dewb_add(struct class *c,
+static ssize_t class_dewb_add_show(struct class *c, struct class_attribute *attr,
+                                   char *buf)
+{
+	(void)c;
+	(void)attr;
+
+	/* Get module reference */
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
+	snprintf(buf, PAGE_SIZE, "# Usage: echo URL > add\n");
+	return strlen(buf);
+}
+
+static ssize_t class_dewb_add_store(struct class *c,
 			struct class_attribute *attr,
 			const char *buf, size_t count)
 {
@@ -117,7 +131,21 @@ out:
 	return ret;
 }
 
-static ssize_t class_dewb_remove(struct class *c,
+static ssize_t class_dewb_remove_show(struct class *c, struct class_attribute *attr,
+                                      char *buf)
+{
+	(void)c;
+	(void)attr;
+
+	/* Get module reference */
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
+	snprintf(buf, PAGE_SIZE, "# Usage: echo URL > remove\n");
+	return strlen(buf);
+}
+
+static ssize_t class_dewb_remove_store(struct class *c,
 				struct class_attribute *attr,
 				const char *buf,
 				size_t count)
@@ -157,8 +185,8 @@ void dewb_sysfs_device_init(dewb_device_t *dev)
 }
 
 static struct class_attribute class_dewb_attrs[] = {
-	__ATTR(add,	0200, NULL, class_dewb_add),
-	__ATTR(remove,	0200, NULL, class_dewb_remove),
+	__ATTR(add,	0600, class_dewb_add_show, class_dewb_add_store),
+	__ATTR(remove,	0600, class_dewb_remove_show, class_dewb_remove_store),
 	__ATTR_NULL
 };
 
