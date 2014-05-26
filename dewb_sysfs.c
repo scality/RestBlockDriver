@@ -67,8 +67,8 @@ static ssize_t attr_disk_size_show(struct device *dv,
 }
 
 static DEVICE_ATTR(dewb_debug, S_IWUSR | S_IRUGO, &attr_debug_show, &attr_debug_store);
-static DEVICE_ATTR(dewb_urls, S_IWUSR | S_IRUGO, &attr_urls_show, NULL);
-static DEVICE_ATTR(dewb_size, S_IWUSR | S_IRUGO, &attr_disk_size_show, NULL);
+static DEVICE_ATTR(dewb_urls, S_IRUGO, &attr_urls_show, NULL);
+static DEVICE_ATTR(dewb_size, S_IRUGO, &attr_disk_size_show, NULL);
 
 
 /********************************************************************
