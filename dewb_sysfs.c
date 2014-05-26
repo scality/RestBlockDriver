@@ -143,7 +143,7 @@ static ssize_t class_dewb_remove_show(struct class *c, struct class_attribute *a
 	if (!try_module_get(THIS_MODULE))
 		return -ENODEV;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo URL > remove\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo device_name > remove\n");
 
 	module_put(THIS_MODULE);
 	return strlen(buf);
