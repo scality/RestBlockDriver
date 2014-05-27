@@ -37,11 +37,15 @@
 
 #define DEWB_THREAD_POOL_SIZE	8
 
-#define DEWB_DEBUG(fmt, a...) \
-	do { if (dev->debug)  \
+#define DEWB_INTERNAL_DBG(dbg, fmt, a...) \
+	do { if ((dbg)->level)					\
               printk(KERN_NOTICE "%s @%s:%d: " fmt "\n" ,       \
-		      dev->name, __func__, __LINE__, ##a);	\
+		     (dbg)->name, __func__, __LINE__, ##a);	\
         } while (0)
+
+#define DEWB_DEBUG(fmt, a...) DEWB_INTERNAL_DBG(dbg, fmt, ##a)
+
+#define DEWB_DEV_DEBUG(fmt, a...) DEWB_INTERNAL_DBG(&dev->debug, fmt, ##a)
 
 
 #define DEWB_INFO(fmt, a...) \
@@ -69,6 +73,11 @@ struct dewb_cdmi_desc_s {
 };
 
 /* dewb device definition */
+typedef struct dewb_debug_s {
+	const char		*name;
+	int			level;
+} dewb_debug_t;
+
 typedef struct dewb_device_s {
 
 	/* Device subsystem related data */
@@ -98,8 +107,7 @@ typedef struct dewb_device_s {
 	struct list_head	waiting_queue; /* Requests to be sent */
 
 	/* Debug traces */
-	int			debug;
-	
+	dewb_debug_t		debug;
 } dewb_device_t;
 
 /* dewb.c */
@@ -113,19 +121,21 @@ void dewb_sysfs_device_init(dewb_device_t *dev);
 void dewb_sysfs_cleanup(void);
 
 /* dewb_cdmi.c */
-int dewb_cdmi_init(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc,
+int dewb_cdmi_init(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 		const char *url);
-int dewb_cdmi_connect(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc);
-int dewb_cdmi_disconnect(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc);
-int dewb_cdmi_getsize(dewb_device_t *dev, uint64_t *size);
+int dewb_cdmi_connect(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc);
+int dewb_cdmi_disconnect(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc);
 
-int dewb_cdmi_getrange(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc,
+int dewb_cdmi_getsize(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
+		uint64_t *size);
+
+int dewb_cdmi_getrange(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 		uint64_t offset, int size);
 
-int dewb_cdmi_putrange(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc,
+int dewb_cdmi_putrange(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 		uint64_t offset, int size);
 
-int dewb_cdmi_flush(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc, 
+int dewb_cdmi_flush(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 		unsigned long flush_size);
 
 /* dewb_http.c */

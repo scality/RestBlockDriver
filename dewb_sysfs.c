@@ -24,11 +24,11 @@ static ssize_t attr_debug_store(struct device *dv,
 
 	disk = dev_to_disk(dv);
 	if (*buff == '0')
-		dev->debug = 0;
+		dev->debug.level = 0;
 	else
-		dev->debug = 1;
+		dev->debug.level = 1;
 	
-	DEWB_INFO("Setting the debug level to %d", dev->debug);
+	DEWB_INFO("Setting the debug level to %d", dev->debug.level);
 	return count;
 }
 
@@ -38,7 +38,7 @@ static ssize_t attr_debug_show(struct device *dv,
 	struct gendisk *disk	  = dev_to_disk(dv);
 	struct dewb_device_s *dev = disk->private_data;
 	
-	snprintf(buff, PAGE_SIZE, "%d\n", dev->debug);
+	snprintf(buff, PAGE_SIZE, "%d\n", dev->debug.level);
 
 	return strlen(buff);	
 }

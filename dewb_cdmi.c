@@ -78,7 +78,7 @@ static int get_port(const char *url, int *port)
  * Parse url and initialise cdmi structure in all threads descriptors
  * 
  */
-int dewb_cdmi_init(dewb_device_t *dev,
+int dewb_cdmi_init(dewb_debug_t *dbg,
 		struct dewb_cdmi_desc_s *desc,
 		const char *url)
 {
@@ -138,7 +138,7 @@ int dewb_cdmi_init(dewb_device_t *dev,
  *
  * Returns 0 if successfull or a negative value depending the error.
  */
-int dewb_cdmi_connect(dewb_device_t *dev,
+int dewb_cdmi_connect(dewb_debug_t *dbg,
 		struct dewb_cdmi_desc_s *desc)
 {
 	int ret;
@@ -192,7 +192,7 @@ out_error:
  * Disctonnect current descriptor from CDMI server
  *
  */
-int dewb_cdmi_disconnect(dewb_device_t *dev,
+int dewb_cdmi_disconnect(dewb_debug_t *dbg,
 			struct dewb_cdmi_desc_s *desc)
 {
 	if (!desc->socket)
@@ -207,7 +207,7 @@ int dewb_cdmi_disconnect(dewb_device_t *dev,
 /*
  *  Send or receive packet.
  */
-static int sock_xmit(dewb_device_t *dev, 
+static int sock_xmit(dewb_debug_t *dbg,
 		struct dewb_cdmi_desc_s *desc,
 		int send, 
 		void *buf, int size,
@@ -280,7 +280,7 @@ static int sock_xmit(dewb_device_t *dev,
 	return result;
 }
 
-static int sock_send_receive(dewb_device_t *dev,
+static int sock_send_receive(dewb_debug_t *dbg,
 			struct dewb_cdmi_desc_s *desc,
 			int send_size, int rcv_size)
 {
@@ -297,8 +297,8 @@ static int sock_send_receive(dewb_device_t *dev,
 	 */
 	if (desc->nb_requests == DEWB_REUSE_LIMIT) {
 		DEWB_DEBUG("Limit of %u requests reached reconnecting socket", DEWB_REUSE_LIMIT);
-		dewb_cdmi_disconnect(dev, desc);
-		ret = dewb_cdmi_connect(dev, desc);
+		dewb_cdmi_disconnect(dbg, desc);
+		ret = dewb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 	}
 	else
@@ -306,10 +306,10 @@ static int sock_send_receive(dewb_device_t *dev,
 
 	/* Send buffer */
 xmit_again:
-	ret = sock_xmit(dev, desc, 1, buff, send_size, 0);
+	ret = sock_xmit(dbg, desc, 1, buff, send_size, 0);
 	if (ret == -EPIPE) {
-		dewb_cdmi_disconnect(dev, desc);
-		ret = dewb_cdmi_connect(dev, desc);
+		dewb_cdmi_disconnect(dbg, desc);
+		ret = dewb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 		goto xmit_again;
 	}
@@ -317,11 +317,11 @@ xmit_again:
 		return -EIO;
 	
 	/* Receive response */
-	ret = sock_xmit(dev, desc, 0, buff, rcv_size, strict_rcv);
+	ret = sock_xmit(dbg, desc, 0, buff, rcv_size, strict_rcv);
 	/* Is the connection to be reopened ? */
 	if (ret == -EPIPE) {
-		dewb_cdmi_disconnect(dev, desc);
-		ret = dewb_cdmi_connect(dev, desc);
+		dewb_cdmi_disconnect(dbg, desc);
+		ret = dewb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 		goto xmit_again;
 	}
@@ -329,7 +329,7 @@ xmit_again:
 	return ret;
 }
 
-static int sock_send_sglist_receive(dewb_device_t *dev,
+static int sock_send_sglist_receive(dewb_debug_t *dbg,
 				struct dewb_cdmi_desc_s *desc,
 				int send_size, int rcv_size)
 {
@@ -346,8 +346,8 @@ static int sock_send_sglist_receive(dewb_device_t *dev,
 	 */
 	if (desc->nb_requests == DEWB_REUSE_LIMIT) {
 		DEWB_DEBUG("Limit of %u requests reached reconnecting socket", DEWB_REUSE_LIMIT);
-		dewb_cdmi_disconnect(dev, desc);
-		ret = dewb_cdmi_connect(dev, desc);
+		dewb_cdmi_disconnect(dbg, desc);
+		ret = dewb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 	}
 	else
@@ -355,10 +355,10 @@ static int sock_send_sglist_receive(dewb_device_t *dev,
 
 	/* Send buffer */
 xmit_again:
-	ret = sock_xmit(dev, desc, 1, buff, send_size, 0);
+	ret = sock_xmit(dbg, desc, 1, buff, send_size, 0);
 	if (ret == -EPIPE) {
-		dewb_cdmi_disconnect(dev, desc);
-		ret = dewb_cdmi_connect(dev, desc);
+		dewb_cdmi_disconnect(dbg, desc);
+		ret = dewb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 		goto xmit_again;
 	}
@@ -371,10 +371,10 @@ xmit_again:
 		char *buff = sg_virt(&desc->sgl[i]);
 		int length = desc->sgl[i].length;
 
-		ret = sock_xmit(dev, desc, 1, buff, length, 0);
+		ret = sock_xmit(dbg, desc, 1, buff, length, 0);
 		if (ret == -EPIPE) {
-			dewb_cdmi_disconnect(dev, desc);
-			ret = dewb_cdmi_connect(dev, desc);
+			dewb_cdmi_disconnect(dbg, desc);
+			ret = dewb_cdmi_connect(dbg, desc);
 			if (ret) return ret;
 			goto xmit_again;
 		}
@@ -385,10 +385,10 @@ xmit_again:
 		}
 	}
 	
-	ret = sock_xmit(dev, desc, 1, "\r\n", 2, 0);
+	ret = sock_xmit(dbg, desc, 1, "\r\n", 2, 0);
 	if (ret == -EPIPE) {
-		dewb_cdmi_disconnect(dev, desc);
-		ret = dewb_cdmi_connect(dev, desc);
+		dewb_cdmi_disconnect(dbg, desc);
+		ret = dewb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 		goto xmit_again;
 	}
@@ -397,11 +397,11 @@ xmit_again:
 	
 
 	/* Receive response */
-	ret = sock_xmit(dev, desc, 0, buff, rcv_size, strict_rcv);
+	ret = sock_xmit(dbg, desc, 0, buff, rcv_size, strict_rcv);
 	/* Is the connection to be reopened ? */
 	if (ret == -EPIPE) {
-		dewb_cdmi_disconnect(dev, desc);
-		ret = dewb_cdmi_connect(dev, desc);
+		dewb_cdmi_disconnect(dbg, desc);
+		ret = dewb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 		goto xmit_again;
 	}
@@ -411,7 +411,8 @@ xmit_again:
 
 
 
-int dewb_cdmi_flush(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc, 
+int dewb_cdmi_flush(dewb_debug_t *dbg,
+		struct dewb_cdmi_desc_s *desc, 
 		unsigned long flush_size)
 {
 	char *buff = desc->xmit_buff;
@@ -427,12 +428,15 @@ int dewb_cdmi_flush(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc,
 				desc->ip_addr, desc->filename, flush_size);
 	if (len <= 0) return len;
 	
-	len = sock_send_receive(dev, desc, len, 0);
+	len = sock_send_receive(dbg, desc, len, 0);
 	if (len < 0) return len;
 
 	buff[len] = 0;
 	ret = dewb_http_header_get_uint64(buff, len, "Content-Length", &size);
 	if (ret)
+		return -EIO;
+
+	if (size != flush_size)
 		return -EIO;
 	
 	return 0;
@@ -440,9 +444,9 @@ int dewb_cdmi_flush(dewb_device_t *dev, struct dewb_cdmi_desc_s *desc,
 
 /* HACK: due to a bug in HTTP HEAD from scality,using metadata instead */
 #if 0
-int dewb_cdmi_getsize(dewb_device_t *dev, uint64_t *size)
+int dewb_cdmi_getsize(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
+		uint64_t *size)
 {
-	struct dewb_cdmi_desc_s *desc = &dev->thread_cdmi_desc[0];
 	char *buff = desc->xmit_buff;
 
 	int ret, len;
@@ -452,7 +456,7 @@ int dewb_cdmi_getsize(dewb_device_t *dev, uint64_t *size)
 			desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 
-	len = sock_send_receive(dev, desc, len, 0);
+	len = sock_send_receive(dbg, desc, len, 0);
 	if (len < 0) return len;
 	
 	buff[len] = 0;
@@ -464,9 +468,9 @@ int dewb_cdmi_getsize(dewb_device_t *dev, uint64_t *size)
 }
 #endif
 
-int dewb_cdmi_getsize(dewb_device_t *dev, uint64_t *size)
+int dewb_cdmi_getsize(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
+		uint64_t *size)
 {
-	struct dewb_cdmi_desc_s *desc = &dev->thread_cdmi_desc[0];
 	char *buff = desc->xmit_buff;
 
 	int ret, len;
@@ -476,7 +480,7 @@ int dewb_cdmi_getsize(dewb_device_t *dev, uint64_t *size)
 			desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 
-	len = sock_send_receive(dev, desc, len, 0);
+	len = sock_send_receive(dbg, desc, len, 0);
 	if (len < 0) return len;
 	
 	buff[len] = 0;
@@ -492,7 +496,7 @@ int dewb_cdmi_getsize(dewb_device_t *dev, uint64_t *size)
  * sends a buffer to CDMI server through a CDMI put range at primitive
  * at specified "offset" reading "size" bytes from "buff".
  */
-int dewb_cdmi_putrange(dewb_device_t *dev, 
+int dewb_cdmi_putrange(dewb_debug_t *dbg,
 		struct dewb_cdmi_desc_s *desc,
 		uint64_t offset, int size)
 {
@@ -515,7 +519,7 @@ int dewb_cdmi_putrange(dewb_device_t *dev,
 	xmit_buff += ret;
 	header_size = ret;
 
-	len = sock_send_sglist_receive(dev, desc, header_size, 0);
+	len = sock_send_sglist_receive(dbg, desc, header_size, 0);
 	if (len < 0) {
 		DEWB_ERROR("ERROR sending sglist: %d", len);
 		return len;
@@ -544,7 +548,7 @@ out:
  * get a buffer from th CDMI server through a CDMI get range primitive
  *
  */
-int dewb_cdmi_getrange(dewb_device_t *dev, 
+int dewb_cdmi_getrange(dewb_debug_t *dbg,
 		struct dewb_cdmi_desc_s *desc,
 		uint64_t offset, int size)
 {
@@ -565,7 +569,7 @@ int dewb_cdmi_getrange(dewb_device_t *dev,
 	if (len <= 0) 
 		goto out;
 	
-	rcv = len = sock_send_receive(dev, desc, len, 0);
+	rcv = len = sock_send_receive(dbg, desc, len, 0);
 	if (len < 0) return len;	
 
 	/* Skip header */
@@ -580,7 +584,7 @@ int dewb_cdmi_getrange(dewb_device_t *dev,
 	while (len < size) {
 		DEWB_DEBUG("Have to read more [read=%d, toread=%d]",
 			len, size - len);
-		ret = sock_xmit(dev, desc, 0, desc->xmit_buff + rcv, size - len, 0);
+		ret = sock_xmit(dbg, desc, 0, desc->xmit_buff + rcv, size - len, 0);
 		if (ret < 0) {
 			DEWB_ERROR("ERROR sock xmit ret = %d", ret);
 			return -EIO;

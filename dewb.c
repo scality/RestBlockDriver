@@ -47,17 +47,17 @@ static void dewb_xmit_range(struct dewb_device_s *dev,
 	}
 
 	if (size != 4096)
-		DEWB_DEBUG("Wrote size of %lu", size);
+		DEWB_DEV_DEBUG("Wrote size of %lu", size);
 
 	if (write) {
-		dewb_cdmi_putrange(dev,
+		dewb_cdmi_putrange(&dev->debug,
 				desc,
 
 				range_start, 
 				size);
 	}
 	else {
-		dewb_cdmi_getrange(dev,
+		dewb_cdmi_getrange(&dev->debug,
 				desc,
 				buf,
 				range_start, 
@@ -77,8 +77,8 @@ static int dewb_xfer_bio(struct dewb_device_s *dev,
 	** before sending actual bio to device
 	*/
 	if (bio->bi_rw & REQ_FLUSH) {
-		DEWB_DEBUG("[Flush(REG_FLUSH)]");
-		dewb_cdmi_flush(dev, desc, dev->disk_size);
+		DEWB_DEV_DEBUG("[Flush(REG_FLUSH)]");
+		dewb_cdmi_flush(&dev->debug, desc, dev->disk_size);
 	}
 
 	
@@ -86,7 +86,7 @@ static int dewb_xfer_bio(struct dewb_device_s *dev,
 		char *buffer = kmap(bvec->bv_page);
 		unsigned int nbsect = bvec->bv_len / 512UL;
 		
-		DEWB_DEBUG("[Transfering sect=%lu, nb=%d w=%d]",
+		DEWB_DEV_DEBUG("[Transfering sect=%lu, nb=%d w=%d]",
 			(unsigned long) sector, nbsect, 
 			bio_data_dir(bio) == WRITE);
 		
@@ -103,8 +103,8 @@ static int dewb_xfer_bio(struct dewb_device_s *dev,
 	** after the bio have been sent
 	*/
 	if (bio->bi_rw & REQ_FUA) {
-		DEWB_DEBUG("[Flush(REG_FUA)]");
-		dewb_cdmi_flush(dev, desc, dev->disk_size);
+		DEWB_DEV_DEBUG("[Flush(REG_FUA)]");
+		dewb_cdmi_flush(&dev->debug, desc, dev->disk_size);
 	}
 
 	return 0;
@@ -118,12 +118,14 @@ void dewb_xfer_scl(struct dewb_device_s *dev,
 
 	int ret;
 	if (rq_data_dir(req) == WRITE) {
-		ret = dewb_cdmi_putrange(dev, desc,
+		ret = dewb_cdmi_putrange(&dev->debug,
+					desc,
 					blk_rq_pos(req) * 512ULL, 
 					blk_rq_sectors(req) * 512ULL);
 	}
 	else {
-		ret = dewb_cdmi_getrange(dev, desc,
+		ret = dewb_cdmi_getrange(&dev->debug,
+					desc,
 					blk_rq_pos(req) * 512ULL, 
 					blk_rq_sectors(req) * 512ULL);
 	}
@@ -167,23 +169,23 @@ static int dewb_thread(void *data)
 		if (blk_rq_sectors(req) == 0)
 			continue;
 
-		DEWB_DEBUG("NEW REQUEST [tid:%d]", th_id);
+		DEWB_DEV_DEBUG("NEW REQUEST [tid:%d]", th_id);
 		/* Create scatterlist */
 		sg_init_table(dev->thread_cdmi_desc[th_id].sgl, DEV_NB_PHYS_SEGS);
 	        dev->thread_cdmi_desc[th_id].sgl_size = 
 			blk_rq_map_sg(dev->q, req, 
 				dev->thread_cdmi_desc[th_id].sgl);
 
-		DEWB_DEBUG("Scatterlist size = %d", 
+		DEWB_DEV_DEBUG("Scatterlist size = %d", 
 			dev->thread_cdmi_desc[th_id].sgl_size);
 
-		DEWB_DEBUG("[sector = %lu, nr_sectors=%u w=%d]",
+		DEWB_DEV_DEBUG("[sector = %lu, nr_sectors=%u w=%d]",
 			blk_rq_pos(req), blk_rq_sectors(req),
 			rq_data_dir(req) == WRITE);
 
 		/* Call scatter function */
 		dewb_xfer_scl(dev, &dev->thread_cdmi_desc[th_id], req);
-		DEWB_DEBUG("END REQUEST [tid:%d]", th_id);
+		DEWB_DEV_DEBUG("END REQUEST [tid:%d]", th_id);
 		
 		/* No IO error testing for the moment */
 		blk_end_request_all(req, 0);
@@ -201,7 +203,7 @@ static void dewb_rq_fn(struct request_queue *q)
 
        	while ((req = blk_fetch_request(q)) != NULL) {
 		if (req->cmd_type != REQ_TYPE_FS) {
-			DEWB_DEBUG("Skip non-CMD request");
+			DEWB_DEV_DEBUG("Skip non-CMD request");
 			__blk_end_request_all(req, -EIO);
 			continue;
 		}
@@ -284,7 +286,8 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 
 	for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++) {
 
-		if ((ret = dewb_cdmi_connect(dev, &dev->thread_cdmi_desc[i]))) {
+		if ((ret = dewb_cdmi_connect(&dev->debug,
+					&dev->thread_cdmi_desc[i]))) {
 			DEWB_ERROR("Unable to connect to CDMI endpoint : %d",
 				ret);
 			put_disk(disk);
@@ -293,7 +296,9 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 
 	}
 	/* Caution: be sure to call this before spawning threads */
-	ret = dewb_cdmi_getsize(dev, &dev->disk_size);
+	ret = dewb_cdmi_getsize(&dev->debug,
+				&dev->thread_cdmi_desc[0],
+				&dev->disk_size);
 
 	set_capacity(disk, dev->disk_size / 512ULL);
 
@@ -346,7 +351,8 @@ static dewb_device_t *dewb_device_new(void)
 		goto out;
 
 	dev->id = i;
-	dev->debug = DEWB_DEBUG_LEVEL;
+	dev->debug.name = &dev->name[0];
+	dev->debug.level = DEWB_DEBUG_LEVEL;
 	dev->users = 0;
 	sprintf(dev->name, DEV_NAME "%c", (char)(i + 'a'));
 
@@ -457,7 +463,8 @@ int dewb_device_add(char *url)
 
 	/* Parse add command */
 	for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++) {
-		if (dewb_cdmi_init(dev, &dev->thread_cdmi_desc[i], url)) {
+		if (dewb_cdmi_init(&dev->debug,
+				   &dev->thread_cdmi_desc[i], url)) {
 			DEWB_ERROR("Invalid URL : %s", url);
 			rc = -EINVAL;
 			goto err_out_dev;
@@ -477,7 +484,7 @@ int dewb_device_add(char *url)
 
 	dewb_sysfs_device_init(dev);
 	
-	DEWB_DEBUG("Added device (major:%d)", dev->major);
+	DEWB_DEV_DEBUG("Added device (major:%d)", dev->major);
 
 	return rc;
 err_out_unregister:
