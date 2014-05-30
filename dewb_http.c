@@ -163,7 +163,57 @@ int dewb_http_mkhead(char *buff, int len, char *host, char *page)
 	return (len - mylen);
 }
 
-int dewb_http_mktruncate(char *buff, int len, char *host, char *page, unsigned long size)
+int dewb_http_mkcreate(char *buff, int len, char *host, char *page)
+{
+	char *bufp = buff;
+	int mylen = len;
+	int ret;
+
+	*buff = 0;
+	ret = add_buffer(&bufp, &mylen, "PUT ");
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, page);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, " " HTTP_VER CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_KEEPALIVE CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_USER_AGENT CRLF);
+	if (ret)
+		return -ENOMEM;
+	
+	ret = add_buffer(&bufp, &mylen, "Host: ");
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, host);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, "If-None-Match: *");
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, CRLF CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	return (len - mylen);
+}
+
+int dewb_http_mktruncate(char *buff, int len, char *host, char *page, unsigned long long size)
 {
 	char *bufp = buff;
 	int mylen = len;
@@ -206,6 +256,52 @@ int dewb_http_mktruncate(char *buff, int len, char *host, char *page, unsigned l
 	sprintf(buf, "%s: %lu", HTTP_TRUNCATE, size);
 
 	ret = add_buffer(&bufp, &mylen, buf);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, CRLF CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	return (len - mylen);
+}
+
+int dewb_http_mkdelete(char *buff, int len, char *host, char *page)
+{
+	char *bufp = buff;
+	int mylen = len;
+	int ret;
+
+	*buff = 0;
+	ret = add_buffer(&bufp, &mylen, "DELETE ");
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, page);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, " " HTTP_VER CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_KEEPALIVE CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_USER_AGENT CRLF);
+	if (ret)
+		return -ENOMEM;
+	
+	ret = add_buffer(&bufp, &mylen, "Host: ");
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, host);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, CRLF);
 	if (ret)
 		return -ENOMEM;
 

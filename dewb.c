@@ -496,6 +496,90 @@ err_out_mod:
 	return rc;
 }
 
+int dewb_device_create(char *url, unsigned long long size)
+{
+	dewb_debug_t debug;
+	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
+	int rc;
+
+	debug.name = NULL;
+	debug.level = 0;
+
+	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
+	if (cdmi_desc == NULL)
+	{
+		rc = -ENOMEM;
+		goto err_out_mod;
+	}
+
+	/* First, setup a cdmi connection then Truncate(create) the file. */
+	rc = dewb_cdmi_init(&debug, cdmi_desc, url);
+	if (rc != 0)
+		goto err_out_alloc;
+
+	rc = dewb_cdmi_connect(&debug, cdmi_desc);
+	if (rc != 0)
+		goto err_out_alloc;
+
+	rc = dewb_cdmi_create(&debug, cdmi_desc, size);
+	if (rc != 0)
+		goto err_out_cdmi;
+
+	dewb_cdmi_disconnect(&debug, cdmi_desc);
+	kfree(cdmi_desc);
+
+	return rc;
+err_out_cdmi:
+	dewb_cdmi_disconnect(&debug, cdmi_desc);
+err_out_alloc:
+	kfree(cdmi_desc);
+err_out_mod:
+	DEWB_ERROR("Error creating device %s", url);
+	return rc;
+}
+
+int dewb_device_destroy(char *url)
+{
+	dewb_debug_t debug;
+	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
+	int rc;
+
+	debug.name = NULL;
+	debug.level = 0;
+
+	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
+	if (cdmi_desc == NULL)
+	{
+		rc = -ENOMEM;
+		goto err_out_mod;
+	}
+
+	/* First, setup a cdmi connection then Truncate(create) the file. */
+	rc = dewb_cdmi_init(&debug, cdmi_desc, url);
+	if (rc != 0)
+		goto err_out_alloc;
+
+	rc = dewb_cdmi_connect(&debug, cdmi_desc);
+	if (rc != 0)
+		goto err_out_alloc;
+
+	rc = dewb_cdmi_delete(&debug, cdmi_desc);
+	if (rc != 0)
+		goto err_out_cdmi;
+
+	dewb_cdmi_disconnect(&debug, cdmi_desc);
+	kfree(cdmi_desc);
+
+	return rc;
+err_out_cdmi:
+	dewb_cdmi_disconnect(&debug, cdmi_desc);
+err_out_alloc:
+	kfree(cdmi_desc);
+err_out_mod:
+	DEWB_ERROR("Error destroying device %s", url);
+    return rc;
+}
+
 static int __init dewblock_init(void)
 {
 	int rc;

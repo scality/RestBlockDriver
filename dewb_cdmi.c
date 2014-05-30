@@ -436,9 +436,99 @@ int dewb_cdmi_flush(dewb_debug_t *dbg,
 	if (ret)
 		return -EIO;
 
-	if (size != flush_size)
-		return -EIO;
+	return 0;
+}
+
+int dewb_cdmi_create(dewb_debug_t *dbg,
+		struct dewb_cdmi_desc_s *desc,
+		unsigned long long trunc_size)
+{
+	char *buff = desc->xmit_buff;
+	int len;
+	int ret;
+        enum dewb_http_statuscode code;
+
+	if (!desc->socket)
+		return 0;
+
+        /* Construct/send HTTP create */
+	len = dewb_http_mkcreate(buff, DEWB_XMIT_BUFFER_SIZE,
+                                 desc->ip_addr, desc->filename);
+	if (len <= 0) return len;
 	
+	len = sock_send_receive(dbg, desc, len, 0);
+	if (len < 0) return len;
+
+        ret = dewb_http_get_status(buff, len, &code);
+        if (ret == -1)
+        {
+                DEWB_ERROR("[create] Cannot retrieve response status from %.*s", 32, buff);
+                return -EIO;
+        }
+
+        if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS)
+        {
+		DEWB_ERROR("[create] Status of create operation = %i.", code);
+		return -EIO;
+        }
+
+	/* Construct/send HTTP truncate */
+	len = dewb_http_mktruncate(buff, DEWB_XMIT_BUFFER_SIZE,
+				desc->ip_addr, desc->filename, trunc_size);
+	if (len <= 0) return len;
+	
+	len = sock_send_receive(dbg, desc, len, 0);
+	if (len < 0) return len;
+
+        ret = dewb_http_get_status(buff, len, &code);
+        if (ret == -1)
+        {
+                DEWB_ERROR("[create] Cannot retrieve response status");
+                return -EIO;
+        }
+
+        if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS)
+        {
+		DEWB_ERROR("[create] Status of create operation = %i.", code);
+		return -EIO;
+        }
+
+	return 0;
+}
+
+int dewb_cdmi_delete(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc)
+{
+	char *buff = desc->xmit_buff;
+	int len;
+	int ret;
+        enum dewb_http_statuscode code;
+
+	if (!desc->socket)
+		return 0;
+
+	/* Construct HTTP delete */
+	len = dewb_http_mkdelete(buff, DEWB_XMIT_BUFFER_SIZE,
+				desc->ip_addr, desc->filename);
+	if (len <= 0) return len;
+	
+	len = sock_send_receive(dbg, desc, len, 0);
+	if (len < 0) return len;
+
+        ret = dewb_http_get_status(buff, len, &code);
+        if (ret == -1)
+        {
+                DEWB_ERROR("[destroy] Cannot retrieve response status");
+                return -EIO;
+        }
+
+        if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS)
+        {
+		DEWB_ERROR("[destroy] Status of delete operation = %i.", code);
+                if (code == DEWB_HTTP_STATUS_NOT_FOUND)
+                        return -ENOENT;
+		return -EIO;
+        }
+
 	return 0;
 }
 

@@ -85,6 +85,143 @@ static void class_dewb_release(struct class *cls)
 	kfree(cls);
 }
 
+static ssize_t class_dewb_create_show(struct class *c, struct class_attribute *attr,
+                                      char *buf)
+{
+	(void)c;
+	(void)attr;
+
+	/* Get module reference */
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
+	snprintf(buf, PAGE_SIZE, "# Usage: echo 'URL size(bytes)' > create\n");
+
+	module_put(THIS_MODULE);
+	return strlen(buf);
+}
+
+static ssize_t class_dewb_create_store(struct class *c,
+				struct class_attribute *attr,
+				const char *buf, size_t count)
+{
+        ssize_t ret = 0;
+        char url[DEWB_URL_SIZE + 1];
+        const char *tmp = buf;
+        unsigned long long size = 0;
+        size_t len = 0;
+
+	(void)c;
+	(void)attr;
+
+	/* Get module reference */
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
+        DEWB_INFO("Creating volume with params: %s    (%lu)", buf, count);
+
+        /* Ensure we have two space-separated args + only 1 space */
+        tmp = strrchr(buf, ' ');
+        if (tmp == NULL || tmp != strchr(buf, ' '))
+        {
+            DEWB_INFO("tmp=%p, strchr=%p", tmp, strchr(buf, ' '));
+            ret = -EINVAL;
+            goto out;
+        }
+
+        len = (size_t)(tmp - buf);
+	if ((len == 0) || (len > DEWB_URL_SIZE)) {
+            DEWB_INFO("len=%lu", len);
+            ret = -EINVAL;
+            goto out;
+        }
+
+	memcpy(url, buf, len);
+	if (url[len - 1] == '\n')
+		url[len - 1] = 0;
+	else
+		url[len] = 0;
+
+        DEWB_INFO("Trying to create device '%s' ...", url);
+
+        while (*tmp != 0 && *tmp == ' ')
+            tmp++;
+
+        /* Check that the second arg is numeric-only */
+        ret = kstrtoull(tmp, 10, &size);
+        if (ret != 0)
+            goto out;
+
+        DEWB_INFO("... of %llu bytes", size);
+
+        ret = dewb_device_create(url, size);
+        if (ret != 0)
+        {
+            goto out;
+        }
+
+        ret = count;
+
+out:
+        module_put(THIS_MODULE);
+	return ret;
+}
+
+static ssize_t class_dewb_destroy_show(struct class *c, struct class_attribute *attr,
+                                      char *buf)
+{
+	(void)c;
+	(void)attr;
+
+	/* Get module reference */
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
+	snprintf(buf, PAGE_SIZE, "# Usage: echo URL > destroy\n");
+
+	module_put(THIS_MODULE);
+	return strlen(buf);
+}
+
+static ssize_t class_dewb_destroy_store(struct class *c,
+					struct class_attribute *attr,
+					const char *buf, size_t count)
+{
+        ssize_t ret = 0;
+        char url[DEWB_URL_SIZE + 1];
+
+	(void)c;
+	(void)attr;
+
+	/* Get module reference */
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
+	/* Sanity check URL size */
+	if ((count == 0) || (count > DEWB_URL_SIZE)) {
+		DEWB_ERROR("Url too long");
+		ret =-ENOMEM;
+		goto out;
+	}
+	
+	memcpy(url, buf, count);
+	if (url[count - 1] == '\n')
+		url[count - 1] = 0;
+	else
+		url[count] = 0;
+
+        DEWB_INFO("Trying to destroy device '%s'", url);
+        ret = dewb_device_destroy(url);
+        if (ret != 0)
+        {
+            goto out;
+        }
+
+out:
+        module_put(THIS_MODULE);
+	return ret;
+}
+
 static ssize_t class_dewb_add_show(struct class *c, struct class_attribute *attr,
                                    char *buf)
 {
@@ -191,6 +328,8 @@ void dewb_sysfs_device_init(dewb_device_t *dev)
 static struct class_attribute class_dewb_attrs[] = {
 	__ATTR(add,	0600, class_dewb_add_show, class_dewb_add_store),
 	__ATTR(remove,	0600, class_dewb_remove_show, class_dewb_remove_store),
+	__ATTR(create,	0600, class_dewb_create_show, class_dewb_create_store),
+	__ATTR(destroy,	0600, class_dewb_destroy_show, class_dewb_destroy_store),
 	__ATTR_NULL
 };
 
