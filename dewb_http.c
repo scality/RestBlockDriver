@@ -29,6 +29,76 @@ static int add_buffer(char **buff, int *len, char *str)
 	return 0;
 }
 
+int dewb_http_get_status(char *buf, int len, enum dewb_http_statuscode *code)
+{
+	int ret;
+	long status;
+	char codebuf[8];
+	int codelen = 0;
+
+	if (!strncmp(buf, HTTP_VER, strlen(HTTP_VER)))
+	{
+		buf = buf + strlen(HTTP_VER);
+		while (*buf != 0 && *buf == ' ')
+			++buf;
+
+		while (codelen < sizeof(codebuf) - 1 && buf[codelen] != 0
+		       && buf[codelen] >= '0' && buf[codelen] <= '9')
+		{
+			codebuf[codelen] = buf[codelen];
+			codelen++;
+		}
+		codebuf[codelen] = 0;
+
+		ret = kstrtol(codebuf, 10, &status);
+		if (ret != 0)
+		{
+			DEWB_ERROR("Could not retrieve HTTP status code: err %i (buf=%.*s)", ret, 5, buf);
+			return -1;
+		}
+
+		// Known codes have their values fixed to the enum, so keep them
+		// Otherwise, consider it as an unknown extension.
+		switch (status)
+		{
+		case 100: case 101:
+		case 200: case 201: case 202: case 203: case 204: case 205: case 206:
+		case 300: case 301: case 302: case 303: case 304: case 305: case 307:
+		case 400: case 401: case 402: case 403: case 404: case 405: case 40 : case 407: case 408: case 409:
+		case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417:
+		case 500: case 501: case 502: case 503: case 504: case 505:
+			*code = status;
+			break ;
+		default:
+			*code = DEWB_HTTP_STATUS_EXTENSION;
+			break ;
+		}
+
+		return 0;
+	}
+
+	return -1;
+}
+
+
+enum dewb_http_statusrange dewb_http_get_status_range(enum dewb_http_statuscode status)
+{
+	enum dewb_http_statusrange range = DEWB_HTTP_STATUSRANGE_EXTENDED;
+
+	if (status >= 100 && status < 200)
+		range = DEWB_HTTP_STATUSRANGE_INFORMATIONAL;
+	else if (status >= 200 && status < 300)
+		range = DEWB_HTTP_STATUSRANGE_SUCCESS;
+	else if (status >= 300 && status < 400)
+		range = DEWB_HTTP_STATUSRANGE_REDIRECTION;
+	else if (status >= 400 && status < 500)
+		range = DEWB_HTTP_STATUSRANGE_CLIENTERROR;
+	else if (status >= 500 && status < 600)
+		range = DEWB_HTTP_STATUSRANGE_SERVERERROR;
+
+	return range;
+}
+
 #if 0
 // Add a \0 at the end of the buffer
 static int finish_buffer(char **buff, int *len)
