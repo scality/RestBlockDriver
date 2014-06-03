@@ -6,14 +6,38 @@ Prérequis
 
 Système supporté Ubuntu 12.04.4 LTS
 
-Le fichier à utiliser doit exister sur le serveur dewpoint
-Pour le créer:
-# truncate /mnt/fuse/0/myfile --size 50M
-
 Installation du driver
 ----------------------
 
 # insmod dewb
+
+Création d'un nouveau volume
+----------------------------
+
+Afin de créer un volume, il suffit de donner la resource REST à créer au driver,
+accompagnée d'une taille en octets, comme l'exemple qui suit:
+# echo "http://<ip>[:port]/<path_and_filename> filesize_in_bytes" > /sys/class/dewb/create
+
+Le volume sera alors créé sur le stockage, avec la taille demandée.
+Attention cependant :
+* Créer un volume ne l'ajoute pas automatiquement dans les devices dewblock
+* Le chemin vers le volume que l'on crée doit exister. Le driver ne crée pas le chemin automatiquement.
+
+Il est maintenant possible d'ajouter ce volume en tant que device (voir plus bas).
+
+Destruction d'un volume existant
+--------------------------------
+
+Détruire un volume signifie que ce volume ne sera plus accessible après opération.
+Afin de détruire un volume, il faut donner au driver la resource REST à supprimer du stockage
+comme l'exemple suivant l'indique:
+# echo "http://<ip>[:port]/<path_and_filename>" > /sys/class/dewb/destroy
+
+Le volume est alors supprimé du stockage et n'est plus accessible.
+Attention cependant :
+* LE volume à détruire doit exister au préalable
+* Détruire un volume utilisé par d'autres drivers dewblock sur d'autres machines
+peut mener à des erreurs et un comportement innatendus et non-testés.
 
 Ajout d'un nouveau device
 -------------------------
@@ -62,17 +86,17 @@ Traces de debug
 Il est possible d'activer/désactiver les traces de debug avec la commande suivante:
 
 Activer:
-# echo 1 > /sys/dewb?/dewb_debug
+# echo 1 > /sys/block/dewb?/dewb_debug
 Désactiver:
-# echo 0 > /sys/dewb?/dewb_debug
+# echo 0 > /sys/block/dewb?/dewb_debug
 
 Lire les informations relatives au device
 -----------------------------------------
 
 L'URL CDMI associée:
-# cat /sys/dewb?/dewb_urls
+# cat /sys/block/dewb?/dewb_urls
 La taille du disque:
-# cat /sys/dewb?/dewb_size
+# cat /sys/block/dewb?/dewb_size
 
 Reste à faire:
 
