@@ -1,107 +1,107 @@
-MODE D'EMPLOI
+INSTRUCTIONS
 =============
 
-Prérequis
+Prerequisites
 ---------
 
-Système supporté Ubuntu 12.04.4 LTS
+Ubuntu 12.04.4 LTS system supported
 
-Installation du driver
+Installing the driver
 ----------------------
 
-# insmod dewb
+# Insmod DEWB
 
-Création d'un nouveau volume
+Creating a new volume
 ----------------------------
 
-Afin de créer un volume, il suffit de donner la resource REST à créer au driver,
-accompagnée d'une taille en octets, comme l'exemple qui suit:
+To create a volume, just give the REST resource to create the driver,
+accompanied by a byte size, such as the following example:
 # echo "http://<ip>[:port]/<path_and_filename> filesize_in_bytes" > /sys/class/dewb/create
 
-Le volume sera alors créé sur le stockage, avec la taille demandée.
-Attention cependant :
-* Créer un volume ne l'ajoute pas automatiquement dans les devices dewblock
-* Le chemin vers le volume que l'on crée doit exister. Le driver ne crée pas le chemin automatiquement.
+The volume will be created on the storage with the requested size.
+But beware:
+* Create volume does not automatically add devices in dewblock
+* The path to the volume that is created must exist. The driver does not automatically create the path.
 
-Il est maintenant possible d'ajouter ce volume en tant que device (voir plus bas).
+It is now possible to add the volume as a device ( see below).
 
-Destruction d'un volume existant
+Destruction of an existing volume
 --------------------------------
 
-Détruire un volume signifie que ce volume ne sera plus accessible après opération.
-Afin de détruire un volume, il faut donner au driver la resource REST à supprimer du stockage
-comme l'exemple suivant l'indique:
+Destroy a volume means that this volume will not be accessible after operation.
+To destroy a volume, it must give the driver the REST resource to remove from storage
+as the following example shows:
 # echo "http://<ip>[:port]/<path_and_filename>" > /sys/class/dewb/destroy
 
-Le volume est alors supprimé du stockage et n'est plus accessible.
-Attention cependant :
-* LE volume à détruire doit exister au préalable
-* Détruire un volume utilisé par d'autres drivers dewblock sur d'autres machines
-peut mener à des erreurs et un comportement innatendus et non-testés.
+The volume is then removed from storage and is no longer accessible.
+But beware:
+* THE destroy volume must already exist
+* Destroy a volume used by other drivers on other machines dewblock
+can lead to errors and innatendus behavior and untested.
 
-Ajout d'un nouveau device
+Adding a new device
 -------------------------
 
-Il suffit ensuite de créer un block driver pointant dessus comme suit:
+Then simply create a block driver pointing to it as follows:
 # echo "http://<ip>[:port]/<path_and_filename>" > /sys/class/dewb/add
 
-Une entreée dans /dev est créé:
-* /dev/dewba pour le 1er ajout
-* /dev/dewbb pour le 2e
-Et ainsi de suite ...
+A disable input /dev is created:
+* /dev/dewba for the first addition
+* /dev/dewbb for the 2nd
+And so on ...
 
-Suppression d'un device
+Deleting a device
 -----------------------
 
-Un device créé à l'étape précédente peut être supprimé par la commande
-suivante: 
+A device created in the previous step may be removed by the control
+following :
 # echo "device" > /sys/class/dewb/remove
-device peut être par exemple dewba, dewbb, dewbc ...
+device can for example be dewba, dewbb, ... dewbc
 
-Partitionnement d'un device
+Partitioning a device
 ---------------------------
 
-Les devices peuvent être partitionnés comme des disques classiques,
-par exemple:
+The devices can be partitioned as conventional discs
+for example :
 
 # fdisk /dev/dewb
 
-Une fois partitionné, les fichiers associés dans /dev sont créés par ex
+Once partitioned, the associated files in /dev are created by ex
 * /dev/dewba1
 * /dev/dewba2
-Et ainsi de suite ...
+And so on ...
 
-Interface sysfs
+sysfs interface
 ---------------
 
-Pour chaque device, une entrée est créée dans /sys/block
-* /sys/block/dewba pour le device dewba
-* /sys/block/dewbb pour le device dewbb
-Et ainsi de suite
+For each device , an entry is created in /sys/block
+* /sys/block/device dewba for dewba
+* /sys/block/device dewbb for dewbb
+And so on
 
 
-Traces de debug
+Trace debug
 ---------------
 
-Il est possible d'activer/désactiver les traces de debug avec la commande suivante:
+It is possible to enable/disable debug trace with the following command:
 
-Activer:
+activate:
 # echo 1 > /sys/block/dewb?/dewb_debug
-Désactiver:
+disable:
 # echo 0 > /sys/block/dewb?/dewb_debug
 
-Lire les informations relatives au device
+Read the information on the device
 -----------------------------------------
 
-L'URL CDMI associée:
+The URL associated CDMI :
 # cat /sys/block/dewb?/dewb_urls
-La taille du disque:
+disk size :
 # cat /sys/block/dewb?/dewb_size
 
-Reste à faire:
+Remains to be done :
 
-* Tolérance aux pannes quand plus de serveur (reset ou timeout).
-* Optimiser la taille des secteurs.
-* Mettre le device en non rotational
-* Support de DKMS
-* Rollback si pas de connexions 
+* Fault tolerance when more server (reset or timeout).
+* Optimize the size of the sectors.
+* Put the device in non-rotational
+* Support DKMS
+* Rollback if no connections
