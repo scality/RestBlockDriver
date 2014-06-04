@@ -9,7 +9,7 @@ Ubuntu 12.04.4 LTS system supported
 Installing the driver
 ----------------------
 
-# Insmod DEWB
+# insmod dewb
 
 Creating a new volume
 ----------------------------
@@ -23,10 +23,10 @@ But beware:
 * Create volume does not automatically add devices in dewblock
 * The path to the volume that is created must exist. The driver does not automatically create the path.
 
-It is now possible to add the volume as a device ( see below).
+It is now possible to add the volume as a device (see below).
 
 Destruction of an existing volume
---------------------------------
+---------------------------------
 
 Destroy a volume means that this volume will not be accessible after operation.
 To destroy a volume, it must give the driver the REST resource to remove from storage
@@ -35,7 +35,7 @@ as the following example shows:
 
 The volume is then removed from storage and is no longer accessible.
 But beware:
-* THE destroy volume must already exist
+* The destroyed volume must already exist
 * Destroy a volume used by other drivers on other machines dewblock
 can lead to errors and innatendus behavior and untested.
 
@@ -45,7 +45,7 @@ Adding a new device
 Then simply create a block driver pointing to it as follows:
 # echo "http://<ip>[:port]/<path_and_filename>" > /sys/class/dewb/add
 
-A disable input /dev is created:
+An device /dev is created:
 * /dev/dewba for the first addition
 * /dev/dewbb for the 2nd
 And so on ...
@@ -53,15 +53,15 @@ And so on ...
 Deleting a device
 -----------------------
 
-A device created in the previous step may be removed by the control
-following :
+A device created in the previous step may be removed by the
+following control :
 # echo "device" > /sys/class/dewb/remove
 device can for example be dewba, dewbb, ... dewbc
 
 Partitioning a device
 ---------------------------
 
-The devices can be partitioned as conventional discs
+The devices can be partitioned as conventional disks
 for example :
 
 # fdisk /dev/dewb
@@ -75,8 +75,8 @@ sysfs interface
 ---------------
 
 For each device , an entry is created in /sys/block
-* /sys/block/device dewba for dewba
-* /sys/block/device dewbb for dewbb
+* /sys/block/device/dewba for dewba
+* /sys/block/device/dewbb for dewbb
 And so on
 
 
