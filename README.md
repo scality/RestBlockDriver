@@ -16,6 +16,7 @@ Creating a new volume
 
 To create a volume, just give the REST resource to create the driver,
 accompanied by a byte size, such as the following example:
+
   # echo "http://<ip>[:port]/<path_and_filename> filesize_in_bytes" > /sys/class/dewb/create
 
 The volume will be created on the storage with the requested size.
@@ -31,6 +32,7 @@ Destruction of an existing volume
 Destroy a volume means that this volume will not be accessible after operation.
 To destroy a volume, it must give the driver the REST resource to remove from storage
 as the following example shows:
+
   # echo "http://<ip>[:port]/<path_and_filename>" > /sys/class/dewb/destroy
 
 The volume is then removed from storage and is no longer accessible.
@@ -43,6 +45,7 @@ Adding a new device
 -------------------
 
 Then simply create a block driver pointing to it as follows:
+
   # echo "http://<ip>[:port]/<path_and_filename>" > /sys/class/dewb/add
 
 An device /dev is created:
@@ -55,7 +58,9 @@ Deleting a device
 
 A device created in the previous step may be removed by the
 following control :
+
   # echo "device" > /sys/class/dewb/remove
+
 device can for example be dewba, dewbb, ... dewbc
 
 Partitioning a device
@@ -86,16 +91,23 @@ Debugging
 It is possible to enable/disable debug trace with the following command:
 
 activate:
+
   # echo 1 > /sys/block/dewb?/dewb_debug
+
 disable:
+
   # echo 0 > /sys/block/dewb?/dewb_debug
+
 
 Get information on the device
 ----------------------------------
 
 The URL associated CDMI :
+
   # cat /sys/block/dewb?/dewb_urls
+
 disk size :
+
   # cat /sys/block/dewb?/dewb_size
 
 Remains to be done :
