@@ -115,6 +115,6 @@ Remains to be done :
 
   * Fault tolerance when more server (reset or timeout).
   * Optimize sector sizes.
-  * Put the device in sleep mode
+  * Put the device in non-rotational
   * Support DKMS
   * Rollback if connection lost
