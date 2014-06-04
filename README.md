@@ -29,8 +29,8 @@ It is now possible to add the volume as a device (see below).
 Destruction of an existing volume
 ---------------------------------
 
-Destroy a volume means that this volume will not be accessible after operation.
-To destroy a volume, it must give the driver the REST resource to remove from storage
+Destroy a volume, is different than deletion; it means that this volume will no longer be accessible after this operation.
+To destroy a volume, give the driver the REST resource to remove from storage
 as the following example shows:
 
   # echo "http://<ip>[:port]/<path_and_filename>" > /sys/class/dewb/destroy
@@ -39,7 +39,7 @@ The volume is then removed from storage and is no longer accessible.
 But beware:
   * The destroyed volume must already exist
   * Destroy a volume used by other drivers on other machines dewblock
-can lead to errors and innatendus behavior and untested.
+can lead to errors and unexpected behaviors; this is untested.
 
 Adding a new device
 -------------------
@@ -114,7 +114,7 @@ Remains to be done :
 --------------------
 
   * Fault tolerance when more server (reset or timeout).
-  * Optimize the size of the sectors.
+  * Optimize sector sizes.
   * Put the device in non-rotational
   * Support DKMS
-  * Rollback if no connections
+  * Rollback if connection lost
