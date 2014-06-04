@@ -7,12 +7,12 @@ Prerequisites
 Ubuntu 12.04.4 LTS system supported
 
 Installing the driver
-----------------------
+---------------------
 
   # insmod dewb
 
 Creating a new volume
-----------------------------
+---------------------
 
 To create a volume, just give the REST resource to create the driver,
 accompanied by a byte size, such as the following example:
@@ -40,7 +40,7 @@ But beware:
 can lead to errors and innatendus behavior and untested.
 
 Adding a new device
--------------------------
+-------------------
 
 Then simply create a block driver pointing to it as follows:
   # echo "http://<ip>[:port]/<path_and_filename>" > /sys/class/dewb/add
@@ -51,7 +51,7 @@ An device /dev is created:
 And so on ...
 
 Deleting a device
------------------------
+-----------------
 
 A device created in the previous step may be removed by the
 following control :
@@ -59,7 +59,7 @@ following control :
 device can for example be dewba, dewbb, ... dewbc
 
 Partitioning a device
----------------------------
+---------------------
 
 The devices can be partitioned as conventional disks
 for example :
@@ -80,8 +80,8 @@ For each device , an entry is created in /sys/block
 And so on
 
 
-Trace debug
----------------
+Debugging
+---------
 
 It is possible to enable/disable debug trace with the following command:
 
@@ -90,8 +90,8 @@ activate:
 disable:
   # echo 0 > /sys/block/dewb?/dewb_debug
 
-Read the information on the device
------------------------------------------
+Get information on the device
+----------------------------------
 
 The URL associated CDMI :
   # cat /sys/block/dewb?/dewb_urls
@@ -99,6 +99,7 @@ disk size :
   # cat /sys/block/dewb?/dewb_size
 
 Remains to be done :
+--------------------
 
   * Fault tolerance when more server (reset or timeout).
   * Optimize the size of the sectors.
