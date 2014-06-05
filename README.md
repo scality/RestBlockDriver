@@ -17,7 +17,7 @@ Creating a new volume
 To create a volume, just give the REST resource to create the driver,
 accompanied by a byte size, such as the following example:
 
-  # echo "http://<ip>[:port]/<path_and_filename> filesize_in_bytes" > /sys/class/dewb/create
+  # echo "http://ip[:port]/path_and_filename filesize_in_bytes" > /sys/class/dewb/create
 
 The volume will be created on the storage with the requested size.
 But beware:
@@ -33,7 +33,7 @@ Destroy a volume, is different than deletion; it means that this volume will no 
 To destroy a volume, give the driver the REST resource to remove from storage
 as the following example shows:
 
-  # echo "http://<ip>[:port]/<path_and_filename>" > /sys/class/dewb/destroy
+  # echo "http://ip[:port]/path_and_filename" > /sys/class/dewb/destroy
 
 The volume is then removed from storage and is no longer accessible.
 But beware:
@@ -46,7 +46,7 @@ Adding a new device
 
 Then simply create a block driver pointing to it as follows:
 
-  # echo "http://<ip>[:port]/<path_and_filename>" > /sys/class/dewb/add
+  # echo "http://ip[:port]/path_and_filename" > /sys/class/dewb/add
 
 An device /dev is created:
   * /dev/dewba for the first addition
