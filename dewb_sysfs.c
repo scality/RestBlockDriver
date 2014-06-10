@@ -318,6 +318,166 @@ static ssize_t class_dewb_remove_store(struct class *c,
 	return (ret < 0) ? ret : count;
 }
 
+static ssize_t class_dewb_addmirror_show(struct class *c, struct class_attribute *attr,
+					 char *buf)
+{
+	(void)c;
+	(void)attr;
+
+	/* Get module reference */
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
+	snprintf(buf, PAGE_SIZE, "# Usage: echo mirror_url1,...,mirror_urlN > add_mirrors\n");
+
+	module_put(THIS_MODULE);
+	return strlen(buf);
+}
+
+static ssize_t class_dewb_addmirror_store(struct class *c,
+					  struct class_attribute *attr,
+					  const char *buf,
+					  size_t count)
+{
+	ssize_t		ret = 0;
+	char	    	url[DEWB_URL_SIZE];
+	const char	*tmp = buf;
+	const char	*tmpend = tmp;
+
+	while (tmp != NULL)
+	{
+		while (*tmp != 0 && *tmp == ',')
+			++tmp;
+
+		tmpend = strchr(tmp, ',');
+		if (tmpend != NULL)
+		{
+			memcpy(url, tmp, (tmpend - tmp));
+                        url[(tmpend - tmp)] = 0;
+		}
+		else
+		{
+                        // Strip the ending newline
+			tmpend = tmp;
+                        while (*tmpend && *tmpend != '\n')
+				tmpend++;
+
+			if ((tmpend - tmp) > DEWB_URL_SIZE)
+			{
+				DEWB_ERROR("Url too big: '%s'", tmp);
+				ret = -EINVAL;
+				goto end;
+			}
+			memcpy(url, tmp, (tmpend - tmp));
+                        url[(tmpend - tmp)] = 0;
+                        tmpend = NULL;
+		}
+
+		ret = dewb_mirror_add(url);
+		if (ret < 0)
+		{
+			goto end;
+		}
+
+		tmp = tmpend;
+	}
+
+	ret = count;
+
+end:
+	return ret;
+}
+
+static ssize_t class_dewb_removemirror_show(struct class *c, struct class_attribute *attr,
+					    char *buf)
+{
+	(void)c;
+	(void)attr;
+
+	/* Get module reference */
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
+	snprintf(buf, PAGE_SIZE, "# Usage: echo mirror_url1,...,mirror_urlN > remove_mirrors\n");
+
+	module_put(THIS_MODULE);
+	return strlen(buf);
+}
+
+static ssize_t class_dewb_removemirror_store(struct class *c,
+					     struct class_attribute *attr,
+					     const char *buf,
+					     size_t count)
+{
+	ssize_t		ret = 0;
+	char	    	url[DEWB_URL_SIZE];
+	const char	*tmp = buf;
+	const char	*tmpend = tmp;
+
+	while (tmp != NULL)
+	{
+		while (*tmp != 0 && *tmp == ',')
+			++tmp;
+
+		tmpend = strchr(tmp, ',');
+		if (tmpend != NULL)
+		{
+			memcpy(url, tmp, (tmpend - tmp));
+                        url[(tmpend - tmp)] = 0;
+		}
+		else
+		{
+                        // Strip the ending newline
+			tmpend = tmp;
+                        while (*tmpend && *tmpend != '\n')
+				tmpend++;
+
+			if ((tmpend - tmp) > DEWB_URL_SIZE)
+			{
+				DEWB_ERROR("Url too big: '%s'", tmp);
+				ret = -EINVAL;
+				goto end;
+			}
+			memcpy(url, tmp, (tmpend - tmp));
+                        url[(tmpend - tmp)] = 0;
+                        tmpend = NULL;
+		}
+
+		ret = dewb_mirror_remove(url);
+		if (ret < 0)
+		{
+			goto end;
+		}
+
+		tmp = tmpend;
+
+	}
+
+	ret = count;
+
+end:
+	return ret;
+}
+
+static ssize_t class_dewb_mirrors_show(struct class *c, struct class_attribute *attr,
+				       char *buf)
+{
+	ssize_t	ret = 0;
+
+	(void)c;
+	(void)attr;
+
+	/* Get module reference */
+	if (!try_module_get(THIS_MODULE))
+		return -ENODEV;
+
+	ret = dewb_mirrors_dump(buf, PAGE_SIZE);
+
+	module_put(THIS_MODULE);
+	return ret;
+}
+
+
 void dewb_sysfs_device_init(dewb_device_t *dev)
 {
 	device_create_file(disk_to_dev(dev->disk), &dev_attr_dewb_debug);
@@ -326,10 +486,13 @@ void dewb_sysfs_device_init(dewb_device_t *dev)
 }
 
 static struct class_attribute class_dewb_attrs[] = {
-	__ATTR(add,	0600, class_dewb_add_show, class_dewb_add_store),
-	__ATTR(remove,	0600, class_dewb_remove_show, class_dewb_remove_store),
-	__ATTR(create,	0600, class_dewb_create_show, class_dewb_create_store),
-	__ATTR(destroy,	0600, class_dewb_destroy_show, class_dewb_destroy_store),
+	__ATTR(add,		0600, class_dewb_add_show, class_dewb_add_store),
+	__ATTR(remove,		0600, class_dewb_remove_show, class_dewb_remove_store),
+	__ATTR(create,		0600, class_dewb_create_show, class_dewb_create_store),
+	__ATTR(destroy,		0600, class_dewb_destroy_show, class_dewb_destroy_store),
+	__ATTR(add_mirrors,	0600, class_dewb_addmirror_show, class_dewb_addmirror_store),
+	__ATTR(remove_mirrors,	0600, class_dewb_removemirror_show, class_dewb_removemirror_store),
+	__ATTR(mirrors,		0400, class_dewb_mirrors_show, NULL),
 	__ATTR_NULL
 };
 

@@ -172,6 +172,11 @@ typedef struct dewb_device_s {
 	dewb_debug_t		debug;
 } dewb_device_t;
 
+typedef struct dewb_mirror_s {
+    char            		url[DEWB_URL_SIZE];
+    struct dewb_mirror_s   	*next;
+} dewb_mirror_t;
+
 /* dewb.c */
 int dewb_device_create(char *url, unsigned long long size);
 int dewb_device_destroy(char *url);
@@ -179,6 +184,10 @@ int dewb_device_destroy(char *url);
 int dewb_device_add(char *url);
 int dewb_device_remove(dewb_device_t *dev);
 int dewb_device_remove_by_id(int dev_id);
+
+int dewb_mirror_add(const char *url);
+int dewb_mirror_remove(const char *url);
+ssize_t dewb_mirrors_dump(char *buf, ssize_t max_size);
 
 /* dewb_sysfs.c*/
 int dewb_sysfs_init(void);

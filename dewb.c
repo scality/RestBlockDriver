@@ -29,6 +29,7 @@
 MODULE_LICENSE("GPL");
 
 static dewb_device_t	devtab[DEV_MAX];
+static dewb_mirror_t    *mirrors = NULL;
 static DEFINE_SPINLOCK(devtab_lock);
 
 /*
@@ -413,6 +414,154 @@ static int __dewb_device_remove(dewb_device_t *dev)
 	__dewb_device_free(dev);
 
 	return 0;
+}
+
+int dewb_mirror_add(const char *url)
+{
+	int		ret = 0;
+	int		found = 0;
+	dewb_mirror_t	*cur = NULL;
+	dewb_mirror_t	*last = NULL;
+	dewb_mirror_t	*new = NULL;
+
+	if (strlen(url) >= DEWB_URL_SIZE)
+	{
+		DEWB_ERROR("Url too big: '%s'", url);
+		ret = -EINVAL;
+		goto end;
+	}
+
+	new = kmalloc(sizeof(*new), GFP_KERNEL);
+	if (new == NULL)
+	{
+		DEWB_ERROR("Cannot allocate memory to add a new mirror.");
+		ret = -ENOMEM;
+		goto end;
+	}
+	new->next = NULL;
+	strcpy(new->url, url);
+
+	spin_lock(&devtab_lock);
+	cur = mirrors;
+	while (cur != NULL)
+	{
+		if (strcmp(url, cur->url) == 0)
+		{
+			found = 1;
+			break ;
+		}
+		last = cur;
+		cur = cur->next;
+	}
+	if (found == 0)
+	{
+		if (last != NULL)
+			last->next = new;
+		else
+			mirrors = new;
+		new = NULL;
+	}
+	spin_unlock(&devtab_lock);
+
+	ret = 0;
+end:
+	if (new != NULL)
+		kfree(new);
+
+	return ret;
+}
+
+int dewb_mirror_remove(const char *url)
+{
+	int		ret = 0;
+	int		found = 0;
+	dewb_mirror_t	*cur = NULL;
+	dewb_mirror_t	*prev = NULL;
+
+	if (strlen(url) >= DEWB_URL_SIZE)
+	{
+		DEWB_ERROR("Url too big: '%s'", url);
+		ret = -EINVAL;
+		goto end;
+	}
+
+	spin_lock(&devtab_lock);
+	cur = mirrors;
+	while (cur != NULL)
+	{
+		if (strcmp(url, cur->url) == 0)
+		{
+			found = 1;
+			break ;
+		}
+		prev = cur;
+		cur = cur->next;
+	}
+	if (found == 0)
+	{
+		DEWB_ERROR("Cannot remove mirror: Url is not part of mirrors");
+		ret = -ENOENT;
+	}
+	else
+	{
+		if (prev)
+			prev->next = cur->next;
+		else
+			mirrors = cur->next;
+		kfree(cur);
+	}
+	spin_unlock(&devtab_lock);
+
+	ret = 0;
+end:
+	return ret;
+}
+
+ssize_t dewb_mirrors_dump(char *buf, ssize_t max_size)
+{
+	dewb_mirror_t	*cur = NULL;
+	ssize_t		printed = 0;
+	ssize_t		len = 0;
+	ssize_t		ret = 0;
+
+	spin_lock(&devtab_lock);
+	cur = mirrors;
+	while (cur)
+	{
+		if (printed != 0)
+		{
+			len = snprintf(buf + printed, max_size - printed, ",");
+			if (len == -1 || len != 1)
+			{
+				DEWB_ERROR("Not enough space to print mirrors list in buffer.");
+				ret = -ENOMEM;
+				break ;
+			}
+			printed += len;
+		}
+
+		len = snprintf(buf + printed, max_size - printed, "%s", cur->url);
+		if (len == -1 || len > (max_size - printed))
+		{
+			DEWB_ERROR("Not enough space to print mirrors list in buffer.");
+			ret = -ENOMEM;
+			break ;
+		}
+		printed += len;
+
+		cur = cur->next;
+	}
+	spin_unlock(&devtab_lock);
+
+	len = snprintf(buf + printed, max_size - printed, "\n");
+	if (len == -1 || len != 1)
+	{
+		DEWB_ERROR("Not enough space to print mirrors list in buffer.");
+		ret = -ENOMEM;
+	}
+	printed += len;
+
+	return ret < 0 ? ret : printed;
 }
 
 int dewb_device_remove(dewb_device_t *dev)
