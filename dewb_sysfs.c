@@ -9,8 +9,8 @@
  * /sys/block/dewb?/
  *                   dewb_debug	 Sets verbosity
  *                   dewb_urls	 Gets device CDMI url
+ *                   dewb_name   Gets device's on-storage filename
  *		     dewb_size   Gets device size
- *		     dewb_remove Removes the device
  *******************************************************************/
 static ssize_t attr_debug_store(struct device *dv, 
 				struct device_attribute *attr, 
@@ -55,6 +55,17 @@ static ssize_t attr_urls_show(struct device *dv,
 	return strlen(buff);
 }
 
+static ssize_t attr_disk_name_show(struct device *dv,
+                                   struct device_attribute *attr, char *buff)
+{
+	struct gendisk *disk	  = dev_to_disk(dv);
+	struct dewb_device_s *dev = disk->private_data;
+
+	snprintf(buff, PAGE_SIZE, "%s\n", kbasename(dev->thread_cdmi_desc[0].url));
+
+	return strlen(buff);
+}
+
 static ssize_t attr_disk_size_show(struct device *dv, 
 				struct device_attribute *attr, char *buff)
 {
@@ -68,14 +79,17 @@ static ssize_t attr_disk_size_show(struct device *dv,
 
 static DEVICE_ATTR(dewb_debug, S_IWUSR | S_IRUGO, &attr_debug_show, &attr_debug_store);
 static DEVICE_ATTR(dewb_urls, S_IRUGO, &attr_urls_show, NULL);
+static DEVICE_ATTR(dewb_name, S_IRUGO, &attr_disk_name_show, NULL);
 static DEVICE_ATTR(dewb_size, S_IRUGO, &attr_disk_size_show, NULL);
 
 
-/********************************************************************
+/************************************************************************
  * /sys/class/dewp/
+ *                   create     Create the volume's file on the storage
+ *                   destroy    Removes the volume's file on the storage
  *                   add	Create a new dewp device
- *                   remove	Remove the last created device
- *******************************************************************/
+ *                   remove	Remove the requested device
+ ***********************************************************************/
 
 static struct class *class_dewb;		/* /sys/class/dewp */
 
@@ -482,6 +496,7 @@ void dewb_sysfs_device_init(dewb_device_t *dev)
 {
 	device_create_file(disk_to_dev(dev->disk), &dev_attr_dewb_debug);
 	device_create_file(disk_to_dev(dev->disk), &dev_attr_dewb_urls);
+	device_create_file(disk_to_dev(dev->disk), &dev_attr_dewb_name);
 	device_create_file(disk_to_dev(dev->disk), &dev_attr_dewb_size);
 }
 
