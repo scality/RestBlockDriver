@@ -253,7 +253,7 @@ int dewb_http_mktruncate(char *buff, int len, char *host, char *page, unsigned l
 	if (ret)
 		return -ENOMEM;
 
-	sprintf(buf, "%s: %lu", HTTP_TRUNCATE, size);
+	sprintf(buf, "%s: %llu", HTTP_TRUNCATE, size);
 
 	ret = add_buffer(&bufp, &mylen, buf);
 	if (ret)

@@ -140,7 +140,6 @@ static int dewb_thread(void *data)
 	struct dewb_device_s *dev = data;
 	struct request *req;
 	unsigned long flags;
-	struct bio *bio;
 	int th_id;
 	
 	/* Init thread specific values */
@@ -231,6 +230,11 @@ static int dewb_open(struct block_device *bdev, fmode_t mode)
 	return 0;
 }
 
+/*
+ * After linux kernel v3.10, this function stops returning anything
+ * (becomes void). To avoid supporting too many things, just keep it int
+ * and ignore th associated warning.
+ */
 static int dewb_release(struct gendisk *disk, fmode_t mode)
 {
 	dewb_device_t *dev = disk->private_data;
