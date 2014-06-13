@@ -109,7 +109,7 @@ static ssize_t class_dewb_create_show(struct class *c, struct class_attribute *a
 	if (!try_module_get(THIS_MODULE))
 		return -ENODEV;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo 'URL size(bytes)' > create\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo 'Filename size(bytes)' > create\n");
 
 	module_put(THIS_MODULE);
 	return strlen(buf);
@@ -120,7 +120,7 @@ static ssize_t class_dewb_create_store(struct class *c,
 				const char *buf, size_t count)
 {
         ssize_t ret = 0;
-        char url[DEWB_URL_SIZE + 1];
+        char filename[DEWB_URL_SIZE + 1];
         const char *tmp = buf;
         unsigned long long size = 0;
         size_t len = 0;
@@ -144,19 +144,19 @@ static ssize_t class_dewb_create_store(struct class *c,
         }
 
         len = (size_t)(tmp - buf);
-	if ((len == 0) || (len > DEWB_URL_SIZE)) {
+	if ((len == 0) || (len >= DEWB_URL_SIZE)) {
             DEWB_INFO("len=%lu", len);
             ret = -EINVAL;
             goto out;
         }
 
-	memcpy(url, buf, len);
-	if (url[len - 1] == '\n')
-		url[len - 1] = 0;
+	memcpy(filename, buf, len);
+	if (filename[len - 1] == '\n')
+		filename[len - 1] = 0;
 	else
-		url[len] = 0;
+		filename[len] = 0;
 
-        DEWB_INFO("Trying to create device '%s' ...", url);
+        DEWB_INFO("Trying to create device '%s' ...", filename);
 
         while (*tmp != 0 && *tmp == ' ')
             tmp++;
@@ -168,7 +168,7 @@ static ssize_t class_dewb_create_store(struct class *c,
 
         DEWB_INFO("... of %llu bytes", size);
 
-        ret = dewb_device_create(url, size);
+        ret = dewb_device_create(filename, size);
         if (ret != 0)
         {
             goto out;
@@ -191,7 +191,7 @@ static ssize_t class_dewb_destroy_show(struct class *c, struct class_attribute *
 	if (!try_module_get(THIS_MODULE))
 		return -ENODEV;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo URL > destroy\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo Filename > destroy\n");
 
 	module_put(THIS_MODULE);
 	return strlen(buf);
@@ -202,7 +202,7 @@ static ssize_t class_dewb_destroy_store(struct class *c,
 					const char *buf, size_t count)
 {
         ssize_t ret = 0;
-        char url[DEWB_URL_SIZE + 1];
+        char filename[DEWB_URL_SIZE + 1];
 
 	(void)c;
 	(void)attr;
@@ -212,20 +212,20 @@ static ssize_t class_dewb_destroy_store(struct class *c,
 		return -ENODEV;
 
 	/* Sanity check URL size */
-	if ((count == 0) || (count > DEWB_URL_SIZE)) {
+	if ((count == 0) || (count >= DEWB_URL_SIZE)) {
 		DEWB_ERROR("Url too long");
 		ret =-ENOMEM;
 		goto out;
 	}
 	
-	memcpy(url, buf, count);
-	if (url[count - 1] == '\n')
-		url[count - 1] = 0;
+	memcpy(filename, buf, count);
+	if (filename[count - 1] == '\n')
+		filename[count - 1] = 0;
 	else
-		url[count] = 0;
+		filename[count] = 0;
 
-        DEWB_INFO("Trying to destroy device '%s'", url);
-        ret = dewb_device_destroy(url);
+        DEWB_INFO("Trying to destroy device '%s'", filename);
+        ret = dewb_device_destroy(filename);
         if (ret != 0)
         {
             goto out;

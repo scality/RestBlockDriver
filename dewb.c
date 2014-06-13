@@ -381,6 +381,35 @@ static void dewb_device_free(dewb_device_t *dev)
 	spin_unlock(&devtab_lock);
 }
 
+static int _dewb_reconstruct_url(char *url, char *name,
+				 const char *baseurl, const char *basepath,
+				 const char *filename)
+{
+	int urllen = 0;
+	int namelen = 0;
+	int seplen = 0;
+
+	urllen = strlen(baseurl);
+	if (baseurl[urllen - 1] != '/')
+		seplen = 1;
+
+	if (seplen)
+	{
+		urllen = snprintf(url, DEWB_URL_SIZE, "%s/%s", baseurl, filename);
+		namelen = snprintf(name, DEWB_URL_SIZE, "%s/%s", basepath, filename);
+	}
+	else
+	{
+		urllen = snprintf(url, DEWB_URL_SIZE, "%s%s", baseurl, filename);
+		namelen = snprintf(name, DEWB_URL_SIZE, "%s%s", basepath, filename);
+	}
+
+	if (urllen >= DEWB_URL_SIZE || namelen >= DEWB_URL_SIZE)
+		return -EINVAL;
+
+	return 0;
+}
+
 static int __dewb_device_remove(dewb_device_t *dev)
 {
 	int i;
@@ -420,6 +449,100 @@ static int __dewb_device_remove(dewb_device_t *dev)
 	return 0;
 }
 
+static void _dewb_mirror_free(dewb_mirror_t *mirror)
+{
+	if (mirror)
+		kfree(mirror);
+}
+
+static int _dewb_mirror_new(const char *url, dewb_mirror_t **mirror)
+{
+	dewb_debug_t	dbg;
+	dewb_mirror_t	*new = NULL;
+	int		ret = 0;
+
+	new = kmalloc(sizeof(*new), GFP_KERNEL);
+	if (new == NULL)
+	{
+		DEWB_ERROR("Cannot allocate memory to add a new mirror.");
+		ret = -ENOMEM;
+		goto end;
+	}
+	new->next = NULL;
+
+	ret = dewb_cdmi_init(&dbg, &new->cdmi_desc, url);
+	if (ret != 0)
+	{
+		DEWB_ERROR("Could not initialize mirror descriptor (parse URL).");
+		goto end;
+	}
+
+	if (mirror)
+	{
+		*mirror = new;
+		new = NULL;
+	}
+
+	ret = 0;
+end:
+	if (new)
+		_dewb_mirror_free(new);
+
+	return ret;
+}
+
+
+/*
+ * XXX NOTE XXX: #13 This function picks only one mirror that has enough free
+ * space in the URL buffer to append the filename.
+ */
+static int _dewb_mirror_pick(const char *filename, struct dewb_cdmi_desc_s *pick)
+{
+	char url[DEWB_URL_SIZE];
+	char name[DEWB_URL_SIZE];
+	int ret;
+	int found = 0;
+	dewb_mirror_t *mirror = NULL;
+
+	spin_lock(&devtab_lock);
+	mirror = mirrors;
+	while (mirror != NULL)
+	{
+		DEWB_INFO("Browsing mirror: %s", mirror->cdmi_desc.url);
+		ret = _dewb_reconstruct_url(url, name,
+					    mirror->cdmi_desc.url,
+					    mirror->cdmi_desc.filename,
+					    filename);
+		DEWB_INFO("Dewb reconstruct url yielded %s, %i", url, ret);
+		if (ret == 0)
+		{
+			memcpy(pick, &mirror->cdmi_desc,
+			       sizeof(mirror->cdmi_desc));
+			strncpy(pick->url, url, DEWB_URL_SIZE);
+			strncpy(pick->filename, name, DEWB_URL_SIZE);
+			DEWB_INFO("Copied into pick: url=%s, name=%s", pick->url, pick->filename);
+			found = 1;
+			break ;
+		}
+		mirror = mirror->next;
+	}
+	spin_unlock(&devtab_lock);
+
+	DEWB_INFO("Browsed all mirrors");
+
+	if (!found)
+	{
+		DEWB_ERROR("Could not match any mirror for filename %s", filename);
+		// No such device or adress seems to match 'missing mirror'
+		ret = -ENXIO;
+		goto end;
+	}
+
+	ret = 0;
+end:
+	return ret;
+}
+
 int dewb_mirror_add(const char *url)
 {
 	int		ret = 0;
@@ -435,21 +558,15 @@ int dewb_mirror_add(const char *url)
 		goto end;
 	}
 
-	new = kmalloc(sizeof(*new), GFP_KERNEL);
-	if (new == NULL)
-	{
-		DEWB_ERROR("Cannot allocate memory to add a new mirror.");
-		ret = -ENOMEM;
+	ret = _dewb_mirror_new(url, &new);
+	if (ret != 0)
 		goto end;
-	}
-	new->next = NULL;
-	strcpy(new->url, url);
 
 	spin_lock(&devtab_lock);
 	cur = mirrors;
 	while (cur != NULL)
 	{
-		if (strcmp(url, cur->url) == 0)
+		if (strcmp(url, cur->cdmi_desc.url) == 0)
 		{
 			found = 1;
 			break ;
@@ -470,7 +587,7 @@ int dewb_mirror_add(const char *url)
 	ret = 0;
 end:
 	if (new != NULL)
-		kfree(new);
+		_dewb_mirror_free(new);
 
 	return ret;
 }
@@ -493,7 +610,7 @@ int dewb_mirror_remove(const char *url)
 	cur = mirrors;
 	while (cur != NULL)
 	{
-		if (strcmp(url, cur->url) == 0)
+		if (strcmp(url, cur->cdmi_desc.url) == 0)
 		{
 			found = 1;
 			break ;
@@ -512,7 +629,7 @@ int dewb_mirror_remove(const char *url)
 			prev->next = cur->next;
 		else
 			mirrors = cur->next;
-		kfree(cur);
+		_dewb_mirror_free(cur);
 	}
 	spin_unlock(&devtab_lock);
 
@@ -544,7 +661,7 @@ ssize_t dewb_mirrors_dump(char *buf, ssize_t max_size)
 			printed += len;
 		}
 
-		len = snprintf(buf + printed, max_size - printed, "%s", cur->url);
+		len = snprintf(buf + printed, max_size - printed, "%s", cur->cdmi_desc.url);
 		if (len == -1 || len > (max_size - printed))
 		{
 			DEWB_ERROR("Not enough space to print mirrors list in buffer.");
@@ -649,7 +766,7 @@ err_out_mod:
 	return rc;
 }
 
-int dewb_device_create(char *url, unsigned long long size)
+int dewb_device_create(char *filename, unsigned long long size)
 {
 	dewb_debug_t debug;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
@@ -665,8 +782,8 @@ int dewb_device_create(char *url, unsigned long long size)
 		goto err_out_mod;
 	}
 
-	/* First, setup a cdmi connection then Truncate(create) the file. */
-	rc = dewb_cdmi_init(&debug, cdmi_desc, url);
+	/* Now, setup a cdmi connection then Truncate(create) the file. */
+	rc = _dewb_mirror_pick(filename, cdmi_desc);
 	if (rc != 0)
 		goto err_out_alloc;
 
@@ -687,11 +804,11 @@ err_out_cdmi:
 err_out_alloc:
 	kfree(cdmi_desc);
 err_out_mod:
-	DEWB_ERROR("Error creating device %s", url);
+	DEWB_ERROR("Error creating device %s", filename);
 	return rc;
 }
 
-int dewb_device_destroy(char *url)
+int dewb_device_destroy(char *filename)
 {
 	dewb_debug_t debug;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
@@ -707,10 +824,12 @@ int dewb_device_destroy(char *url)
 		goto err_out_mod;
 	}
 
-	/* First, setup a cdmi connection then Truncate(create) the file. */
-	rc = dewb_cdmi_init(&debug, cdmi_desc, url);
+	/* Now, setup a cdmi connection then Truncate(create) the file. */
+	rc = _dewb_mirror_pick(filename, cdmi_desc);
 	if (rc != 0)
 		goto err_out_alloc;
+	DEWB_INFO("Creating Device: Picked mirror [ip=%s port=%d fullpath=%s]",
+		  cdmi_desc->ip_addr, cdmi_desc->port, cdmi_desc->filename);
 
 	rc = dewb_cdmi_connect(&debug, cdmi_desc);
 	if (rc != 0)
@@ -729,8 +848,8 @@ err_out_cdmi:
 err_out_alloc:
 	kfree(cdmi_desc);
 err_out_mod:
-	DEWB_ERROR("Error destroying device %s", url);
-    return rc;
+	DEWB_ERROR("Error destroying volume %s", filename);
+	return rc;
 }
 
 static int __init dewblock_init(void)

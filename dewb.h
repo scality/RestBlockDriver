@@ -173,8 +173,8 @@ typedef struct dewb_device_s {
 } dewb_device_t;
 
 typedef struct dewb_mirror_s {
-    char            		url[DEWB_URL_SIZE];
     struct dewb_mirror_s   	*next;
+    struct dewb_cdmi_desc_s	cdmi_desc;
 } dewb_mirror_t;
 
 /* dewb.c */
