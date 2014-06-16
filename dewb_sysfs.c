@@ -257,11 +257,9 @@ static ssize_t class_dewb_add_store(struct class *c,
 			const char *buf, size_t count)
 {
 	int ret;
-	char url[DEWB_URL_SIZE + 1];
+	char filename[DEWB_URL_SIZE + 1];
 
 	/* Get module reference */
-	if (!try_module_get(THIS_MODULE))
-		return -ENODEV;
 
 	/* Sanity check URL size */
 	if ((count == 0) || (count > DEWB_URL_SIZE)) {
@@ -270,17 +268,16 @@ static ssize_t class_dewb_add_store(struct class *c,
 		goto out;
 	}
 	
-	memcpy(url, buf, count);
-	if (url[count - 1] == '\n')
-		url[count - 1] = 0;
+	memcpy(filename, buf, count);
+	if (filename[count - 1] == '\n')
+		filename[count - 1] = 0;
 	else
-		url[count] = 0;
+		filename[count] = 0;
 
-	ret = dewb_device_add(url);
+	ret = dewb_device_add(filename);
 	if (ret == 0)
 		return count;
 out:
-	module_put(THIS_MODULE);
 	return ret;
 }
 
@@ -326,8 +323,6 @@ static ssize_t class_dewb_remove_store(struct class *c,
 	}	
 
 	ret = dewb_device_remove_by_id(dev_id);
-	if (ret == 0)
-		module_put(THIS_MODULE);
 
 	return (ret < 0) ? ret : count;
 }

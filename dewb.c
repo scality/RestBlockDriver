@@ -713,32 +713,46 @@ int dewb_device_remove_by_id(int dev_id)
 	return ret;
 }
 
-int dewb_device_add(char *url)
+int dewb_device_add(char *filename)
 {
 	dewb_device_t *dev;
 	ssize_t rc;
 	int irc;
 	int i;
+	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
+
+	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
+	if (cdmi_desc == NULL)
+	{
+		rc = -ENOMEM;
+		goto err_out_mod;
+	}
 
 	/* Allocate dev structure */
 	dev = dewb_device_new();
 	if (!dev) {
 		rc=  -ENOMEM;
-		goto err_out_mod;
+		goto err_out_cdmi_desc;
 	}
 
 	init_waitqueue_head(&dev->waiting_wq);
 	INIT_LIST_HEAD(&dev->waiting_queue);
 	spin_lock_init(&dev->waiting_lock);
 
+	/* Pick a convenient mirror to get dewb_cdmi_desc
+	 * TODO: #13 We need to manage failover by using every mirror
+	 */
+	rc = _dewb_mirror_pick(filename, cdmi_desc);
+	if (rc != 0)
+	{
+		goto err_out_dev;
+	}
+	DEWB_INFO("Adding Device: Picked mirror [ip=%s port=%d fullpath=%s]",
+		  cdmi_desc->ip_addr, cdmi_desc->port, cdmi_desc->filename);
+
 	/* Parse add command */
 	for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++) {
-		if (dewb_cdmi_init(&dev->debug,
-				   &dev->thread_cdmi_desc[i], url)) {
-			DEWB_ERROR("Invalid URL : %s", url);
-			rc = -EINVAL;
-			goto err_out_dev;
-		}
+		memcpy(&dev->thread_cdmi_desc[i], cdmi_desc, sizeof(*cdmi_desc));
 	}
 	irc = register_blkdev(0, dev->name);
 	if (irc < 0) {
@@ -761,8 +775,10 @@ err_out_unregister:
 	unregister_blkdev(dev->major, dev->name);
 err_out_dev:
 	dewb_device_free(dev);
+err_out_cdmi_desc:
+	kfree(cdmi_desc);
 err_out_mod:
-	DEWB_ERROR("Error adding device %s", url);
+	DEWB_ERROR("Error adding device %s", filename);
 	return rc;
 }
 
@@ -796,6 +812,14 @@ int dewb_device_create(char *filename, unsigned long long size)
 		goto err_out_cdmi;
 
 	dewb_cdmi_disconnect(&debug, cdmi_desc);
+
+	rc = dewb_device_add(filename);
+	if (rc != 0)
+	{
+		DEWB_ERROR("Cannot add created volume automatically.");
+		goto err_out_cdmi;
+	}
+
 	kfree(cdmi_desc);
 
 	return rc;
@@ -813,6 +837,8 @@ int dewb_device_destroy(char *filename)
 	dewb_debug_t debug;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 	int rc;
+	int remove_err = 0;
+	int i;
 
 	debug.name = NULL;
 	debug.level = 0;
@@ -824,12 +850,36 @@ int dewb_device_destroy(char *filename)
 		goto err_out_mod;
 	}
 
-	/* Now, setup a cdmi connection then Truncate(create) the file. */
+	// Remove every device (normally only 1) associated to filename
+	spin_lock(&devtab_lock);
+	for (i = 0; i < DEV_MAX; ++i)
+	{
+		const char *fname = kbasename(devtab[i].thread_cdmi_desc[0].filename);
+		if (strcmp(filename, fname) == 0)
+		{
+			rc = dewb_device_remove(&devtab[i]);
+			if (rc != 0)
+			{
+				DEWB_ERROR("Cannot add created volume automatically.");
+				remove_err = 1;
+				break ;
+			}
+		}
+	}
+	spin_unlock(&devtab_lock);
+
+	if (remove_err)
+	{
+		DEWB_ERROR("Could not remove every device associated to "
+			   "volume %s", filename);
+		goto err_out_alloc;
+	}
+
+
+	/* First, setup a cdmi connection then Delete the file. */
 	rc = _dewb_mirror_pick(filename, cdmi_desc);
 	if (rc != 0)
 		goto err_out_alloc;
-	DEWB_INFO("Creating Device: Picked mirror [ip=%s port=%d fullpath=%s]",
-		  cdmi_desc->ip_addr, cdmi_desc->port, cdmi_desc->filename);
 
 	rc = dewb_cdmi_connect(&debug, cdmi_desc);
 	if (rc != 0)
@@ -852,6 +902,27 @@ err_out_mod:
 	return rc;
 }
 
+static void dewb_remove_devices(void)
+{
+	int ret;
+	int i = 0;
+
+	spin_lock(&devtab_lock);
+	for (i=0; i<DEV_MAX; ++i)
+	{
+                if (devtab[i].disk)
+                {
+			ret = __dewb_device_remove(&devtab[i]);
+			if (ret != -EINVAL)
+			{
+				DEWB_ERROR("Could not remove device for volume at unload %s",
+					   devtab[i].thread_cdmi_desc[0].filename);
+			}
+                }
+	}
+	spin_unlock(&devtab_lock);
+}
+
 static int __init dewblock_init(void)
 {
 	int rc;
@@ -864,13 +935,15 @@ static int __init dewblock_init(void)
 	rc = dewb_sysfs_init();
 	if (rc)
 		return rc;
-	
+
 	return 0;
 }
  
 static void __exit dewblock_cleanup(void)
 {
-	DEWB_INFO("Cleaning up module");	
+	DEWB_INFO("Cleaning up module");
+
+	dewb_remove_devices();
 	dewb_sysfs_cleanup();
 
 	return ;
