@@ -231,6 +231,8 @@ static ssize_t class_dewb_destroy_store(struct class *c,
             goto out;
         }
 
+        ret = count;
+
 out:
         module_put(THIS_MODULE);
 	return ret;
