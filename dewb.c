@@ -854,15 +854,20 @@ int dewb_device_destroy(char *filename)
 	spin_lock(&devtab_lock);
 	for (i = 0; i < DEV_MAX; ++i)
 	{
-		const char *fname = kbasename(devtab[i].thread_cdmi_desc[0].filename);
-		if (strcmp(filename, fname) == 0)
+		if (!device_free_slot(&devtab[i]))
 		{
-			rc = dewb_device_remove(&devtab[i]);
-			if (rc != 0)
+			const char *fname
+			    = kbasename(devtab[i].thread_cdmi_desc[0].filename);
+			if (strcmp(filename, fname) == 0)
 			{
-				DEWB_ERROR("Cannot add created volume automatically.");
-				remove_err = 1;
-				break ;
+				rc = __dewb_device_remove(&devtab[i]);
+				if (rc != 0)
+				{
+					DEWB_ERROR("Cannot add created"
+						   " volume automatically.");
+					remove_err = 1;
+					break ;
+				}
 			}
 		}
 	}
@@ -910,7 +915,7 @@ static void dewb_remove_devices(void)
 	spin_lock(&devtab_lock);
 	for (i=0; i<DEV_MAX; ++i)
 	{
-                if (devtab[i].disk)
+		if (!device_free_slot(&devtab[i]))
                 {
 			ret = __dewb_device_remove(&devtab[i]);
 			if (ret != -EINVAL)
