@@ -54,6 +54,8 @@
 #define DEWB_ERROR(fmt, a...) \
 	printk(KERN_ERR "dewb: " fmt "\n" , ##a)
 
+#define DEWB_MIN(x, y) ((x) < (y) ? (x) : (y))
+#define DEWB_N_JSON_TOKENS	128
 
 /*
  * Status Ranges extracted from RFC 2616
@@ -219,7 +221,11 @@ int dewb_cdmi_create(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 		unsigned long long trunc_size);
 int dewb_cdmi_delete(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc);
 
+int dewb_cdmi_list(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
+		   int (*volume_cb)(const char *));
+
 /* dewb_http.c */
+int dewb_http_mklist(char *buff, int len, char *host, char *page);
 int dewb_http_mkhead(char *buff, int len, char *host, char *page);
 int dewb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page, 
 		uint64_t start, uint64_t end);

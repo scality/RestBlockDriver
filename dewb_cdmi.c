@@ -7,6 +7,8 @@
 #include <linux/tcp.h>
 #include "dewb.h"
 
+#include "jsmn/jsmn.h"
+
 /* TODO: add username and password support */
 #define CDMI_DISCONNECTED	0
 #define CDMI_CONNECTED		1
@@ -410,6 +412,206 @@ xmit_again:
 }
 
 
+
+int dewb_cdmi_list(dewb_debug_t *dbg,
+		   struct dewb_cdmi_desc_s *desc,
+		   int (*volume_cb)(const char *))
+{
+	jsmn_parser	json_parser;
+	jsmntok_t	*json_tokens = NULL;
+	unsigned int	n_tokens = 0;
+	jsmnerr_t	json_err = JSMN_ERROR_NOMEM;
+
+	char filename[DEWB_URL_SIZE+1];
+	char *buff = desc->xmit_buff;
+
+	enum dewb_http_statuscode code;
+	char *content = NULL;
+	uint64_t contentlen;
+
+	int len;
+	int ret;
+	int array, obj, found;
+	int cb_errcount = 0;
+
+	if (!desc->socket)
+		return 0;
+
+	// Construct HTTTP GET (for listing container)
+	len = dewb_http_mklist(buff, DEWB_XMIT_BUFFER_SIZE,
+			       desc->ip_addr, desc->filename);
+	if (len <= 0) return len;
+
+	len = sock_send_receive(dbg, desc, len, 0);
+	if (len < 0) return len;
+
+	// Check response status
+	ret = dewb_http_get_status(buff, len, &code);
+	if (ret == -1)
+	{
+		DEWB_ERROR("[list] Cannot retrieve response status");
+		ret = -EIO;
+		goto err;
+	}
+	if (code != DEWB_HTTP_STATUS_OK)
+	{
+		DEWB_ERROR("[list] Mirror listing yielded "
+			   "response status %i", code);
+		ret = -EIO;
+		goto err;
+	}
+
+	// Get content length
+	ret = dewb_http_header_get_uint64(buff, len,
+					  "Content-Length", &contentlen);
+	if (ret)
+	{
+		DEWB_ERROR("[list] Could not find content length in "
+			   "response headers.");
+		ret = -EIO;
+		goto err;
+	}
+
+	content = kmalloc(contentlen, GFP_KERNEL);
+	if (content == NULL)
+	{
+		DEWB_ERROR("[list] Cannot allocate enough memory to"
+			   " read volume repository.");
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	// Skip header
+	ret = dewb_http_skipheader(&buff, &len);
+	if (ret) {
+		DEWB_ERROR("getrange: skipheader failed: %d", ret);
+		ret = -EIO;
+		goto err;
+	}
+	if (len > contentlen)
+	{
+		DEWB_ERROR("[list] More data left than expected:"
+			   " len=%i > contentlen=%llu", len, contentlen);
+		ret = -EIO;
+		goto err;
+	}
+
+	// Get body
+	// First, copy leftovers from buff
+	memcpy(content, buff, len);
+	// More bytes may have to be read; get them
+	while (len < contentlen) {
+		ret = sock_xmit(dbg, desc, 0, content + len, contentlen - len, 1);
+		if (ret < 0) {
+			DEWB_ERROR("ERROR sock xmit ret = %d", ret);
+			ret = -EIO;
+			goto err;
+		}
+		len += ret;
+	}
+
+	if (len != contentlen) {
+		DEWB_ERROR("getrange error: len: %d contentlen:%llu", len, contentlen);
+		ret = -EIO;
+		goto err;
+	}
+
+	// Now retrieve the list of objects...
+#define DEWB_N_JSON_TOKENS	128
+	jsmn_init(&json_parser);
+	n_tokens = DEWB_N_JSON_TOKENS;
+	do
+	{
+		n_tokens *= 2;
+		json_tokens = krealloc(json_tokens,
+				       n_tokens * sizeof(*json_tokens),
+				       GFP_KERNEL);
+		if (json_tokens != NULL)
+		{
+			json_err = jsmn_parse(&json_parser, content, contentlen,
+					      json_tokens, n_tokens);
+		}
+	} while (json_tokens != NULL
+		 && json_err < 0 && json_err == JSMN_ERROR_NOMEM);
+
+	if (json_err < 0)
+	{
+		if (json_tokens == NULL)
+		{
+			DEWB_ERROR("Could not allocate enough memory to "
+				   "parse JSON volume list.");
+			ret = -ENOMEM;
+		}
+		else
+		{
+			DEWB_ERROR("Could not parse Json: error %i", json_err);
+			ret = -EIO;
+		}
+		goto err;
+	}
+
+	// Find the "children" object within json root object
+	// for each sub-loop, ret (aka tmp iterator) is intialized to 1
+	// in order to start after the object/array token it iterates within.
+	found = 0;
+	for (ret = 0; ret < json_err; ret ++)
+	{
+		jsmntok_t   *objtok = &json_tokens[ret];
+		// Dive into root object
+		if (objtok->parent == -1 && objtok->type == JSMN_OBJECT)
+		{
+			obj = ret;
+			for (ret = 1; obj+ret < json_err; ret += 2)
+			{
+				jsmntok_t   *artok = &json_tokens[obj+ret];
+				// Dive into key 'children' (should contain an array)
+				if (artok->type == JSMN_STRING
+				    && strncmp("children", &content[artok->start],
+					       artok->end - artok->start) == 0
+				    && obj+ret < json_err
+				    && json_tokens[obj+ret+1].type == JSMN_ARRAY)
+				{
+					array = obj + ret + 1;
+					DEWB_DEBUG("Found children list:");
+					// List children of the array we found.
+					for (ret = 1;
+					     array + ret < json_err
+					     && json_tokens[array+ret].parent == array;
+					     ++ret)
+					{
+						len = json_tokens[array+ret].end
+							- json_tokens[array+ret].start;
+						DEWB_DEBUG("Volume %i: %.*s", ret, len,
+							   &content[json_tokens[array+ret].start]);
+						strncpy(filename,
+							&content[json_tokens[array+ret].start],
+							DEWB_MIN(DEWB_URL_SIZE, len));
+						filename[DEWB_MIN(DEWB_URL_SIZE, len)] = 0;
+
+						if (volume_cb(filename) != 0)
+							cb_errcount += 1;
+					}
+					found = 1;
+					break ;
+				}
+			}
+			if (found)
+				break ;
+		}
+	}
+
+	ret = 0;
+	if (cb_errcount != 0)
+		ret = -EIO;
+
+err:
+	if (json_tokens)
+		kfree(json_tokens);
+	if (content)
+		kfree(content);
+
+	return ret;
+}
 
 int dewb_cdmi_flush(dewb_debug_t *dbg,
 		struct dewb_cdmi_desc_s *desc, 

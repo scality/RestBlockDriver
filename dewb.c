@@ -567,11 +567,13 @@ int dewb_mirror_add(const char *url)
 {
 	int		ret = 0;
 	int		found = 0;
+	int		was_first = 0;
 	dewb_mirror_t	*cur = NULL;
 	dewb_mirror_t	*last = NULL;
 	dewb_mirror_t	*new = NULL;
 
 	dewb_debug_t debug;
+	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 
 	debug.name = "<Mirror-Adder>";
 	debug.level = DEWB_DEBUG_LVL;
@@ -580,12 +582,20 @@ int dewb_mirror_add(const char *url)
 	{
 		DEWB_ERROR("Url too big: '%s'", url);
 		ret = -EINVAL;
-		goto end;
+		goto err_out_dev;
 	}
 
 	ret = _dewb_mirror_new(&debug, url, &new);
 	if (ret != 0)
-		goto end;
+		goto err_out_dev;
+
+	cdmi_desc = kcalloc(1, sizeof(*cdmi_desc), GFP_KERNEL);
+	if (cdmi_desc == NULL)
+	{
+		ret = -ENOMEM;
+		goto err_out_mirror_alloc;
+	}
+	memcpy(cdmi_desc, &new->cdmi_desc, sizeof(new->cdmi_desc));
 
 	spin_lock(&devtab_lock);
 	cur = mirrors;
@@ -601,6 +611,8 @@ int dewb_mirror_add(const char *url)
 	}
 	if (found == 0)
 	{
+		if (mirrors == NULL)
+			was_first = 1;
 		if (last != NULL)
 			last->next = new;
 		else
@@ -609,10 +621,29 @@ int dewb_mirror_add(const char *url)
 	}
 	spin_unlock(&devtab_lock);
 
-	ret = 0;
-end:
-	if (new != NULL)
-		_dewb_mirror_free(new);
+	if (was_first)
+	{
+		ret = dewb_cdmi_connect(&debug, cdmi_desc);
+		if (ret != 0)
+			goto err_out_cdmi_alloc;
+
+		ret = dewb_cdmi_list(&debug, cdmi_desc, &dewb_device_attach);
+		if (ret != 0)
+			goto err_out_cdmi;
+
+		dewb_cdmi_disconnect(&debug, cdmi_desc);
+	}
+	kfree(cdmi_desc);
+
+	return 0;
+
+err_out_cdmi:
+	dewb_cdmi_disconnect(&debug, cdmi_desc);
+err_out_cdmi_alloc:
+	kfree(cdmi_desc);
+err_out_mirror_alloc:
+	_dewb_mirror_free(new);
+err_out_dev:
 
 	return ret;
 }
@@ -628,6 +659,22 @@ int dewb_mirror_remove(const char *url)
 	{
 		DEWB_ERROR("Url too big: '%s'", url);
 		ret = -EINVAL;
+		goto end;
+	}
+
+	// Check if it's the last mirror. If yes, remove all devices.
+	spin_lock(&devtab_lock);
+	ret = 0;
+	if (mirrors != NULL && mirrors->next == NULL)
+	{
+		ret = _dewb_detach_devices();
+	}
+	spin_unlock(&devtab_lock);
+
+	if (ret != 0)
+	{
+		DEWB_ERROR("Could not remove all devices; not removing mirror.");
+		ret = -EBUSY;
 		goto end;
 	}
 
