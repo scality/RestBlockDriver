@@ -89,7 +89,7 @@ static DEVICE_ATTR(dewb_size, S_IRUGO, &attr_disk_size_show, NULL);
  *                   destroy    Removes the volume's file on the storage
  *                   attach	Attach a volume as a new dewp device
  *                   detach	Detaches (remove from the system)
- *				the requested device
+ *				the requested volume (or device)
  ***********************************************************************/
 
 static struct class *class_dewb;		/* /sys/class/dewp */
@@ -106,7 +106,7 @@ static ssize_t class_dewb_create_show(struct class *c, struct class_attribute *a
 	(void)c;
 	(void)attr;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo 'Filename size(bytes)' > create\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo 'VolumeName size(bytes)' > create\n");
 
 	return strlen(buf);
 }
@@ -179,7 +179,7 @@ static ssize_t class_dewb_destroy_show(struct class *c, struct class_attribute *
 	(void)c;
 	(void)attr;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo Filename > destroy\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo VolumeName > destroy\n");
 
 	return strlen(buf);
 }
@@ -226,7 +226,7 @@ static ssize_t class_dewb_attach_show(struct class *c, struct class_attribute *a
 	(void)c;
 	(void)attr;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo URL > attach\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo VolumeName > attach\n");
 
 	return strlen(buf);
 }
@@ -264,7 +264,7 @@ static ssize_t class_dewb_detach_show(struct class *c, struct class_attribute *a
 	(void)c;
 	(void)attr;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo volume_name > detach\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo VolumeName > detach\n");
 
 	return strlen(buf);
 }
