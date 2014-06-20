@@ -352,9 +352,10 @@ static ssize_t class_dewb_addmirror_store(struct class *c,
 					  size_t count)
 {
 	ssize_t		ret = 0;
-	char	    	url[DEWB_URL_SIZE];
+	char		url[DEWB_URL_SIZE+1];
 	const char	*tmp = buf;
 	const char	*tmpend = tmp;
+	int		errcount = 0;
 
 	while (tmp != NULL)
 	{
@@ -384,17 +385,21 @@ static ssize_t class_dewb_addmirror_store(struct class *c,
                         url[(tmpend - tmp)] = 0;
                         tmpend = NULL;
 		}
+		url[DEWB_URL_SIZE] = 0;
 
 		ret = dewb_mirror_add(url);
 		if (ret < 0)
-		{
-			goto end;
-		}
+			errcount += 1;
 
 		tmp = tmpend;
 	}
 
 	ret = count;
+	if (errcount > 0)
+	{
+		DEWB_ERROR("Could not add every mirror to driver.");
+		ret = -EINVAL;
+	}
 
 end:
 	return ret;
