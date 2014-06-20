@@ -19,6 +19,7 @@ Prerequisites
 ---------
 
 Ubuntu 12.04.4 LTS system supported
+
 Minimal Linux kernel version: v3.8
 
 Installing the driver
@@ -148,7 +149,7 @@ Creating a new volume
 To create a volume, just give the name of the file to create to the driver,
 accompanied by a byte size, such as in the following example:
 
-  # echo "filename filesize\_in\_bytes" > /sys/class/dewb/create
+    # echo "filename filesize\_in\_bytes" > /sys/class/dewb/create
 
 The volume will be created on the storage with the requested size.
 But beware:
@@ -168,7 +169,7 @@ Destroying a volume means that it volume will no longer be accessible after
 a successful operation. To destroy a volume, give the driver the name of the
 file to remove from the storage as the following example shows:
 
-  # echo filename > /sys/class/dewb/destroy
+    # echo filename > /sys/class/dewb/destroy
 
 The volume is then removed from storage and is no longer accessible.
 But beware:
@@ -203,7 +204,7 @@ In order to attach an existing Volume file in the system (if it could not be
 done automatically), you simply need to write the name of the Volume to the
 attach control file, as the example indicates:
 
-  # echo VolumeName > /sys/class/dewb/attach
+    # echo VolumeName > /sys/class/dewb/attach
 
 Then, a device is created in /dev:
   * /dev/dewba for the first attach operation
@@ -221,10 +222,14 @@ Detaching a device
 A device attached may be detached by writing the volume's name into the detach
 control file as the example shows:
 
-  # echo VolumeName > /sys/class/dewb/detach
+    # echo VolumeName > /sys/class/dewb/detach
 
 The VolumeName is the same Volume Name used for Create/Destroy as well
 as Attach operations.
+
+
+Using the devices
+=================
 
 Partitioning a device
 ---------------------
@@ -232,7 +237,7 @@ Partitioning a device
 The devices can be partitioned as conventional disks
 for instance:
 
-  # fdisk /dev/dewba
+    # fdisk /dev/dewba
 
 Once partitioned, the associated files in /dev are created, for instance for a
 volume named "TestVolume", mapped on the device "dewba":
@@ -256,11 +261,11 @@ It is possible to enable/disable debug trace with the following command:
 
 activate:
 
-  # echo 1 > /sys/block/dewb?/dewb\_debug
+    # echo 1 > /sys/block/dewb?/dewb\_debug
 
 disable:
 
-  # echo 0 > /sys/block/dewb?/dewb\_debug
+    # echo 0 > /sys/block/dewb?/dewb\_debug
 
 
 Get information on the device
@@ -268,15 +273,15 @@ Get information on the device
 
 The URL associated CDMI:
 
-  # cat /sys/block/dewb?/dewb\_urls
+    # cat /sys/block/dewb?/dewb\_urls
 
 disk size:
 
-  # cat /sys/block/dewb?/dewb\_size
+    # cat /sys/block/dewb?/dewb\_size
 
 volume name:
 
-  # cat /sys/block/dewb?/dewb\_name
+    # cat /sys/block/dewb?/dewb\_name
 
 Remains to be done :
 --------------------
