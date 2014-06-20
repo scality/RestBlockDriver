@@ -29,7 +29,7 @@
 MODULE_LICENSE("GPL");
 
 static dewb_device_t	devtab[DEV_MAX];
-static dewb_mirror_t    *mirrors = NULL;
+static dewb_mirror_t	*mirrors = NULL;
 static DEFINE_SPINLOCK(devtab_lock);
 
 /*
@@ -172,7 +172,7 @@ static int dewb_thread(void *data)
 		DEWB_DEV_DEBUG("NEW REQUEST [tid:%d]", th_id);
 		/* Create scatterlist */
 		sg_init_table(dev->thread_cdmi_desc[th_id].sgl, DEV_NB_PHYS_SEGS);
-	        dev->thread_cdmi_desc[th_id].sgl_size = 
+		dev->thread_cdmi_desc[th_id].sgl_size = 
 			blk_rq_map_sg(dev->q, req, 
 				dev->thread_cdmi_desc[th_id].sgl);
 
@@ -201,7 +201,7 @@ static void dewb_rq_fn(struct request_queue *q)
 	struct request *req;
 	unsigned long flags;
 
-       	while ((req = blk_fetch_request(q)) != NULL) {
+	while ((req = blk_fetch_request(q)) != NULL) {
 		if (req->cmd_type != REQ_TYPE_FS) {
 			DEWB_DEV_DEBUG("Skip non-CMD request");
 			__blk_end_request_all(req, -EIO);
@@ -251,7 +251,7 @@ static int dewb_release(struct gendisk *disk, fmode_t mode)
 static const struct block_device_operations dewb_fops =
 {
 	.owner   =	THIS_MODULE,
-	.open    =	dewb_open,
+	.open	 =	dewb_open,
 	.release =	dewb_release,
 };
 

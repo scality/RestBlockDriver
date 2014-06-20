@@ -56,7 +56,7 @@ static ssize_t attr_urls_show(struct device *dv,
 }
 
 static ssize_t attr_disk_name_show(struct device *dv,
-                                   struct device_attribute *attr, char *buff)
+				   struct device_attribute *attr, char *buff)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
 	struct dewb_device_s *dev = disk->private_data;
@@ -101,7 +101,7 @@ static void class_dewb_release(struct class *cls)
 }
 
 static ssize_t class_dewb_create_show(struct class *c, struct class_attribute *attr,
-                                      char *buf)
+				      char *buf)
 {
 	(void)c;
 	(void)attr;
@@ -120,11 +120,11 @@ static ssize_t class_dewb_create_store(struct class *c,
 				struct class_attribute *attr,
 				const char *buf, size_t count)
 {
-        ssize_t ret = 0;
-        char filename[DEWB_URL_SIZE + 1];
-        const char *tmp = buf;
-        unsigned long long size = 0;
-        size_t len = 0;
+	ssize_t ret = 0;
+	char filename[DEWB_URL_SIZE + 1];
+	const char *tmp = buf;
+	unsigned long long size = 0;
+	size_t len = 0;
 
 	(void)c;
 	(void)attr;
@@ -133,23 +133,24 @@ static ssize_t class_dewb_create_store(struct class *c,
 	if (!try_module_get(THIS_MODULE))
 		return -ENODEV;
 
-        DEWB_INFO("Creating volume with params: %s    (%lu)", buf, count);
+	DEWB_INFO("Creating volume with params: %s    (%lu)", buf, count);
 
-        /* Ensure we have two space-separated args + only 1 space */
-        tmp = strrchr(buf, ' ');
-        if (tmp == NULL || tmp != strchr(buf, ' '))
-        {
-            DEWB_INFO("tmp=%p, strchr=%p", tmp, strchr(buf, ' '));
-            ret = -EINVAL;
-            goto out;
-        }
+	/* Ensure we have two space-separated args + only 1 space */
+	tmp = strrchr(buf, ' ');
+	if (tmp == NULL || tmp != strchr(buf, ' '))
+	{
+		DEWB_ERROR("More than one space in arguments: tmp=%p,
+                          strchr=%p", tmp, strchr(buf, ' '));
+		ret = -EINVAL;
+		goto out;
+	}
 
-        len = (size_t)(tmp - buf);
+	len = (size_t)(tmp - buf);
 	if ((len == 0) || (len >= DEWB_URL_SIZE)) {
-            DEWB_INFO("len=%lu", len);
-            ret = -EINVAL;
-            goto out;
-        }
+		DEWB_ERROR("len=%lu", len);
+		ret = -EINVAL;
+		goto out;
+	}
 
 	memcpy(filename, buf, len);
 	if (filename[len - 1] == '\n')
@@ -157,33 +158,33 @@ static ssize_t class_dewb_create_store(struct class *c,
 	else
 		filename[len] = 0;
 
-        DEWB_INFO("Trying to create device '%s' ...", filename);
+	DEWB_INFO("Trying to create device '%s' ...", filename);
 
-        while (*tmp != 0 && *tmp == ' ')
-            tmp++;
+	while (*tmp != 0 && *tmp == ' ')
+		tmp++;
 
-        /* Check that the second arg is numeric-only */
-        ret = kstrtoull(tmp, 10, &size);
-        if (ret != 0)
-            goto out;
+	/* Check that the second arg is numeric-only */
+	ret = kstrtoull(tmp, 10, &size);
+	if (ret != 0)
+		goto out;
 
-        DEWB_INFO("... of %llu bytes", size);
+	DEWB_INFO("... of %llu bytes", size);
 
-        ret = dewb_device_create(filename, size);
-        if (ret != 0)
-        {
-            goto out;
-        }
+	ret = dewb_device_create(filename, size);
+	if (ret != 0)
+	{
+		goto out;
+	}
 
-        ret = count;
+	ret = count;
 
 out:
-        module_put(THIS_MODULE);
+	module_put(THIS_MODULE);
 	return ret;
 }
 
 static ssize_t class_dewb_destroy_show(struct class *c, struct class_attribute *attr,
-                                      char *buf)
+				       char *buf)
 {
 	(void)c;
 	(void)attr;
@@ -202,8 +203,8 @@ static ssize_t class_dewb_destroy_store(struct class *c,
 					struct class_attribute *attr,
 					const char *buf, size_t count)
 {
-        ssize_t ret = 0;
-        char filename[DEWB_URL_SIZE + 1];
+	ssize_t ret = 0;
+	char filename[DEWB_URL_SIZE + 1];
 
 	(void)c;
 	(void)attr;
@@ -225,17 +226,17 @@ static ssize_t class_dewb_destroy_store(struct class *c,
 	else
 		filename[count] = 0;
 
-        DEWB_INFO("Trying to destroy device '%s'", filename);
-        ret = dewb_device_destroy(filename);
-        if (ret != 0)
-        {
-            goto out;
-        }
+	DEWB_INFO("Trying to destroy device '%s'", filename);
+	ret = dewb_device_destroy(filename);
+	if (ret != 0)
+	{
+		goto out;
+	}
 
-        ret = count;
+	ret = count;
 
 out:
-        module_put(THIS_MODULE);
+	module_put(THIS_MODULE);
 	return ret;
 }
 
@@ -366,13 +367,13 @@ static ssize_t class_dewb_addmirror_store(struct class *c,
 		if (tmpend != NULL)
 		{
 			memcpy(url, tmp, (tmpend - tmp));
-                        url[(tmpend - tmp)] = 0;
+			url[(tmpend - tmp)] = 0;
 		}
 		else
 		{
-                        // Strip the ending newline
+			// Strip the ending newline
 			tmpend = tmp;
-                        while (*tmpend && *tmpend != '\n')
+			while (*tmpend && *tmpend != '\n')
 				tmpend++;
 
 			if ((tmpend - tmp) > DEWB_URL_SIZE)
@@ -382,8 +383,8 @@ static ssize_t class_dewb_addmirror_store(struct class *c,
 				goto end;
 			}
 			memcpy(url, tmp, (tmpend - tmp));
-                        url[(tmpend - tmp)] = 0;
-                        tmpend = NULL;
+			url[(tmpend - tmp)] = 0;
+			tmpend = NULL;
 		}
 		url[DEWB_URL_SIZE] = 0;
 
@@ -427,7 +428,7 @@ static ssize_t class_dewb_removemirror_store(struct class *c,
 					     size_t count)
 {
 	ssize_t		ret = 0;
-	char	    	url[DEWB_URL_SIZE];
+	char		url[DEWB_URL_SIZE];
 	const char	*tmp = buf;
 	const char	*tmpend = tmp;
 
@@ -440,13 +441,13 @@ static ssize_t class_dewb_removemirror_store(struct class *c,
 		if (tmpend != NULL)
 		{
 			memcpy(url, tmp, (tmpend - tmp));
-                        url[(tmpend - tmp)] = 0;
+			url[(tmpend - tmp)] = 0;
 		}
 		else
 		{
-                        // Strip the ending newline
+			// Strip the ending newline
 			tmpend = tmp;
-                        while (*tmpend && *tmpend != '\n')
+			while (*tmpend && *tmpend != '\n')
 				tmpend++;
 
 			if ((tmpend - tmp) > DEWB_URL_SIZE)
@@ -456,8 +457,8 @@ static ssize_t class_dewb_removemirror_store(struct class *c,
 				goto end;
 			}
 			memcpy(url, tmp, (tmpend - tmp));
-                        url[(tmpend - tmp)] = 0;
-                        tmpend = NULL;
+			url[(tmpend - tmp)] = 0;
+			tmpend = NULL;
 		}
 
 		ret = dewb_mirror_remove(url);
@@ -527,7 +528,7 @@ int dewb_sysfs_init(void)
 		return -ENOMEM;
 
 	class_dewb->name	  = DEV_NAME;
-	class_dewb->owner         = THIS_MODULE;
+	class_dewb->owner	  = THIS_MODULE;
 	class_dewb->class_release = class_dewb_release;
 	class_dewb->class_attrs   = class_dewb_attrs;
 

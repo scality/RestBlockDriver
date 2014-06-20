@@ -8,6 +8,7 @@
 #include <linux/net.h>
 #include <linux/scatterlist.h>
 #include <net/sock.h>
+
 /* Constants */
 
 #define MB			(1024 * 1024)
@@ -39,9 +40,9 @@
 
 #define DEWB_INTERNAL_DBG(dbg, fmt, a...) \
 	do { if ((dbg)->level)					\
-              printk(KERN_NOTICE "%s @%s:%d: " fmt "\n" ,       \
-		     (dbg)->name, __func__, __LINE__, ##a);	\
-        } while (0)
+		printk(KERN_NOTICE "%s @%s:%d: " fmt "\n" ,	\
+			(dbg)->name, __func__, __LINE__, ##a);	\
+	} while (0)
 
 #define DEWB_DEBUG(fmt, a...) DEWB_INTERNAL_DBG(dbg, fmt, ##a)
 
@@ -120,7 +121,7 @@ enum dewb_http_statuscode
 
 /* dewb_cdmi.c */
 struct dewb_cdmi_desc_s {
-        /* For /sys/block/dewb?/dewb_url */
+	/* For /sys/block/dewb?/dewb_url */
 	char			url[DEWB_URL_SIZE + 1];
 	uint8_t			state;
 	char			ip_addr[16];
@@ -133,7 +134,7 @@ struct dewb_cdmi_desc_s {
 	struct scatterlist	sgl[DEV_NB_PHYS_SEGS];
 	int			sgl_size;
 	struct socket		*socket;
-	struct sockaddr_in      sockaddr;
+	struct sockaddr_in	sockaddr;
 };
 
 /* dewb device definition */
@@ -175,8 +176,8 @@ typedef struct dewb_device_s {
 } dewb_device_t;
 
 typedef struct dewb_mirror_s {
-    struct dewb_mirror_s   	*next;
-    struct dewb_cdmi_desc_s	cdmi_desc;
+	struct dewb_mirror_s   	*next;
+	struct dewb_cdmi_desc_s	cdmi_desc;
 } dewb_mirror_t;
 
 /* dewb.c */
