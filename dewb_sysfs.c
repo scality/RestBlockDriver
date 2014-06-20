@@ -106,13 +106,8 @@ static ssize_t class_dewb_create_show(struct class *c, struct class_attribute *a
 	(void)c;
 	(void)attr;
 
-	/* Get module reference */
-	if (!try_module_get(THIS_MODULE))
-		return -ENODEV;
-
 	snprintf(buf, PAGE_SIZE, "# Usage: echo 'Filename size(bytes)' > create\n");
 
-	module_put(THIS_MODULE);
 	return strlen(buf);
 }
 
@@ -128,10 +123,6 @@ static ssize_t class_dewb_create_store(struct class *c,
 
 	(void)c;
 	(void)attr;
-
-	/* Get module reference */
-	if (!try_module_get(THIS_MODULE))
-		return -ENODEV;
 
 	DEWB_INFO("Creating volume with params: %s    (%lu)", buf, count);
 
@@ -179,7 +170,6 @@ static ssize_t class_dewb_create_store(struct class *c,
 	ret = count;
 
 out:
-	module_put(THIS_MODULE);
 	return ret;
 }
 
@@ -189,13 +179,8 @@ static ssize_t class_dewb_destroy_show(struct class *c, struct class_attribute *
 	(void)c;
 	(void)attr;
 
-	/* Get module reference */
-	if (!try_module_get(THIS_MODULE))
-		return -ENODEV;
-
 	snprintf(buf, PAGE_SIZE, "# Usage: echo Filename > destroy\n");
 
-	module_put(THIS_MODULE);
 	return strlen(buf);
 }
 
@@ -208,10 +193,6 @@ static ssize_t class_dewb_destroy_store(struct class *c,
 
 	(void)c;
 	(void)attr;
-
-	/* Get module reference */
-	if (!try_module_get(THIS_MODULE))
-		return -ENODEV;
 
 	/* Sanity check URL size */
 	if ((count == 0) || (count >= DEWB_URL_SIZE)) {
@@ -236,7 +217,6 @@ static ssize_t class_dewb_destroy_store(struct class *c,
 	ret = count;
 
 out:
-	module_put(THIS_MODULE);
 	return ret;
 }
 
@@ -246,13 +226,8 @@ static ssize_t class_dewb_attach_show(struct class *c, struct class_attribute *a
 	(void)c;
 	(void)attr;
 
-	/* Get module reference */
-	if (!try_module_get(THIS_MODULE))
-		return -ENODEV;
-
 	snprintf(buf, PAGE_SIZE, "# Usage: echo URL > attach\n");
 
-	module_put(THIS_MODULE);
 	return strlen(buf);
 }
 
@@ -262,8 +237,6 @@ static ssize_t class_dewb_attach_store(struct class *c,
 {
 	int ret;
 	char filename[DEWB_URL_SIZE + 1];
-
-	/* Get module reference */
 
 	/* Sanity check URL size */
 	if ((count == 0) || (count > DEWB_URL_SIZE)) {
@@ -291,13 +264,8 @@ static ssize_t class_dewb_detach_show(struct class *c, struct class_attribute *a
 	(void)c;
 	(void)attr;
 
-	/* Get module reference */
-	if (!try_module_get(THIS_MODULE))
-		return -ENODEV;
-
 	snprintf(buf, PAGE_SIZE, "# Usage: echo volume_name > detach\n");
 
-	module_put(THIS_MODULE);
 	return strlen(buf);
 }
 
@@ -334,13 +302,8 @@ static ssize_t class_dewb_addmirror_show(struct class *c, struct class_attribute
 	(void)c;
 	(void)attr;
 
-	/* Get module reference */
-	if (!try_module_get(THIS_MODULE))
-		return -ENODEV;
-
 	snprintf(buf, PAGE_SIZE, "# Usage: echo mirror_url1,...,mirror_urlN > add_mirrors\n");
 
-	module_put(THIS_MODULE);
 	return strlen(buf);
 }
 
@@ -409,13 +372,8 @@ static ssize_t class_dewb_removemirror_show(struct class *c, struct class_attrib
 	(void)c;
 	(void)attr;
 
-	/* Get module reference */
-	if (!try_module_get(THIS_MODULE))
-		return -ENODEV;
-
 	snprintf(buf, PAGE_SIZE, "# Usage: echo mirror_url1,...,mirror_urlN > remove_mirrors\n");
 
-	module_put(THIS_MODULE);
 	return strlen(buf);
 }
 
@@ -482,13 +440,8 @@ static ssize_t class_dewb_mirrors_show(struct class *c, struct class_attribute *
 	(void)c;
 	(void)attr;
 
-	/* Get module reference */
-	if (!try_module_get(THIS_MODULE))
-		return -ENODEV;
-
 	ret = dewb_mirrors_dump(buf, PAGE_SIZE);
 
-	module_put(THIS_MODULE);
 	return ret;
 }
 
