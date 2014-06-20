@@ -765,6 +765,7 @@ int dewb_cdmi_getsize(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 {
 	char *buff = desc->xmit_buff;
 
+	enum dewb_http_statuscode code;
 	int ret, len;
 
 	/* Construct a GET (?metadata) command */
@@ -775,6 +776,20 @@ int dewb_cdmi_getsize(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 	len = sock_send_receive(dbg, desc, len, 0);
 	if (len < 0) return len;
 	
+	ret = dewb_http_get_status(buff, len, &code);
+	if (ret != 0)
+	{
+		DEWB_ERROR("Cannot get http response status.");
+		return -EIO;
+	}
+	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS)
+	{
+		DEWB_ERROR("Http server responded with bad status: %i", code);
+		if (code == DEWB_HTTP_STATUS_NOT_FOUND)
+			return -ENODEV;
+		return -EIO;
+	}
+
 	buff[len] = 0;
 	ret = dewb_http_header_get_uint64(buff, len, "\"cdmi_size\"", size);
 	if (ret)

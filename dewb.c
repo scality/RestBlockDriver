@@ -304,6 +304,12 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	ret = dewb_cdmi_getsize(&dev->debug,
 				&dev->thread_cdmi_desc[0],
 				&dev->disk_size);
+	if (ret != 0)
+	{
+		DEWB_ERROR("Could not retrieve volume size.");
+		put_disk(disk);
+		return ret;
+	}
 
 	set_capacity(disk, dev->disk_size / 512ULL);
 
