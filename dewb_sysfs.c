@@ -139,8 +139,8 @@ static ssize_t class_dewb_create_store(struct class *c,
 	tmp = strrchr(buf, ' ');
 	if (tmp == NULL || tmp != strchr(buf, ' '))
 	{
-		DEWB_ERROR("More than one space in arguments: tmp=%p,
-                          strchr=%p", tmp, strchr(buf, ' '));
+		DEWB_ERROR("More than one space in arguments: tmp=%p,"
+                           "strchr=%p", tmp, strchr(buf, ' '));
 		ret = -EINVAL;
 		goto out;
 	}

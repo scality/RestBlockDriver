@@ -576,7 +576,7 @@ int dewb_mirror_add(const char *url)
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 
 	debug.name = "<Mirror-Adder>";
-	debug.level = DEWB_DEBUG_LVL;
+	debug.level = DEWB_DEBUG_LEVEL;
 
 	if (strlen(url) >= DEWB_URL_SIZE)
 	{
