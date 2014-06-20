@@ -455,22 +455,20 @@ static void _dewb_mirror_free(dewb_mirror_t *mirror)
 		kfree(mirror);
 }
 
-static int _dewb_mirror_new(const char *url, dewb_mirror_t **mirror)
+static int _dewb_mirror_new(dewb_debug_t *dbg, const char *url, dewb_mirror_t **mirror)
 {
-	dewb_debug_t	dbg;
 	dewb_mirror_t	*new = NULL;
 	int		ret = 0;
 
-	new = kmalloc(sizeof(*new), GFP_KERNEL);
+	new = kcalloc(1, sizeof(*new), GFP_KERNEL);
 	if (new == NULL)
 	{
 		DEWB_ERROR("Cannot allocate memory to add a new mirror.");
 		ret = -ENOMEM;
 		goto end;
 	}
-	new->next = NULL;
 
-	ret = dewb_cdmi_init(&dbg, &new->cdmi_desc, url);
+	ret = dewb_cdmi_init(dbg, &new->cdmi_desc, url);
 	if (ret != 0)
 	{
 		DEWB_ERROR("Could not initialize mirror descriptor (parse URL).");
@@ -551,6 +549,11 @@ int dewb_mirror_add(const char *url)
 	dewb_mirror_t	*last = NULL;
 	dewb_mirror_t	*new = NULL;
 
+	dewb_debug_t debug;
+
+	debug.name = "<Mirror-Adder>";
+	debug.level = DEWB_DEBUG_LVL;
+
 	if (strlen(url) >= DEWB_URL_SIZE)
 	{
 		DEWB_ERROR("Url too big: '%s'", url);
@@ -558,7 +561,7 @@ int dewb_mirror_add(const char *url)
 		goto end;
 	}
 
-	ret = _dewb_mirror_new(url, &new);
+	ret = _dewb_mirror_new(&debug, url, &new);
 	if (ret != 0)
 		goto end;
 
