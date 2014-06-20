@@ -763,14 +763,30 @@ ssize_t dewb_mirrors_dump(char *buf, ssize_t max_size)
 	return ret < 0 ? ret : printed;
 }
 
-int dewb_device_detach(dewb_device_t *dev)
+int dewb_device_detach_by_name(const char *filename)
 {
 	int ret;
+	int i;
 
 	spin_lock(&devtab_lock);	
-
-	ret = __dewb_device_detach(dev);
-
+	for (i = 0; i < DEV_MAX; ++i)
+	{
+		if (!device_free_slot(&devtab[i]))
+		{
+			const char *fname
+			    = kbasename(devtab[i].thread_cdmi_desc[0].filename);
+			if (strcmp(filename, fname) == 0)
+			{
+				ret = __dewb_device_detach(&devtab[i]);
+				if (ret != 0)
+				{
+					DEWB_ERROR("Cannot detach"
+						   " volume automatically.");
+					break ;
+				}
+			}
+		}
+	}
 	spin_unlock(&devtab_lock);
 
 	return ret;	

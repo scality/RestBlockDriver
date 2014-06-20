@@ -295,7 +295,7 @@ static ssize_t class_dewb_detach_show(struct class *c, struct class_attribute *a
 	if (!try_module_get(THIS_MODULE))
 		return -ENODEV;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo device_name > detach\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo volume_name > detach\n");
 
 	module_put(THIS_MODULE);
 	return strlen(buf);
@@ -306,29 +306,26 @@ static ssize_t class_dewb_detach_store(struct class *c,
 				const char *buf,
 				size_t count)
 {
-	int dev_id;
 	int ret;
+	char filename[DEWB_URL_SIZE + 1];
 
-	/* Sanity check */
-	
-	/* 123456 7*/
-	/* dewba\0\n */
-	if (count < 6) {
-		DEWB_ERROR("Unable to detach: unknown device");
-		return -EINVAL;
+	/* Sanity check URL size */
+	if ((count == 0) || (count > DEWB_URL_SIZE)) {
+		DEWB_ERROR("Url too long");
+		return -ENOMEM;
 	}
+	
+	memcpy(filename, buf, count);
+	if (filename[count - 1] == '\n')
+		filename[count - 1] = 0;
+	else
+		filename[count] = 0;
 
-	/* Determine device ID to remove */
-	dev_id = buf[4] - 'a';
-	if ((dev_id < 0) || (dev_id >= DEV_MAX)) {
+	ret = dewb_device_detach_by_name(filename);
+	if (ret == 0)
+		return count;
 
-		DEWB_ERROR("Unable to detach: unknown device dewb%c ", buf[4]);
-		return -EINVAL;
-	}	
-
-	ret = dewb_device_detach_by_id(dev_id);
-
-	return (ret < 0) ? ret : count;
+	return ret;
 }
 
 static ssize_t class_dewb_addmirror_show(struct class *c, struct class_attribute *attr,
