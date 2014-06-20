@@ -87,8 +87,9 @@ static DEVICE_ATTR(dewb_size, S_IRUGO, &attr_disk_size_show, NULL);
  * /sys/class/dewp/
  *                   create     Create the volume's file on the storage
  *                   destroy    Removes the volume's file on the storage
- *                   add	Create a new dewp device
- *                   remove	Remove the requested device
+ *                   attach	Attach a volume as a new dewp device
+ *                   detach	Detaches (remove from the system)
+ *				the requested device
  ***********************************************************************/
 
 static struct class *class_dewb;		/* /sys/class/dewp */
@@ -238,8 +239,8 @@ out:
 	return ret;
 }
 
-static ssize_t class_dewb_add_show(struct class *c, struct class_attribute *attr,
-                                   char *buf)
+static ssize_t class_dewb_attach_show(struct class *c, struct class_attribute *attr,
+				      char *buf)
 {
 	(void)c;
 	(void)attr;
@@ -248,13 +249,13 @@ static ssize_t class_dewb_add_show(struct class *c, struct class_attribute *attr
 	if (!try_module_get(THIS_MODULE))
 		return -ENODEV;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo URL > add\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo URL > attach\n");
 
 	module_put(THIS_MODULE);
 	return strlen(buf);
 }
 
-static ssize_t class_dewb_add_store(struct class *c,
+static ssize_t class_dewb_attach_store(struct class *c,
 			struct class_attribute *attr,
 			const char *buf, size_t count)
 {
@@ -276,15 +277,15 @@ static ssize_t class_dewb_add_store(struct class *c,
 	else
 		filename[count] = 0;
 
-	ret = dewb_device_add(filename);
+	ret = dewb_device_attach(filename);
 	if (ret == 0)
 		return count;
 out:
 	return ret;
 }
 
-static ssize_t class_dewb_remove_show(struct class *c, struct class_attribute *attr,
-                                      char *buf)
+static ssize_t class_dewb_detach_show(struct class *c, struct class_attribute *attr,
+				      char *buf)
 {
 	(void)c;
 	(void)attr;
@@ -293,13 +294,13 @@ static ssize_t class_dewb_remove_show(struct class *c, struct class_attribute *a
 	if (!try_module_get(THIS_MODULE))
 		return -ENODEV;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo device_name > remove\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo device_name > detach\n");
 
 	module_put(THIS_MODULE);
 	return strlen(buf);
 }
 
-static ssize_t class_dewb_remove_store(struct class *c,
+static ssize_t class_dewb_detach_store(struct class *c,
 				struct class_attribute *attr,
 				const char *buf,
 				size_t count)
@@ -312,7 +313,7 @@ static ssize_t class_dewb_remove_store(struct class *c,
 	/* 123456 7*/
 	/* dewba\0\n */
 	if (count < 6) {
-		DEWB_ERROR("Unable to remove :unknown device");
+		DEWB_ERROR("Unable to detach: unknown device");
 		return -EINVAL;
 	}
 
@@ -320,11 +321,11 @@ static ssize_t class_dewb_remove_store(struct class *c,
 	dev_id = buf[4] - 'a';
 	if ((dev_id < 0) || (dev_id >= DEV_MAX)) {
 
-		DEWB_ERROR("Unable to remove: unknown device dewb%c ", buf[4]);
+		DEWB_ERROR("Unable to detach: unknown device dewb%c ", buf[4]);
 		return -EINVAL;
 	}	
 
-	ret = dewb_device_remove_by_id(dev_id);
+	ret = dewb_device_detach_by_id(dev_id);
 
 	return (ret < 0) ? ret : count;
 }
@@ -498,8 +499,8 @@ void dewb_sysfs_device_init(dewb_device_t *dev)
 }
 
 static struct class_attribute class_dewb_attrs[] = {
-	__ATTR(add,		0600, class_dewb_add_show, class_dewb_add_store),
-	__ATTR(remove,		0600, class_dewb_remove_show, class_dewb_remove_store),
+	__ATTR(attach,		0600, class_dewb_attach_show, class_dewb_attach_store),
+	__ATTR(detach,		0600, class_dewb_detach_show, class_dewb_detach_store),
 	__ATTR(create,		0600, class_dewb_create_show, class_dewb_create_store),
 	__ATTR(destroy,		0600, class_dewb_destroy_show, class_dewb_destroy_store),
 	__ATTR(add_mirrors,	0600, class_dewb_addmirror_show, class_dewb_addmirror_store),

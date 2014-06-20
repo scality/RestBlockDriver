@@ -181,9 +181,9 @@ typedef struct dewb_mirror_s {
 int dewb_device_create(char *url, unsigned long long size);
 int dewb_device_destroy(char *url);
 
-int dewb_device_add(char *url);
-int dewb_device_remove(dewb_device_t *dev);
-int dewb_device_remove_by_id(int dev_id);
+int dewb_device_attach(char *filename);
+int dewb_device_detach(dewb_device_t *dev);
+int dewb_device_detach_by_id(int dev_id);
 
 int dewb_mirror_add(const char *url);
 int dewb_mirror_remove(const char *url);

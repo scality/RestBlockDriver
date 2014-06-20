@@ -410,7 +410,7 @@ static int _dewb_reconstruct_url(char *url, char *name,
 	return 0;
 }
 
-static int __dewb_device_remove(dewb_device_t *dev)
+static int __dewb_device_detach(dewb_device_t *dev)
 {
 	int i;
 
@@ -447,6 +447,28 @@ static int __dewb_device_remove(dewb_device_t *dev)
 	__dewb_device_free(dev);
 
 	return 0;
+}
+
+static int _dewb_detach_devices(void)
+{
+	int ret;
+	int i = 0;
+	int errcount = 0;
+
+	for (i=0; i<DEV_MAX; ++i)
+	{
+		if (!device_free_slot(&devtab[i]))
+		{
+			ret = __dewb_device_detach(&devtab[i]);
+			if (ret != 0)
+			{
+				DEWB_ERROR("Could not remove device for volume at unload %s",
+					   devtab[i].thread_cdmi_desc[0].filename);
+			}
+		}
+	}
+
+	return errcount;
 }
 
 static void _dewb_mirror_free(dewb_mirror_t *mirror)
@@ -688,20 +710,20 @@ ssize_t dewb_mirrors_dump(char *buf, ssize_t max_size)
 	return ret < 0 ? ret : printed;
 }
 
-int dewb_device_remove(dewb_device_t *dev)
+int dewb_device_detach(dewb_device_t *dev)
 {
 	int ret;
 
 	spin_lock(&devtab_lock);	
 
-	ret = __dewb_device_remove(dev);
+	ret = __dewb_device_detach(dev);
 
 	spin_unlock(&devtab_lock);
 
 	return ret;	
 }
 
-int dewb_device_remove_by_id(int dev_id)
+int dewb_device_detach_by_id(int dev_id)
 {
 	dewb_device_t *dev;
 	int ret;
@@ -709,14 +731,14 @@ int dewb_device_remove_by_id(int dev_id)
 	spin_lock(&devtab_lock);
 
 	dev = &devtab[dev_id];
-	ret = __dewb_device_remove(dev);
+	ret = __dewb_device_detach(dev);
 
 	spin_unlock(&devtab_lock);
 
 	return ret;
 }
 
-int dewb_device_add(char *filename)
+int dewb_device_attach(char *filename)
 {
 	dewb_device_t *dev;
 	ssize_t rc;
@@ -816,7 +838,7 @@ int dewb_device_create(char *filename, unsigned long long size)
 
 	dewb_cdmi_disconnect(&debug, cdmi_desc);
 
-	rc = dewb_device_add(filename);
+	rc = dewb_device_attach(filename);
 	if (rc != 0)
 	{
 		DEWB_ERROR("Cannot add created volume automatically.");
@@ -863,7 +885,7 @@ int dewb_device_destroy(char *filename)
 			    = kbasename(devtab[i].thread_cdmi_desc[0].filename);
 			if (strcmp(filename, fname) == 0)
 			{
-				rc = __dewb_device_remove(&devtab[i]);
+				rc = __dewb_device_detach(&devtab[i]);
 				if (rc != 0)
 				{
 					DEWB_ERROR("Cannot add created"
@@ -910,27 +932,6 @@ err_out_mod:
 	return rc;
 }
 
-static void dewb_remove_devices(void)
-{
-	int ret;
-	int i = 0;
-
-	spin_lock(&devtab_lock);
-	for (i=0; i<DEV_MAX; ++i)
-	{
-		if (!device_free_slot(&devtab[i]))
-                {
-			ret = __dewb_device_remove(&devtab[i]);
-			if (ret != -EINVAL)
-			{
-				DEWB_ERROR("Could not remove device for volume at unload %s",
-					   devtab[i].thread_cdmi_desc[0].filename);
-			}
-                }
-	}
-	spin_unlock(&devtab_lock);
-}
-
 static int __init dewblock_init(void)
 {
 	int rc;
@@ -951,7 +952,10 @@ static void __exit dewblock_cleanup(void)
 {
 	DEWB_INFO("Cleaning up module");
 
-	dewb_remove_devices();
+	spin_lock(&devtab_lock);
+	(void)_dewb_detach_devices();
+	spin_unlock(&devtab_lock);
+
 	dewb_sysfs_cleanup();
 
 	return ;
