@@ -180,10 +180,10 @@ typedef struct dewb_mirror_s {
 } dewb_mirror_t;
 
 /* dewb.c */
-int dewb_device_create(char *url, unsigned long long size);
-int dewb_device_destroy(char *url);
+int dewb_device_create(const char *filename, unsigned long long size);
+int dewb_device_destroy(const char *filename);
 
-int dewb_device_attach(char *filename);
+int dewb_device_attach(const char *filename);
 int dewb_device_detach(dewb_device_t *dev);
 int dewb_device_detach_by_id(int dev_id);
 

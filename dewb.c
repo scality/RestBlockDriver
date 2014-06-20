@@ -785,7 +785,7 @@ int dewb_device_detach_by_id(int dev_id)
 	return ret;
 }
 
-int dewb_device_attach(char *filename)
+int dewb_device_attach(const char *filename)
 {
 	dewb_device_t *dev;
 	ssize_t rc;
@@ -854,7 +854,7 @@ err_out_mod:
 	return rc;
 }
 
-int dewb_device_create(char *filename, unsigned long long size)
+int dewb_device_create(const char *filename, unsigned long long size)
 {
 	dewb_debug_t debug;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
@@ -904,7 +904,7 @@ err_out_mod:
 	return rc;
 }
 
-int dewb_device_destroy(char *filename)
+int dewb_device_destroy(const char *filename)
 {
 	dewb_debug_t debug;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
