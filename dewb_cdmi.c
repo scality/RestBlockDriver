@@ -641,6 +641,56 @@ int dewb_cdmi_flush(dewb_debug_t *dbg,
 	return 0;
 }
 
+int dewb_cdmi_extend(dewb_debug_t *dbg,
+		struct dewb_cdmi_desc_s *desc,
+		unsigned long long trunc_size)
+{
+	char *buff = desc->xmit_buff;
+	unsigned long long cur_size = 0;
+	int len;
+	int ret;
+	enum dewb_http_statuscode code;
+
+	if (!desc->socket)
+		return 0;
+
+	ret = dewb_cdmi_getsize(dbg, desc, &cur_size);
+	if (ret != 0)
+	{
+		DEWB_ERROR("[extend] Could not get size of existing volume.");
+		return ret;
+	}
+
+	if (cur_size >= trunc_size)
+	{
+		DEWB_ERROR("[extend] Cannot shrink a volume.");
+		return -EINVAL;
+	}
+
+	/* Construct/send HTTP truncate */
+	len = dewb_http_mktruncate(buff, DEWB_XMIT_BUFFER_SIZE,
+				   desc->ip_addr, desc->filename, trunc_size);
+	if (len <= 0) return len;
+
+	len = sock_send_receive(dbg, desc, len, 0);
+	if (len < 0) return len;
+
+	ret = dewb_http_get_status(buff, len, &code);
+	if (ret == -1)
+	{
+		DEWB_ERROR("[extend] Cannot retrieve response status");
+		return -EIO;
+	}
+
+	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS)
+	{
+		DEWB_ERROR("[extend] Status of extend operation = %i.", code);
+		return -EIO;
+	}
+
+	return 0;
+}
+
 int dewb_cdmi_create(dewb_debug_t *dbg,
 		struct dewb_cdmi_desc_s *desc,
 		unsigned long long trunc_size)

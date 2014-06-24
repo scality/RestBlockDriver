@@ -926,6 +926,69 @@ err_out_mod:
 	return rc;
 }
 
+int dewb_device_extend(const char *filename, unsigned long long size)
+{
+	dewb_debug_t debug;
+	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
+	int i;
+	int rc;
+
+	debug.name = NULL;
+	debug.level = 0;
+
+	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
+	if (cdmi_desc == NULL)
+	{
+		rc = -ENOMEM;
+		goto err_out_mod;
+	}
+
+	/* Now, setup a cdmi connection then Truncate(create) the file. */
+	rc = _dewb_mirror_pick(filename, cdmi_desc);
+	if (rc != 0)
+		goto err_out_alloc;
+
+	rc = dewb_cdmi_connect(&debug, cdmi_desc);
+	if (rc != 0)
+		goto err_out_alloc;
+
+	rc = dewb_cdmi_extend(&debug, cdmi_desc, size);
+	if (rc != 0)
+		goto err_out_cdmi;
+
+	dewb_cdmi_disconnect(&debug, cdmi_desc);
+
+	kfree(cdmi_desc);
+
+	// Find device (normally only 1) associated to filename and update their size
+	spin_lock(&devtab_lock);
+	for (i = 0; i < DEV_MAX; ++i)
+	{
+		if (!device_free_slot(&devtab[i]))
+		{
+			const char *fname
+			    = kbasename(devtab[i].thread_cdmi_desc[0].filename);
+			if (strcmp(filename, fname) == 0)
+			{
+				devtab[i].disk_size = size;
+				set_capacity(devtab[i].disk, devtab[i].disk_size / 512ULL);
+				break ;
+			}
+		}
+	}
+	spin_unlock(&devtab_lock);
+
+
+	return rc;
+err_out_cdmi:
+	dewb_cdmi_disconnect(&debug, cdmi_desc);
+err_out_alloc:
+	kfree(cdmi_desc);
+err_out_mod:
+	DEWB_ERROR("Error creating device %s", filename);
+	return rc;
+}
+
 int dewb_device_destroy(const char *filename)
 {
 	dewb_debug_t debug;

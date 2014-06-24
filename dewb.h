@@ -182,6 +182,7 @@ typedef struct dewb_mirror_s {
 
 /* dewb.c */
 int dewb_device_create(const char *filename, unsigned long long size);
+int dewb_device_extend(const char *filename, unsigned long long size);
 int dewb_device_destroy(const char *filename);
 
 int dewb_device_attach(const char *filename);
@@ -219,7 +220,9 @@ int dewb_cdmi_truncate(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 		unsigned long trunc_size);
 
 int dewb_cdmi_create(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
-		unsigned long long trunc_size);
+		     unsigned long long trunc_size);
+int dewb_cdmi_extend(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
+		     unsigned long long trunc_size);
 int dewb_cdmi_delete(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc);
 
 int dewb_cdmi_list(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,

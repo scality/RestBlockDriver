@@ -173,6 +173,81 @@ out:
 	return ret;
 }
 
+static ssize_t class_dewb_extend_show(struct class *c, struct class_attribute *attr,
+				      char *buf)
+{
+	(void)c;
+	(void)attr;
+
+	snprintf(buf, PAGE_SIZE,
+		 "The new size must be greater than the current size.\n"
+		 "# Usage: echo 'VolumeName size(bytes)' > extend\n");
+
+	return strlen(buf);
+}
+
+static ssize_t class_dewb_extend_store(struct class *c,
+				       struct class_attribute *attr,
+				       const char *buf, size_t count)
+{
+	ssize_t ret = 0;
+	char filename[DEWB_URL_SIZE + 1];
+	const char *tmp = buf;
+	unsigned long long size = 0;
+	size_t len = 0;
+
+	(void)c;
+	(void)attr;
+
+	DEWB_INFO("Extending volume with params: %s    (%lu)", buf, count);
+
+	/* Ensure we have two space-separated args + only 1 space */
+	tmp = strrchr(buf, ' ');
+	if (tmp == NULL || tmp != strchr(buf, ' '))
+	{
+		DEWB_ERROR("More than one space in arguments: tmp=%p,"
+                           "strchr=%p", tmp, strchr(buf, ' '));
+		ret = -EINVAL;
+		goto out;
+	}
+
+	len = (size_t)(tmp - buf);
+	if ((len == 0) || (len >= DEWB_URL_SIZE)) {
+		DEWB_ERROR("len=%lu", len);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	memcpy(filename, buf, len);
+	if (filename[len - 1] == '\n')
+		filename[len - 1] = 0;
+	else
+		filename[len] = 0;
+
+	DEWB_INFO("Trying to extend device '%s' ...", filename);
+
+	while (*tmp != 0 && *tmp == ' ')
+		tmp++;
+
+	/* Check that the second arg is numeric-only */
+	ret = kstrtoull(tmp, 10, &size);
+	if (ret != 0)
+		goto out;
+
+	DEWB_INFO("... of %llu bytes", size);
+
+	ret = dewb_device_extend(filename, size);
+	if (ret != 0)
+	{
+		goto out;
+	}
+
+	ret = count;
+
+out:
+	return ret;
+}
+
 static ssize_t class_dewb_destroy_show(struct class *c, struct class_attribute *attr,
 				       char *buf)
 {
@@ -458,6 +533,7 @@ static struct class_attribute class_dewb_attrs[] = {
 	__ATTR(attach,		0600, class_dewb_attach_show, class_dewb_attach_store),
 	__ATTR(detach,		0600, class_dewb_detach_show, class_dewb_detach_store),
 	__ATTR(create,		0600, class_dewb_create_show, class_dewb_create_store),
+	__ATTR(extend,		0600, class_dewb_extend_show, class_dewb_extend_store),
 	__ATTR(destroy,		0600, class_dewb_destroy_show, class_dewb_destroy_store),
 	__ATTR(add_mirrors,	0600, class_dewb_addmirror_show, class_dewb_addmirror_store),
 	__ATTR(remove_mirrors,	0600, class_dewb_removemirror_show, class_dewb_removemirror_store),
