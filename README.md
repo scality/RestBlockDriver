@@ -44,7 +44,8 @@ symlinks from the devices and partitions in /dev into /dev/dewb/<VolumeName>/,
 for ease of use.
 
 Then the next and last step is to load the kernel module into the linux kernel:
-  # insmod dewb
+
+    # insmod dewb
 
 Now, your Rest Block Driver is set for use, and you only need to know how to
 control the driver to do the management tasks. To learn that, please continue
