@@ -96,7 +96,7 @@ Adding mirrors
 To add one (or more) new mirror(s) to the driver, you need to write the list of
 mirrors separated by comas into the associated file. The format includes
 protocol, host (IP only: DNS is not supported yet), optional port, and the
-path to the volume repository ("<path>") which does no require an ending '/'.
+path to the volume repository ("path") which does no require an ending '/'.
 In essence, a volume repository URL would look like this:
 
     http://<ip>[:<port>]/<path>
