@@ -71,6 +71,8 @@ For this reason we provide you with three /sys files controlling the mirrors:
 
 Then, the following management files are available:
  * create: allows creating a volume file on the storage
+ * extend: allows extending a volume (increasing size), whether it is attached
+ or not
  * destroy: deletes the volume file from the storage
 
 The way those files work is described in the following sections, each dedicated
@@ -162,6 +164,28 @@ But beware:
 It is now possible to use the volume using the associated /dev device file.
 When you'll tire of it, you will be able to destroy the volume, effectively
 deleting the file from the storage.
+
+Extending a volume
+------------------
+
+Sometimes, a volume might look to be provisionned too small for the actual
+need. For this reason, you can actually extend it through the extend /sys
+control file. This command follows the same usage as the create command, thus
+using it is simple:
+
+    # echo "volumename filesize\_in\_bytes" > /sys/class/dewb/extend
+
+Be aware that this command can only extend a volume, meaning the size you give
+there must be higher than the current size. Also, this is a supported operation
+on an attached volume, though any file-system formatted onto the volume should
+be extended to the new volume's size manually since most of the filesystems
+don't support flexible partition or volume extension (unless you are using LVM
+underneath).
+
+Once the operation is complete, the new size will be properly reported to the
+system without any additional administrative task. For instance, displaying the
+contents of the file /proc/partitions will show you the updated size of the
+volume.
 
 Destruction of an existing volume
 ---------------------------------
