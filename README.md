@@ -47,9 +47,9 @@ Then the next and last step is to load the kernel module into the linux kernel:
 
     # insmod dewblock.ko
 
-Now, your Rest Block Driver is set for use, and you only need to know how to
+Now, the Rest Block Driver is set for use, and you only need to know how to
 control the driver to do the management tasks. To learn that, please continue
-the reading of this document.
+reading.
 
 Semi-automatic provisionning
 ============================
@@ -96,14 +96,14 @@ Adding mirrors
 --------------
 
 To add one (or more) new mirror(s) to the driver, you need to write the list of
-mirrors separated by comas into the associated file. The format includes
+mirrors separated by commas into the associated file. The format includes
 protocol, host (IP only: DNS is not supported yet), optional port, and the
 path to the volume repository ("path") which does no require an ending '/'.
 In essence, a volume repository URL would look like this:
 
     http://<ip>[:<port>]/<path>
 
-Thus, catenating the multiples mirror urls, you can add them all at once like in
+Thus, to concatenate the multiples mirror urls, you can add them all at once like in
 the example:
 
     # export REST_REPO1=http://127.0.0.1:443/volumes
