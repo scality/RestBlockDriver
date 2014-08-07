@@ -13,6 +13,7 @@
 
 #include <linux/module.h>    // included for all kernel modules
 #include <linux/kernel.h>    // included for KERN_INFO
+#include <linux/moduleparam.h>	// included for LKM parameters
 #include <linux/init.h>      // included for __init and __exit macros
 #include <linux/device.h>
 #include <linux/spinlock.h>
@@ -26,11 +27,34 @@
 
 #include "dewb.h"
 
+// LKM information
+MODULE_AUTHOR("Scality: TO BE FILLED");
+MODULE_DESCRIPTION("Block Device Driver for REST-based storage");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DEV_REL_VERSION);
 
 static dewb_device_t	devtab[DEV_MAX];
 static dewb_mirror_t	*mirrors = NULL;
 static DEFINE_SPINLOCK(devtab_lock);
+
+/* Module parameters (LKM parameters)
+ */
+unsigned short dewb_log = DEWB_LOG_LEVEL_DFLT;
+unsigned short req_timeout = DEWB_REQ_TIMEOUT_DFLT;
+unsigned short nb_req_retries = DEWB_NB_REQ_RETRIES_DFLT;
+unsigned short mirror_conn_timeout = DEWB_CONN_TIMEOUT_DFLT;
+MODULE_PARM_DESC(debug, "Global log level for Dewblock LKM");
+module_param_named(debug, dewb_log, ushort, 0644);
+
+MODULE_PARM_DESC(req_timeout, "Global timeout for request");
+module_param(req_timeout, ushort, 0644);
+
+MODULE_PARM_DESC(nb_req_retries, "Global number of retries for request");
+module_param(nb_req_retries, ushort, 0644);
+
+MODULE_PARM_DESC(mirror_conn_timeout, "Global timeout for connection to mirror(s)");
+module_param(mirror_conn_timeout, ushort, 0644);
+
 
 /*
  * Handle an I/O request.
@@ -137,10 +161,16 @@ void dewb_xfer_scl(struct dewb_device_s *dev,
 
 static int dewb_thread(void *data)
 {
-	struct dewb_device_s *dev = data;
+	//struct dewb_device_s *dev = data;
+	struct dewb_device_s *dev;
 	struct request *req;
 	unsigned long flags;
 	int th_id;
+
+	if (dewb_log == DEWB_LOG_DEBUG)
+		DEWB_LOG(KERN_DEBUG, "dewb_thread: thread function with data %p", data);
+
+	dev = data;
 	
 	/* Init thread specific values */
 	spin_lock(&devtab_lock);
@@ -219,7 +249,13 @@ static void dewb_rq_fn(struct request_queue *q)
 
 static int dewb_open(struct block_device *bdev, fmode_t mode)
 {
-	dewb_device_t *dev = bdev->bd_disk->private_data;
+	//dewb_device_t *dev = bdev->bd_disk->private_data;
+	dewb_device_t *dev;
+
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_open: opening block device %p", bdev);
+
+	dev = bdev->bd_disk->private_data;
 
 	spin_lock(&devtab_lock);
 
@@ -235,9 +271,19 @@ static int dewb_open(struct block_device *bdev, fmode_t mode)
  * (becomes void). To avoid supporting too many things, just keep it int
  * and ignore th associated warning.
  */
-static int dewb_release(struct gendisk *disk, fmode_t mode)
+/* FDT: No return value expected
+ *      Fix compilation warning: initialization from incompatible pointer type
+ */
+//static int dewb_release(struct gendisk *disk, fmode_t mode)
+static void dewb_release(struct gendisk *disk, fmode_t mode)
 {
-	dewb_device_t *dev = disk->private_data;
+	//dewb_device_t *dev = disk->private_data;
+	dewb_device_t *dev;
+
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_release: releasing disk %p", disk);
+
+	dev = disk->private_data;
 
 	spin_lock(&devtab_lock);
 
@@ -245,7 +291,7 @@ static int dewb_release(struct gendisk *disk, fmode_t mode)
 
 	spin_unlock(&devtab_lock);
 
-	return 0;
+	//return 0;
 }
 
 static const struct block_device_operations dewb_fops =
@@ -261,6 +307,9 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	struct request_queue *q;
 	int i;
 	int ret;
+
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_init_disk: initializing disk for device: %p", dev);
 
 	/* create gendisk info */
 	disk = alloc_disk(DEV_MINORS);
@@ -346,6 +395,9 @@ static dewb_device_t *dewb_device_new(void)
 	dewb_device_t *dev = NULL;
 	int i;
 
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_DEBUG, "dewb_device_new: creating new device");
+
 	/* Lock table to protect against concurrent devices
 	 * creation */
 	spin_lock(&devtab_lock);
@@ -377,11 +429,17 @@ out:
 */
 static void __dewb_device_free(dewb_device_t *dev)
 {
+	if (dewb_log == DEWB_LOG_DEBUG)
+		DEWB_LOG(KERN_INFO, "__dewb_device_free: freeing device: %p", dev);
+
 	dev->name[0] = 0;
 }
 
 static void dewb_device_free(dewb_device_t *dev)
 {
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_device_free: freeing device: %p", dev);
+
 	spin_lock(&devtab_lock);
 	__dewb_device_free(dev);
 	spin_unlock(&devtab_lock);
@@ -394,6 +452,10 @@ static int _dewb_reconstruct_url(char *url, char *name,
 	int urllen = 0;
 	int namelen = 0;
 	int seplen = 0;
+
+	if (dewb_log == DEWB_LOG_DEBUG)
+		DEWB_LOG(KERN_DEBUG, "_dewb_reconstruct_url: construction of URL with url: %s, name: %s, baseurl: %s, basepath: %p, filename: %s", 
+				url, name, baseurl, basepath, filename);
 
 	urllen = strlen(baseurl);
 	if (baseurl[urllen - 1] != '/')
@@ -419,6 +481,9 @@ static int _dewb_reconstruct_url(char *url, char *name,
 static int __dewb_device_detach(dewb_device_t *dev)
 {
 	int i;
+
+	if (dewb_log == DEWB_LOG_DEBUG)
+		DEWB_LOG(KERN_DEBUG, "__dewb_device_detach: detaching device: %p", dev);
 
 	if (dev->users) {
 		DEWB_ERROR("%s: Unable to remove, device still opened", dev->name);
@@ -461,6 +526,9 @@ static int _dewb_detach_devices(void)
 	int i = 0;
 	int errcount = 0;
 
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "_dewb_detach_devices: detaching devices");
+
 	for (i=0; i<DEV_MAX; ++i)
 	{
 		if (!device_free_slot(&devtab[i]))
@@ -479,6 +547,10 @@ static int _dewb_detach_devices(void)
 
 static void _dewb_mirror_free(dewb_mirror_t *mirror)
 {
+	// FDT: should have a dewb_debug_t params
+	if (dewb_log == DEWB_LOG_DEBUG)
+		DEWB_LOG(KERN_DEBUG, "_dewb_mirror_new: deleting mirror %p", mirror);
+
 	if (mirror)
 		kfree(mirror);
 }
@@ -487,6 +559,9 @@ static int _dewb_mirror_new(dewb_debug_t *dbg, const char *url, dewb_mirror_t **
 {
 	dewb_mirror_t	*new = NULL;
 	int		ret = 0;
+
+	if (dbg->level == DEWB_LOG_DEBUG)
+		DEWB_LOG(KERN_DEBUG, "_dewb_mirror_new: creating mirror with url: %s, mirrors: %p", url, *mirror);
 
 	new = kcalloc(1, sizeof(*new), GFP_KERNEL);
 	if (new == NULL)
@@ -530,6 +605,10 @@ static int _dewb_mirror_pick(const char *filename, struct dewb_cdmi_desc_s *pick
 	int found = 0;
 	dewb_mirror_t *mirror = NULL;
 
+	// FDT: sgould have a dewb_debug_t param
+	if (dewb_log == DEWB_LOG_DEBUG)
+		DEWB_LOG(KERN_DEBUG, "_dewb_mirror_pick: picking mirror with filename: %s, with CDMI pick %p", filename, pick);
+
 	spin_lock(&devtab_lock);
 	mirror = mirrors;
 	while (mirror != NULL)
@@ -569,6 +648,9 @@ end:
 	return ret;
 }
 
+/* FDT: Respect ISO C90
+ *      Fix compilation warning: ISO C90 forbids mixed declarations and code
+ */
 int dewb_mirror_add(const char *url)
 {
 	int		ret = 0;
@@ -577,9 +659,14 @@ int dewb_mirror_add(const char *url)
 	dewb_mirror_t	*cur = NULL;
 	dewb_mirror_t	*last = NULL;
 	dewb_mirror_t	*new = NULL;
-
 	dewb_debug_t debug;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
+
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_mirror_add: adding mirror %s", url);
+
+	//dewb_debug_t debug;
+	//struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 
 	debug.name = "<Mirror-Adder>";
 	debug.level = DEWB_DEBUG_LEVEL;
@@ -661,6 +748,9 @@ int dewb_mirror_remove(const char *url)
 	dewb_mirror_t	*cur = NULL;
 	dewb_mirror_t	*prev = NULL;
 
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_mirror_remove: removing mirror %s", url);
+
 	if (strlen(url) >= DEWB_URL_SIZE)
 	{
 		DEWB_ERROR("Url too big: '%s'", url);
@@ -723,6 +813,9 @@ ssize_t dewb_mirrors_dump(char *buf, ssize_t max_size)
 	ssize_t		len = 0;
 	ssize_t		ret = 0;
 
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_mirrors_dump: dumping mirrors: buf: %p, max_size: %ld", buf, max_size);
+
 	spin_lock(&devtab_lock);
 	cur = mirrors;
 	while (cur)
@@ -768,6 +861,9 @@ int dewb_device_detach_by_name(const char *filename)
 	int ret;
 	int i;
 
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_device_detach_by_name: detaching device name %s", filename);
+
 	spin_lock(&devtab_lock);	
 	for (i = 0; i < DEV_MAX; ++i)
 	{
@@ -797,6 +893,9 @@ int dewb_device_detach_by_id(int dev_id)
 	dewb_device_t *dev;
 	int ret;
 
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_device_detach_by_id: detaching device id %d", dev_id);
+
 	spin_lock(&devtab_lock);
 
 	dev = &devtab[dev_id];
@@ -814,6 +913,9 @@ int dewb_device_attach(const char *filename)
 	int irc;
 	int i;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
+
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_device_attach: attaching filename %s", filename);
 
 	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
 	if (cdmi_desc == NULL)
@@ -882,6 +984,9 @@ int dewb_device_create(const char *filename, unsigned long long size)
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 	int rc;
 
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_device_create: creating filename %s of size %llu", filename, size);
+
 	debug.name = NULL;
 	debug.level = 0;
 
@@ -932,6 +1037,9 @@ int dewb_device_extend(const char *filename, unsigned long long size)
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 	int i;
 	int rc;
+
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_device_extend: extending filename %s to %llu size", filename, size);
 
 	debug.name = NULL;
 	debug.level = 0;
@@ -996,6 +1104,9 @@ int dewb_device_destroy(const char *filename)
 	int rc;
 	int remove_err = 0;
 	int i;
+
+	if (dewb_log >= DEWB_LOG_INFO)
+		DEWB_LOG(KERN_INFO, "dewb_device_destroy: destroying filename: %s", filename);
 
 	debug.name = NULL;
 	debug.level = 0;
@@ -1068,21 +1179,23 @@ static int __init dewblock_init(void)
 {
 	int rc;
 	
-	DEWB_INFO("Installing dewblock module");
+	DEWB_LOG(KERN_INFO, "Initializing %s block device driver version %s", DEV_NAME, DEV_REL_VERSION);
 
 	/* Zeroing device tab */
 	memset(devtab, 0, sizeof(devtab));
 
 	rc = dewb_sysfs_init();
-	if (rc)
+	if (rc) {
+		printk(KERN_ERR "Failed to initialize with code: %d", rc);
 		return rc;
+	}
 
 	return 0;
 }
  
 static void __exit dewblock_cleanup(void)
 {
-	DEWB_INFO("Cleaning up module");
+	DEWB_LOG(KERN_INFO, "Cleaning up %s block device driver", DEV_NAME);
 
 	spin_lock(&devtab_lock);
 	(void)_dewb_detach_devices();

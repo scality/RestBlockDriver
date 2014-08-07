@@ -10,12 +10,12 @@
 #include <net/sock.h>
 
 /* Constants */
-
 #define MB			(1024 * 1024)
 #define GB			(1024 * MB)
 
 /* Unix device constants */
 #define DEV_NAME		"dewb"
+#define DEV_REL_VERSION		"0.1.0"		// Set version of dewb LKM
 #define DEV_MINORS		256
 #define DEV_DEFAULT_DISKSIZE	(50 * MB)
 #define DEV_MAX			16
@@ -29,6 +29,32 @@
 				     * a single HTTP connection before
 				     * restarting a new one.
 				     */
+
+/* LKM parameters
+*/
+extern unsigned short dewb_log;
+extern unsigned short req_timeout;
+extern unsigned short nb_req_retries;
+extern unsigned short mirror_conn_timeout;
+
+// Log level
+#define DEWB_LOG_DEBUG		7
+#define DEWB_LOG_INFO		6
+#define DEWB_LOG_NOTICE		5
+#define DEWB_LOG_WARN		4
+#define DEWB_LGO_ERR		3
+#define DEWB_LOG_CRIT		2
+#define DEWB_LOG_ALERT		1
+#define DEWB_LOG_EMERG		0
+// Default values for parameters
+#define DEWB_REQ_TIMEOUT_DFLT		20
+#define DEWB_NB_REQ_RETRIES_DFLT	3
+#define DEWB_CONN_TIMEOUT_DFLT		30
+#define DEWB_LOG_LEVEL_DFLT		DEWB_LOG_INFO
+// Log function
+#define DEWB_LOG(level, fmt, a...) \
+        printk(level "dewb: " fmt "\n", ##a)
+
 
 #define DEWB_DEBUG_LEVEL	0   /* We do not want to be polluted
 				     * by default */
