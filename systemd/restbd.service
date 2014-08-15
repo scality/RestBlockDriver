@@ -14,17 +14,11 @@ EnvironmentFile=/etc/restbd.conf
 #
 # Start
 #
-# Use pre command to remove double quote
-#ExecStartPre=/usr/bin/touch /tmp/add_mirrors
-#ExecStart=/usr/sbin/insmod ${KMOD_PATH}/${KMOD_NAME}.ko ; /usr/bin/sed -r -e "s,.*,${MIRRORS}," -i /tmp/add_mirrors ; /usr/bin/cp /tmp/add_mirrors /sys/class/dewb/add_mirrors ; /usr/bin/rm -f /tmp/add_mirrors
-# Use post command to add double quote
-#ExecStartPost=/usr/bin/cp /tmp/add_mirrors /sys/class/dewb/add_mirrors
-
 ExecStart=/usr/sbin/insmod ${KMOD_PATH}/${KMOD_NAME}.ko
 ExecStart=/usr/bin/cp /sys/class/dewb/add_mirrors /tmp/add_mirrors
 ExecStart=/usr/bin/sed -r -e "s,.*,${MIRRORS}," -i /tmp/add_mirrors
 ExecStart=/usr/bin/cp /tmp/add_mirrors /sys/class/dewb/add_mirrors
-#ExecStart=/usr/bin/rm -f /tmp/add_mirrors
+ExecStart=/usr/bin/rm -f /tmp/add_mirrors
 
 #
 # Stop
@@ -32,7 +26,7 @@ ExecStart=/usr/bin/cp /tmp/add_mirrors /sys/class/dewb/add_mirrors
 ExecStop=/usr/bin/touch /tmp/add_mirrors
 ExecStop=/usr/bin/cp /tmp/add_mirrors /sys/class/dewb/add_mirrors
 ExecStop=/usr/sbin/rmmod $KMOD_NAME
-#ExecStop=/usr/bin/rm -f /tmp/add_mirrors
+ExecStop=/usr/bin/rm -f /tmp/add_mirrors
 
 
 [Install]

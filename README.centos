@@ -1,0 +1,60 @@
+		README file for CentOS Installation
+
+
+INTRODUCTION
+============
+
+This Linux Kernel Driver can be installed under CentOS v7 and upper release 
+with Linux Kernel greater than v3.8.
+
+
+Installing the driver with a service
+------------------------------------
+CentOS system uses 'systemd' as system management daemon which has been 
+designed for Linux as a replacement of the init system inherited from 
+UNIX System V.
+'systemd' Project: http://www.freedesktop.org/wiki/Software/systemd/
+
+
+In order to install the driver, you must first update the udev configuration
+and reload its rules.
+
+In order to do so, please use the following command:
+
+	# cp udev/50-restblock.rules /etc/udev/rules.d/
+	# udevadm control --reload-rules
+
+
+Once the udev rules have been updated, you can install the 'systemd' script 
+in order to configure and use the driver to access your CDMI Rest API.
+
+In order to install the system script, please use the following command:
+
+	# cp systemd/restbd.service /
+	# cp systemd/restbd.conf /etc/
+
+NB: Update your restbd.conf according to your CDMI condiguration:
+---   - set KMOD_PATH with the path where you have built the driver
+      - set MIRRORS with your mirrors URL
+
+
+Using the driver as a service
+-----------------------------
+'systemd' provides a command named 'systemctl' that allows to interact with any 
+service.
+
+In order to start / stop the service use the following command:
+
+	# systemctl start restbd.service
+	# systemctl stop restbd.service
+
+In order to enable / disable the service at boot time, use the following command:
+
+	# systemctl enable restbd.service
+	# systemctl disable restbd.service
+
+
+UNIT                                           LOAD   ACTIVE SUB       DESCRIPTION
+sys-devices-virtual-block-dewba-dewba1.device  loaded active plugged   /sys/devices/virtual/block/dewba/dewba1
+sys-devices-virtual-block-dewba.device         loaded active plugged   /sys/devices/virtual/block/dewba
+restbd.service                                 loaded active exited    Scality RestBlockDriver
