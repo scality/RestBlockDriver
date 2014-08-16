@@ -9,6 +9,7 @@
 #include <linux/scatterlist.h>
 #include <net/sock.h>
 
+
 /* Constants */
 #define MB			(1024 * 1024)
 #define GB			(1024 * MB)
@@ -30,14 +31,18 @@
 				     * restarting a new one.
 				     */
 
-/* LKM parameters
-*/
+/* TODO: Retry CDMI request (Issue #22)
+ * Linux Kernel Module (LKM) parameters
+ */
 extern unsigned short dewb_log;
 extern unsigned short req_timeout;
 extern unsigned short nb_req_retries;
 extern unsigned short mirror_conn_timeout;
+extern unsigned int thread_pool_size;
 
-// Log level
+/* TODO: LKM logging (Issue #28 and Issue #3)
+ * Standard Kernel value for log level
+ */
 #define DEWB_LOG_DEBUG		7
 #define DEWB_LOG_INFO		6
 #define DEWB_LOG_NOTICE		5
@@ -46,14 +51,20 @@ extern unsigned short mirror_conn_timeout;
 #define DEWB_LOG_CRIT		2
 #define DEWB_LOG_ALERT		1
 #define DEWB_LOG_EMERG		0
-// Default values for parameters
+/* 
+ * Dewblock log function
+ */
+#define DEWB_LOG(level, fmt, a...) \
+        printk(level "dewb: " fmt "\n", ##a)
+
+/* 
+ * Default values for Dewblock LKM parameters
+ */
 #define DEWB_REQ_TIMEOUT_DFLT		20
 #define DEWB_NB_REQ_RETRIES_DFLT	3
 #define DEWB_CONN_TIMEOUT_DFLT		30
 #define DEWB_LOG_LEVEL_DFLT		DEWB_LOG_INFO
-// Log function
-#define DEWB_LOG(level, fmt, a...) \
-        printk(level "dewb: " fmt "\n", ##a)
+#define DEWB_THREAD_POOL_SIZE_DFLT	8
 
 
 #define DEWB_DEBUG_LEVEL	0   /* We do not want to be polluted
@@ -61,8 +72,6 @@ extern unsigned short mirror_conn_timeout;
 
 
 #define DEWB_XMIT_BUFFER_SIZE	(DEWB_HTTP_HEADER_SIZE + DEV_SECTORSIZE)
-
-#define DEWB_THREAD_POOL_SIZE	8
 
 #define DEWB_INTERNAL_DBG(dbg, fmt, a...) \
 	do { if ((dbg)->level)					\
@@ -170,7 +179,6 @@ typedef struct dewb_debug_s {
 } dewb_debug_t;
 
 typedef struct dewb_device_s {
-
 	/* Device subsystem related data */
 	int			id;		/* device ID */
 	int			major;		/* blkdev assigned major */
@@ -183,11 +191,17 @@ typedef struct dewb_device_s {
 	struct request_queue	*q;
 	spinlock_t		rq_lock;	/* request queue lock */
 
-	struct task_struct	*thread[DEWB_THREAD_POOL_SIZE];
+	/* TODO: Use a dynamic thread pool (Issue #33)
+         */
+	//struct task_struct	*thread[DEWB_THREAD_POOL_SIZE_DFLT];
+	struct task_struct	**thread;	/* allow dynamic allocation during device creation */
 	int			nb_threads;
 
 	/* Dewpoint specific data */
-	struct dewb_cdmi_desc_s	thread_cdmi_desc[DEWB_THREAD_POOL_SIZE];
+	/* TODO: Use a dynamic CDMI pool due to the 1 <-> 1 relation with thread (Issue #33)
+	 */
+	//struct dewb_cdmi_desc_s	thread_cdmi_desc[DEWB_THREAD_POOL_SIZE_DFLT];
+	struct dewb_cdmi_desc_s	 **thread_cdmi_desc;	/* allow dynamic allocation during device creation*/
 
 	/* 
 	** List of requests received by the drivers, but still to be

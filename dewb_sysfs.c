@@ -18,17 +18,30 @@ static ssize_t attr_debug_store(struct device *dv,
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
 	struct dewb_device_s *dev = disk->private_data;
+        char *end;
+        long new;
+	int val;
 
-	if (count == 0)
-		return count;
-
-	disk = dev_to_disk(dv);
-	if (*buff == '0')
-		dev->debug.level = 0;
+	/* XXX: simple_strtol is an obsolete function
+	 * TODO: replace it with kstrtol wich can returns:
+	 *       0 on success, -ERANGE on overflow and -EINVAL on parsing error
+	 */
+	new = simple_strtol(buff, &end, 0);
+	if (end == buff || new > INT_MAX || new < INT_MIN) {
+		DEWB_LOG(KERN_WARNING, "attr_debug_store: Invalid debug value");
+		return -EINVAL;
+	}
+	val = (int) new;
+	if (val >= 0 && val <= 7) {
+		dev->debug.level = val;
+		if (dev->debug.level == DEWB_LOG_DEBUG)
+			DEWB_LOG(KERN_DEBUG, "attr_debug_store: Setting Log level to %d for device %s", 
+				val, dev->name);
+	}
 	else
-		dev->debug.level = 1;
-	
-	DEWB_INFO("Setting the debug level to %d", dev->debug.level);
+		DEWB_LOG(KERN_WARNING, "attr_debug_store: Invalid debug value (%d) for device %s in sysfs", 
+			val, dev->name);
+
 	return count;
 }
 
@@ -50,7 +63,8 @@ static ssize_t attr_urls_show(struct device *dv,
 	struct gendisk *disk	  = dev_to_disk(dv);
 	struct dewb_device_s *dev = disk->private_data;
 	
-	snprintf(buff, PAGE_SIZE, "%s\n", dev->thread_cdmi_desc[0].url);
+	//snprintf(buff, PAGE_SIZE, "%s\n", dev->thread_cdmi_desc[0].url);
+	snprintf(buff, PAGE_SIZE, "%s\n", dev->thread_cdmi_desc[0]->url);
 
 	return strlen(buff);
 }
@@ -61,7 +75,8 @@ static ssize_t attr_disk_name_show(struct device *dv,
 	struct gendisk *disk	  = dev_to_disk(dv);
 	struct dewb_device_s *dev = disk->private_data;
 
-	snprintf(buff, PAGE_SIZE, "%s\n", kbasename(dev->thread_cdmi_desc[0].url));
+	//snprintf(buff, PAGE_SIZE, "%s\n", kbasename(dev->thread_cdmi_desc[0].url));
+	snprintf(buff, PAGE_SIZE, "%s\n", kbasename(dev->thread_cdmi_desc[0]->url));
 
 	return strlen(buff);
 }
@@ -574,5 +589,4 @@ void dewb_sysfs_cleanup(void)
 	if (class_dewb)
 		class_destroy(class_dewb);
 	class_dewb = NULL;
-
 }
