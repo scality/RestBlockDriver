@@ -30,7 +30,7 @@ in order to configure and use the driver to access your CDMI Rest API.
 
 In order to install the system script, please use the following command:
 
-	# cp systemd/restbd.service /
+	# cp systemd/restbd.service /etc/systemd/system/
 	# cp systemd/restbd.conf /etc/
 
 NB: Update your restbd.conf according to your CDMI condiguration:
