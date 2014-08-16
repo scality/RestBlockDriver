@@ -54,7 +54,9 @@ In order to enable / disable the service at boot time, use the following command
 	# systemctl disable restbd.service
 
 
-UNIT                                           LOAD   ACTIVE SUB       DESCRIPTION
-sys-devices-virtual-block-dewba-dewba1.device  loaded active plugged   /sys/devices/virtual/block/dewba/dewba1
-sys-devices-virtual-block-dewba.device         loaded active plugged   /sys/devices/virtual/block/dewba
-restbd.service                                 loaded active exited    Scality RestBlockDriver
+Listing device used by RestBlockDriver service:
+	# systemctl list-units | grep -E '(rest|dew)'
+	UNIT                                           LOAD   ACTIVE SUB       DESCRIPTION
+	sys-devices-virtual-block-dewba-dewba1.device  loaded active plugged   /sys/devices/virtual/block/dewba/dewba1
+	sys-devices-virtual-block-dewba.device         loaded active plugged   /sys/devices/virtual/block/dewba
+	restbd.service                                 loaded active exited    Scality RestBlockDriver
