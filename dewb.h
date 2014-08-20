@@ -170,6 +170,7 @@ struct dewb_cdmi_desc_s {
 	int			sgl_size;
 	struct socket		*socket;
 	struct sockaddr_in	sockaddr;
+	struct timeval		timeout;
 };
 
 /* dewb device definition */

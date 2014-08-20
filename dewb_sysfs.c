@@ -5,6 +5,7 @@
 
 #include "dewb.h"
 
+
 /********************************************************************
  * /sys/block/dewb?/
  *                   dewb_debug	 Sets verbosity
@@ -135,17 +136,21 @@ static ssize_t class_dewb_create_store(struct class *c,
 	const char *tmp = buf;
 	unsigned long long size = 0;
 	size_t len = 0;
+	int coeff = 1;
+	char *size_str = NULL;
 
 	(void)c;
 	(void)attr;
 
-	DEWB_INFO("Creating volume with params: %s    (%lu)", buf, count);
+	DEWB_LOG(KERN_INFO, "Creating volume with params: %s (%lu)", buf, count);
+
+	/* TODO: split the buff into two string array with a thread-safe function strtok_r
+	 */
 
 	/* Ensure we have two space-separated args + only 1 space */
 	tmp = strrchr(buf, ' ');
-	if (tmp == NULL || tmp != strchr(buf, ' '))
-	{
-		DEWB_ERROR("More than one space in arguments: tmp=%p,"
+	if (tmp == NULL || tmp != strchr(buf, ' ')) {
+		DEWB_LOG(KERN_ERR, "More than one space in arguments: tmp=%p,"
                            "strchr=%p", tmp, strchr(buf, ' '));
 		ret = -EINVAL;
 		goto out;
@@ -153,38 +158,72 @@ static ssize_t class_dewb_create_store(struct class *c,
 
 	len = (size_t)(tmp - buf);
 	if ((len == 0) || (len >= DEWB_URL_SIZE)) {
-		DEWB_ERROR("len=%lu", len);
+		DEWB_LOG(KERN_ERR, "Invalid volume name (too long: %lu)", len);
 		ret = -EINVAL;
 		goto out;
 	}
 
+	/* remove string termination */
 	memcpy(filename, buf, len);
 	if (filename[len - 1] == '\n')
 		filename[len - 1] = 0;
 	else
 		filename[len] = 0;
 
-	DEWB_INFO("Trying to create device '%s' ...", filename);
-
+	/* skip free space */
 	while (*tmp != 0 && *tmp == ' ')
 		tmp++;
 
+	/* TODO: check for human readable size specification (Issue #15)
+	 *       create a specific function to handle human readable format
+	 */
 	/* Check that the second arg is numeric-only */
-	ret = kstrtoull(tmp, 10, &size);
-	if (ret != 0)
-		goto out;
+	/* remove termination string for string size */
+	if ((tmp[count - len - 3] == 'G') || (tmp[count - len - 3] == 'M')) {
+		DEWB_LOG(KERN_DEBUG, "Using human readable size");
+		size_str = kmalloc(count - len, GFP_KERNEL);
+		memcpy(size_str, tmp, count - len);
+		if (size_str[count - len - 3] == 'G') {
+			coeff = 1024*1024*1024;
+			size_str[count - len - 3] = '\0';
+			DEWB_LOG(KERN_DEBUG, "Detected G size: %s", size_str);
+		} else if (size_str[count - len - 3] == 'M') {
+			coeff = 1024*1024;
+			size_str[count - len - 3] = '\0';
+			DEWB_LOG(KERN_DEBUG, "Detected M size: %s", size_str);
+		}
+		ret = kstrtoull(size_str, 10, &size);
+		if (ret != 0) {
+			DEWB_LOG(KERN_ERR, "Invalid volume size %s (ret: %lu)", size_str, ret);
+			ret = -EINVAL;
+			goto out;
+		}
+		kfree(size_str);
+		size = size * coeff;
+	}
+	else {
+		ret = kstrtoull(tmp, 10, &size);
+		if (ret != 0) {
+			DEWB_LOG(KERN_ERR, "Invalid volume size %s", tmp);
+			ret = -EINVAL;
+			goto out;
+		}
+	}
 
-	DEWB_INFO("... of %llu bytes", size);
+	DEWB_LOG(KERN_INFO, "Creating volume %s of size %llu (bytes)", filename, size);
 
 	ret = dewb_device_create(filename, size);
-	if (ret != 0)
-	{
+	if (ret != 0) {
+		DEWB_LOG(KERN_ERR, "Failed to create device: %lu", ret);
 		goto out;
 	}
 
 	ret = count;
 
 out:
+	if (size_str != NULL)
+		kfree(size_str);
+
 	return ret;
 }
 
@@ -214,7 +253,7 @@ static ssize_t class_dewb_extend_store(struct class *c,
 	(void)c;
 	(void)attr;
 
-	DEWB_INFO("Extending volume with params: %s    (%lu)", buf, count);
+	DEWB_LOG(KERN_INFO, "Extending volume with params: %s (%lu)", buf, count);
 
 	/* Ensure we have two space-separated args + only 1 space */
 	tmp = strrchr(buf, ' ');
@@ -252,8 +291,7 @@ static ssize_t class_dewb_extend_store(struct class *c,
 	DEWB_INFO("... of %llu bytes", size);
 
 	ret = dewb_device_extend(filename, size);
-	if (ret != 0)
-	{
+	if (ret != 0) {
 		goto out;
 	}
 
@@ -564,6 +602,8 @@ int dewb_sysfs_init(void)
 	 * create control files in sysfs
 	 * /sys/class/dewb/...
 	 */
+	/* TODO: check for class_create() from device.h
+	 */
 	class_dewb = kzalloc(sizeof(*class_dewb), GFP_KERNEL);
 	if (!class_dewb)
 		return -ENOMEM;
@@ -577,7 +617,7 @@ int dewb_sysfs_init(void)
 	if (ret) {
 		kfree(class_dewb);
 		class_dewb = NULL;
-		DEWB_ERROR("failed to create class dewb");
+		DEWB_LOG(KERN_ERR, "Failed to create class dewb");
 		return ret;
 	}
 
@@ -586,6 +626,8 @@ int dewb_sysfs_init(void)
 
 void dewb_sysfs_cleanup(void)
 {
+	/* TODO: check for class_unregister from device.h
+	 */
 	if (class_dewb)
 		class_destroy(class_dewb);
 	class_dewb = NULL;

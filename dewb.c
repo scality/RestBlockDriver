@@ -355,6 +355,8 @@ int dewb_xfer_scl(struct dewb_device_s *dev,
 		}
 		if (0 == ret)
 			break;
+		else
+			DEWB_LOG(KERN_NOTICE, "Retrying CDMI request... %d", (i + 1));
 	}
 
 	if (ret) {
@@ -559,6 +561,7 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 			dev);
 		return -ENOMEM;
 	}
+	DEWB_LOG(KERN_INFO, "Creating new disk: %p", disk);
 
 	strcpy(disk->disk_name, dev->name);
 	disk->major	   = dev->major;
@@ -592,12 +595,11 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	for (i = 0; i < thread_pool_size; i++) {
 		//if ((ret = dewb_cdmi_connect(&dev->debug, &dev->thread_cdmi_desc[i]))) {
 		if ((ret = dewb_cdmi_connect(&dev->debug, dev->thread_cdmi_desc[i]))) {
-			DEWB_ERROR("Unable to connect to CDMI endpoint: %d",
+			DEWB_LOG(KERN_ERR, "Unable to connect to CDMI endpoint: %d",
 				ret);
 			put_disk(disk);
 			return -EIO;
 		}
-
 	}
 	/* Caution: be sure to call this before spawning threads */
 	//ret = dewb_cdmi_getsize(&dev->debug, &dev->thread_cdmi_desc[0],
@@ -692,6 +694,13 @@ static dewb_device_t *dewb_device_new(void)
 			DEWB_LOG(KERN_CRIT, "dewb_device_new: Unable to allocate memory for CDMI struct, step %d", i);
 			goto err_mem;
 		}
+		/* TODO: add a socket timeout
+		 * NB: this is erased as cdmi_desc is reallocatd and rewritted
+		 */
+		/* set request timeout */
+		DEWB_LOG(KERN_INFO, "dewb_device_new: Setting CDMI request timeout: %d", req_timeout);
+		dev->thread_cdmi_desc[i]->timeout.tv_sec = req_timeout; 
+		dev->thread_cdmi_desc[i]->timeout.tv_usec = 0; 
 	}
 	dev->thread = kmalloc(sizeof(struct task_struct *) * thread_pool_size, GFP_KERNEL);
 	if (dev->thread == NULL) {
@@ -1229,12 +1238,11 @@ int dewb_device_attach(const char *filename)
 
 	/* TODO: Remove useless memory allocation
 	 */
-/*	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
+	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
 	if (cdmi_desc == NULL) {
 		rc = -ENOMEM;
 		goto err_out_mod;
 	}
-*/
 
 	/* Allocate dev structure */
 	dev = dewb_device_new();
@@ -1249,10 +1257,11 @@ int dewb_device_attach(const char *filename)
 
 	/* set first CDMI struct */
 	//cdmi_desc = &dev->thread_cdmi_desc[0];
-	cdmi_desc = dev->thread_cdmi_desc[0];
+	//cdmi_desc = dev->thread_cdmi_desc[0];
 
 	/* Pick a convenient mirror to get dewb_cdmi_desc
 	 * TODO: #13 We need to manage failover by using every mirror
+	 * NB: _dewb_mirror_pick rewrite the cdmi_desc sruct
 	 */
 	rc = _dewb_mirror_pick(filename, cdmi_desc);
 	if (rc != 0) { 
@@ -1261,12 +1270,17 @@ int dewb_device_attach(const char *filename)
 	DEWB_INFO("Adding Device: Picked mirror [ip=%s port=%d fullpath=%s]",
 		  cdmi_desc->ip_addr, cdmi_desc->port, cdmi_desc->filename);
 
+	/* set timeout value */
+	cdmi_desc->timeout.tv_sec = req_timeout;
+	cdmi_desc->timeout.tv_usec = 0;
+
 	/* Parse add command */
 	/* TODO: copy CDMI struct to for each thread
 	 */
 	//for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++) {
-	for (i = 1; i < thread_pool_size; i++) {	
+	for (i = 0; i < thread_pool_size; i++) {	
 		memcpy(dev->thread_cdmi_desc[i], cdmi_desc, sizeof(*cdmi_desc));
+		DEWB_LOG(KERN_INFO, "thread CDMI timeout: %lu", dev->thread_cdmi_desc[i]->timeout.tv_sec);
 	}
 	irc = register_blkdev(0, dev->name);
 	if (irc < 0) {
@@ -1289,7 +1303,11 @@ int dewb_device_attach(const char *filename)
 err_out_unregister:
 	unregister_blkdev(dev->major, dev->name);
 err_out_dev:
-	if (NULL != dev) dewb_device_free(dev);
+	if (NULL != dev)
+		dewb_device_free(dev);
+	if (NULL != cdmi_desc)
+		kfree(cdmi_desc);
+err_out_mod:
 	DEWB_ERROR("Error adding device %s", filename);
 
 	return rc;
@@ -1304,7 +1322,7 @@ int dewb_device_create(const char *filename, unsigned long long size)
 	if (dewb_log >= DEWB_LOG_INFO)
 		DEWB_LOG(KERN_INFO, "dewb_device_create: creating filename %s of size %llu", filename, size);
 
-	/* TODO: Inherit log ldevel from dewblock LKM (Issue #28)
+	/* TODO: Inherit log level from dewblock LKM (Issue #28)
 	 */
 	debug.name = NULL;
 	//debug.level = 0;
@@ -1524,12 +1542,11 @@ static void __exit dewblock_cleanup(void)
 	/* XXX: Only lock while detaching device
 	 */
 	//spin_lock(&devtab_lock);
-	(void)_dewb_detach_devices();
+	//(void)_dewb_detach_devices();
+	_dewb_detach_devices();
 	//spin_unlock(&devtab_lock);
 
 	dewb_sysfs_cleanup();
-
-	return ;
 }
 
 module_init(dewblock_init);

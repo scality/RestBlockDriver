@@ -178,6 +178,20 @@ int dewb_cdmi_connect(dewb_debug_t *dbg,
 		goto out_error;
 	}
 
+	/* TODO: set request timeout value (Issue #22) */
+	if (desc->timeout.tv_sec > 0) {
+		DEWB_LOG(KERN_INFO, "dewb_cdmi_connect: set socket timeout %lu", desc->timeout.tv_sec);
+		ret = kernel_setsockopt(desc->socket, SOL_SOCKET, SO_RCVTIMEO, 
+			(char *)&desc->timeout, sizeof(struct timeval));
+		if (ret < 0) {
+			DEWB_LOG(KERN_ERR, "Failed to set socket receive timeout value: %d", ret);
+		}
+		ret = kernel_setsockopt(desc->socket, SOL_SOCKET, SO_SNDTIMEO, (char *)&desc->timeout, sizeof(struct timeval));
+		if (ret < 0) {
+			DEWB_LOG(KERN_ERR, "Failed to set socket send timeout value: %d", ret);
+		}
+	}
+
 	/* As we established a new connection, reset the number of
 	   HTTP requests sent */
 	desc->nb_requests = 0;
@@ -205,6 +219,16 @@ int dewb_cdmi_disconnect(dewb_debug_t *dbg,
 	desc->state  = CDMI_DISCONNECTED;
 	return 0;
 }
+
+
+/* static void sock_xmit_timeout(unsigned long arg)
+{
+        struct task_struct *task = (struct task_struct *)arg;
+
+        DEWB_LOG(KERN_WARNING, "dewb sock: killing hung xmit (%s, pid: %d)\n",
+                task->comm, task->pid);
+        force_sig(SIGKILL, task);
+} */
 
 /*
  *  Send or receive packet.
@@ -245,14 +269,28 @@ static int sock_xmit(dewb_debug_t *dbg,
 		msg.msg_flags = MSG_NOSIGNAL;
 
 		if (send) {
+			/* TODO: add a socket timer
+			struct timer_list ti; 
+			DEWB_LOG(KERN_INFO, "Initializing request timeout: %d", desc->xmit_timeout);
+			if (desc->xmit_timeout > 0) {
+				init_timer(&ti);
+				ti.function = sock_xmit_timeout;
+				ti.data = (unsigned long) current;
+				ti.expires = jiffies + req_timeout;
+				add_timer(&ti);
+			} */
+
 			result = kernel_sendmsg(desc->socket, &msg, &iov, 1, size);
+
+			/* if (desc->xmit_timeout > 0)
+				del_timer_sync(&ti); */
 		} else
 			result = kernel_recvmsg(desc->socket, &msg, &iov, 1, size,
 						msg.msg_flags);
 		DEWB_DEBUG("Result = %d", result);
 		if (signal_pending(current)) {
 			siginfo_t info;
-			DEWB_INFO("nbd (pid %d: %s) got signal %d\n",
+			DEWB_INFO("dewb (pid %d: %s) got signal %d\n",
 				task_pid_nr(current), current->comm,
 				dequeue_signal_lock(current, &current->blocked, &info));
 			result = -EINTR;
