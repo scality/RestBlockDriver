@@ -25,7 +25,7 @@
 
 /* Dewpoint server related constants */
 #define DEWB_HTTP_HEADER_SIZE	1024
-#define DEWB_URL_SIZE		64
+#define DEWB_URL_SIZE		256
 #define DEWB_REUSE_LIMIT	500 /* Max number of requests sent to
 				     * a single HTTP connection before
 				     * restarting a new one.
