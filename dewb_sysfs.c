@@ -2,9 +2,66 @@
 #include <linux/kernel.h>    // included for KERN_INFO
 #include <linux/device.h>
 #include <linux/blkdev.h>
+#include <linux/string.h>
 
 #include "dewb.h"
 
+
+/* Function for parsing params and reading humand readable size format
+ * 
+ */
+int parse_params(char *params, const char *delim, char **param_tbl, int param_nb, int max)
+{
+	int i;
+	int j;
+	char *tmp;
+
+	j = 0;
+	for (i = 0; i < max && j < param_nb; i++) {
+		tmp = strsep(&params, delim);
+		if (NULL != tmp && *tmp != '\0') {
+			param_tbl[j] = tmp;
+			j++;
+		}
+	}
+
+	return 0;
+}
+int human_to_bytes(char *size_str, unsigned long long *size)
+{
+	char h;
+	unsigned long long coef;
+	int ret;
+
+	coef = 1;
+	h = size_str[strlen(size_str) - 1];
+	/* get human format if any and set coeff */
+	switch (h) {
+		case 'G':
+			coef = GB;
+			size_str[strlen(size_str) - 1] = '\0';
+			break;
+		case 'M':
+			coef = MB;
+			size_str[strlen(size_str) - 1] = '\0';
+			break;
+		case 'k':
+			coef = kB;
+			size_str[strlen(size_str) - 1] = '\0';
+			break;
+		default:
+			coef = 1;
+	}
+	/* calculate size */
+	ret = kstrtoull(size_str, 10, size);
+	if (ret != 0) {
+		DEWB_LOG_ERR(dewb_log, "Invalid volume size %s (%llu) (ret: %d)", size_str, *size, ret);
+		return -EINVAL;
+	}
+	*size = *size * coef;
+
+	return 0; 
+}
 
 /********************************************************************
  * /sys/block/dewb?/
@@ -29,18 +86,17 @@ static ssize_t attr_debug_store(struct device *dv,
 	 */
 	new = simple_strtol(buff, &end, 0);
 	if (end == buff || new > INT_MAX || new < INT_MIN) {
-		DEWB_LOG(KERN_WARNING, "attr_debug_store: Invalid debug value");
+		DEWB_LOG_WARN(dev->debug.level, "attr_debug_store: Invalid debug value");
 		return -EINVAL;
 	}
 	val = (int) new;
 	if (val >= 0 && val <= 7) {
 		dev->debug.level = val;
-		if (dev->debug.level == DEWB_LOG_DEBUG)
-			DEWB_LOG(KERN_DEBUG, "attr_debug_store: Setting Log level to %d for device %s", 
-				val, dev->name);
+		DEWB_LOG_DEBUG(dev->debug.level, "attr_debug_store: Setting Log level to %d for device %s", 
+			val, dev->name);
 	}
 	else
-		DEWB_LOG(KERN_WARNING, "attr_debug_store: Invalid debug value (%d) for device %s in sysfs", 
+		DEWB_LOG_WARN(dev->debug.level, "attr_debug_store: Invalid debug value (%d) for device %s in sysfs", 
 			val, dev->name);
 
 	return count;
@@ -132,89 +188,53 @@ static ssize_t class_dewb_create_store(struct class *c,
 				const char *buf, size_t count)
 {
 	ssize_t ret = 0;
-	char filename[DEWB_URL_SIZE + 1];
-	const char *tmp = buf;
+	//char filename[DEWB_URL_SIZE + 1];
+	//const char *tmp = buf;
 	unsigned long long size = 0;
 	size_t len = 0;
-	int coeff = 1;
 	char *size_str = NULL;
-
+	char *params[2];
+	char delim = ' ';
+	char *tmp_buf;
 	(void)c;
 	(void)attr;
 
-	DEWB_LOG(KERN_INFO, "Creating volume with params: %s (%lu)", buf, count);
+	DEWB_LOG_INFO(dewb_log, "Creating volume with params: %s (%lu)", buf, count);
 
 	/* TODO: split the buff into two string array with a thread-safe function strtok_r
+	 *       - use a temporary buffer
+	 *       - properly end string
 	 */
-
-	/* Ensure we have two space-separated args + only 1 space */
-	tmp = strrchr(buf, ' ');
-	if (tmp == NULL || tmp != strchr(buf, ' ')) {
-		DEWB_LOG(KERN_ERR, "More than one space in arguments: tmp=%p,"
-                           "strchr=%p", tmp, strchr(buf, ' '));
+	tmp_buf = NULL;
+	if (count >= 256) {
+		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
 		ret = -EINVAL;
 		goto out;
 	}
-
-	len = (size_t)(tmp - buf);
-	if ((len == 0) || (len >= DEWB_URL_SIZE)) {
-		DEWB_LOG(KERN_ERR, "Invalid volume name (too long: %lu)", len);
+	
+	tmp_buf = kmalloc(count, GFP_KERNEL);
+	if (NULL == tmp_buf) {
+		DEWB_LOG_ERR(dewb_log, "Unable to allocate memory for parameters");
+		ret = -ENOMEM;
+		goto out;
+	}
+	memcpy(tmp_buf, buf, count);
+	tmp_buf[count - 1] = 0;
+	parse_params(tmp_buf, &delim, params, 2, count);
+	/* sanity check */
+	len = strlen(params[0]);
+	if (len >= DEWB_URL_SIZE) {
+		DEWB_LOG_ERR(dewb_log, "Invalid volume name (too long: %lu)", len);
 		ret = -EINVAL;
 		goto out;
 	}
+	human_to_bytes(params[1], &size);
 
-	/* remove string termination */
-	memcpy(filename, buf, len);
-	if (filename[len - 1] == '\n')
-		filename[len - 1] = 0;
-	else
-		filename[len] = 0;
+	DEWB_LOG_INFO(dewb_log, "Creating volume %s of size %llu (bytes)", params[0], size);
 
-	/* skip free space */
-	while (*tmp != 0 && *tmp == ' ')
-		tmp++;
-
-	/* TODO: check for human readable size specification (Issue #15)
-	 *       create a specific function to handle human readable format
-	 */
-	/* Check that the second arg is numeric-only */
-	/* remove termination string for string size */
-	if ((tmp[count - len - 3] == 'G') || (tmp[count - len - 3] == 'M')) {
-		DEWB_LOG(KERN_DEBUG, "Using human readable size");
-		size_str = kmalloc(count - len, GFP_KERNEL);
-		memcpy(size_str, tmp, count - len);
-		if (size_str[count - len - 3] == 'G') {
-			coeff = 1024*1024*1024;
-			size_str[count - len - 3] = '\0';
-			DEWB_LOG(KERN_DEBUG, "Detected G size: %s", size_str);
-		} else if (size_str[count - len - 3] == 'M') {
-			coeff = 1024*1024;
-			size_str[count - len - 3] = '\0';
-			DEWB_LOG(KERN_DEBUG, "Detected M size: %s", size_str);
-		}
-		ret = kstrtoull(size_str, 10, &size);
-		if (ret != 0) {
-			DEWB_LOG(KERN_ERR, "Invalid volume size %s (ret: %lu)", size_str, ret);
-			ret = -EINVAL;
-			goto out;
-		}
-		kfree(size_str);
-		size = size * coeff;
-	}
-	else {
-		ret = kstrtoull(tmp, 10, &size);
-		if (ret != 0) {
-			DEWB_LOG(KERN_ERR, "Invalid volume size %s", tmp);
-			ret = -EINVAL;
-			goto out;
-		}
-	}
-
-	DEWB_LOG(KERN_INFO, "Creating volume %s of size %llu (bytes)", filename, size);
-
-	ret = dewb_device_create(filename, size);
+	ret = dewb_device_create(params[0], size);
 	if (ret != 0) {
-		DEWB_LOG(KERN_ERR, "Failed to create device: %lu", ret);
+		DEWB_LOG_ERR(dewb_log, "Failed to create device: %lu", ret);
 		goto out;
 	}
 
@@ -223,6 +243,8 @@ static ssize_t class_dewb_create_store(struct class *c,
 out:
 	if (size_str != NULL)
 		kfree(size_str);
+	if (tmp_buf != NULL)
+		kfree(tmp_buf);
 
 	return ret;
 }
@@ -245,52 +267,47 @@ static ssize_t class_dewb_extend_store(struct class *c,
 				       const char *buf, size_t count)
 {
 	ssize_t ret = 0;
-	char filename[DEWB_URL_SIZE + 1];
-	const char *tmp = buf;
+	//char filename[DEWB_URL_SIZE + 1];
+	//const char *tmp = buf;
 	unsigned long long size = 0;
 	size_t len = 0;
-
+	char *size_str = NULL;
+	char *params[2];
+	char delim = ' ';
+	char *tmp_buf;
 	(void)c;
 	(void)attr;
 
-	DEWB_LOG(KERN_INFO, "Extending volume with params: %s (%lu)", buf, count);
+	DEWB_LOG_INFO(dewb_log, "Extending volume with params: %s (%lu)", buf, count);
 
-	/* Ensure we have two space-separated args + only 1 space */
-	tmp = strrchr(buf, ' ');
-	if (tmp == NULL || tmp != strchr(buf, ' '))
-	{
-		DEWB_ERROR("More than one space in arguments: tmp=%p,"
-                           "strchr=%p", tmp, strchr(buf, ' '));
+	tmp_buf = NULL;
+	if (count >= 256) {
+		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
 		ret = -EINVAL;
 		goto out;
 	}
-
-	len = (size_t)(tmp - buf);
-	if ((len == 0) || (len >= DEWB_URL_SIZE)) {
-		DEWB_ERROR("len=%lu", len);
+	
+	tmp_buf = kmalloc(count, GFP_KERNEL);
+	if (NULL == tmp_buf) {
+		DEWB_LOG_ERR(dewb_log, "Unable to allocate memory for parameters");
+		ret = -ENOMEM;
+		goto out;
+	}
+	memcpy(tmp_buf, buf, count);
+	tmp_buf[count - 1] = 0;
+	parse_params(tmp_buf, &delim, params, 2, count);
+	/* sanity check */
+	len = strlen(params[0]);
+	if (len >= DEWB_URL_SIZE) {
+		DEWB_LOG_ERR(dewb_log, "Invalid volume name (too long: %lu)", len);
 		ret = -EINVAL;
 		goto out;
 	}
+	human_to_bytes(params[1], &size);
 
-	memcpy(filename, buf, len);
-	if (filename[len - 1] == '\n')
-		filename[len - 1] = 0;
-	else
-		filename[len] = 0;
+	DEWB_LOG_INFO(dewb_log, "Creating volume %s of size %llu (bytes)", params[0], size);
 
-	DEWB_INFO("Trying to extend device '%s' ...", filename);
-
-	while (*tmp != 0 && *tmp == ' ')
-		tmp++;
-
-	/* Check that the second arg is numeric-only */
-	ret = kstrtoull(tmp, 10, &size);
-	if (ret != 0)
-		goto out;
-
-	DEWB_INFO("... of %llu bytes", size);
-
-	ret = dewb_device_extend(filename, size);
+	ret = dewb_device_extend(params[0], size);
 	if (ret != 0) {
 		goto out;
 	}
@@ -298,6 +315,11 @@ static ssize_t class_dewb_extend_store(struct class *c,
 	ret = count;
 
 out:
+	if (size_str != NULL)
+		kfree(size_str);
+	if (tmp_buf != NULL)
+		kfree(tmp_buf);
+
 	return ret;
 }
 
@@ -324,8 +346,8 @@ static ssize_t class_dewb_destroy_store(struct class *c,
 
 	/* Sanity check URL size */
 	if ((count == 0) || (count >= DEWB_URL_SIZE)) {
-		DEWB_ERROR("Url too long");
-		ret =-ENOMEM;
+		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
+		ret = -ENOMEM;
 		goto out;
 	}
 	
@@ -335,10 +357,9 @@ static ssize_t class_dewb_destroy_store(struct class *c,
 	else
 		filename[count] = 0;
 
-	DEWB_INFO("Trying to destroy device '%s'", filename);
+	DEWB_LOG_INFO(dewb_log, "Destroying device '%s'", filename);
 	ret = dewb_device_destroy(filename);
-	if (ret != 0)
-	{
+	if (ret != 0) {
 		goto out;
 	}
 
@@ -365,11 +386,12 @@ static ssize_t class_dewb_attach_store(struct class *c,
 {
 	int ret;
 	char filename[DEWB_URL_SIZE + 1];
+	struct dewb_cdmi_desc_s *cdmi_desc;
 
 	/* Sanity check URL size */
 	if ((count == 0) || (count > DEWB_URL_SIZE)) {
-		DEWB_ERROR("Url too long");
-		ret =-ENOMEM;
+		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
+		ret = -EINVAL;
 		goto out;
 	}
 	
@@ -379,10 +401,20 @@ static ssize_t class_dewb_attach_store(struct class *c,
 	else
 		filename[count] = 0;
 
-	ret = dewb_device_attach(filename);
-	if (ret == 0)
+	cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s *), GFP_KERNEL);
+	if (cdmi_desc == NULL) {
+		ret = -ENOMEM;
+                goto out;
+	}
+
+	DEWB_LOG_INFO(dewb_log, "Attaching device %s", filename);
+	ret = dewb_device_attach(cdmi_desc, filename);
+	if (ret == 0) {
+		kfree(cdmi_desc);
 		return count;
+	}
 out:
+
 	return ret;
 }
 
@@ -407,8 +439,8 @@ static ssize_t class_dewb_detach_store(struct class *c,
 
 	/* Sanity check URL size */
 	if ((count == 0) || (count > DEWB_URL_SIZE)) {
-		DEWB_ERROR("Url too long");
-		return -ENOMEM;
+		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
+		return -EINVAL;
 	}
 	
 	memcpy(filename, buf, count);
@@ -417,6 +449,7 @@ static ssize_t class_dewb_detach_store(struct class *c,
 	else
 		filename[count] = 0;
 
+	DEWB_LOG_INFO(dewb_log, "Detaching device %s", filename);
 	ret = dewb_device_detach_by_name(filename);
 	if (ret == 0)
 		return count;
@@ -466,7 +499,7 @@ static ssize_t class_dewb_addmirror_store(struct class *c,
 
 			if ((tmpend - tmp) > DEWB_URL_SIZE)
 			{
-				DEWB_ERROR("Url too big: '%s'", tmp);
+				DEWB_LOG_ERR(dewb_log, "Url too big: '%s'", tmp);
 				ret = -EINVAL;
 				goto end;
 			}
@@ -486,7 +519,7 @@ static ssize_t class_dewb_addmirror_store(struct class *c,
 	ret = count;
 	if (errcount > 0)
 	{
-		DEWB_ERROR("Could not add every mirror to driver.");
+		DEWB_LOG_ERR(dewb_log, "Could not add every mirror to driver.");
 		ret = -EINVAL;
 	}
 
@@ -535,7 +568,7 @@ static ssize_t class_dewb_removemirror_store(struct class *c,
 
 			if ((tmpend - tmp) > DEWB_URL_SIZE)
 			{
-				DEWB_ERROR("Url too big: '%s'", tmp);
+				DEWB_LOG_ERR(dewb_log, "Url too big: '%s'", tmp);
 				ret = -EINVAL;
 				goto end;
 			}
@@ -605,9 +638,10 @@ int dewb_sysfs_init(void)
 	/* TODO: check for class_create() from device.h
 	 */
 	class_dewb = kzalloc(sizeof(*class_dewb), GFP_KERNEL);
-	if (!class_dewb)
+	if (!class_dewb) {
+		DEWB_LOG_CRIT(dewb_log, "Failed to allocate memory for sysfs class registration");
 		return -ENOMEM;
-
+	}
 	class_dewb->name	  = DEV_NAME;
 	class_dewb->owner	  = THIS_MODULE;
 	class_dewb->class_release = class_dewb_release;
@@ -617,7 +651,7 @@ int dewb_sysfs_init(void)
 	if (ret) {
 		kfree(class_dewb);
 		class_dewb = NULL;
-		DEWB_LOG(KERN_ERR, "Failed to create class dewb");
+		DEWB_LOG_CRIT(dewb_log, "Failed to create class dewb");
 		return ret;
 	}
 

@@ -9,9 +9,9 @@
 #include <linux/scatterlist.h>
 #include <net/sock.h>
 
-
 /* Constants */
-#define MB			(1024 * 1024)
+#define kB			1024
+#define MB			(1024 * kB)
 #define GB			(1024 * MB)
 
 /* Unix device constants */
@@ -43,27 +43,41 @@ extern unsigned int thread_pool_size;
 /* TODO: LKM logging (Issue #28 and Issue #3)
  * Standard Kernel value for log level
  */
-#define DEWB_LOG_DEBUG		7
-#define DEWB_LOG_INFO		6
-#define DEWB_LOG_NOTICE		5
-#define DEWB_LOG_WARN		4
-#define DEWB_LGO_ERR		3
-#define DEWB_LOG_CRIT		2
-#define DEWB_LOG_ALERT		1
-#define DEWB_LOG_EMERG		0
+#define DEWB_DEBUG		7
+#define DEWB_INFO		6
+#define DEWB_NOTICE		5
+#define DEWB_WARN		4
+#define DEWB_ERR		3
+#define DEWB_CRIT		2
+#define DEWB_ALERT		1
+#define DEWB_EMERG		0
 /* 
  * Dewblock log function
  */
-#define DEWB_LOG(level, fmt, a...) \
-        printk(level "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_DEBUG(level, fmt, a...) \
+	if (level >= DEWB_DEBUG) printk(KERN_DEBUG "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_INFO(level, fmt, a...) \
+	if (level >= DEWB_INFO) printk(KERN_INFO "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_NOTICE(level, fmt, a...) \
+	if (level >= DEWB_NOTICE) printk(KERN_NOTICE "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_WARN(level, fmt, a...) \
+	if (level >= DEWB_WARN) printk(KERN_WARNING "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_ERR(level, fmt, a...) \
+	if (level >= DEWB_ERR) printk(KERN_ERR "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_CRIT(level, fmt, a...) \
+	if (level >= DEWB_CRIT) printk(KERN_CRIT "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_ALERT(level, fmt, a...) \
+	if (level >= DEWB_ALERT) printk(KERN_ALERT "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_EMERG(level, fmt, a...) \
+	if (level >= DEWB_EMERG) printk(KERN_EMERG "dewb: " fmt "\n", ##a)
 
 /* 
  * Default values for Dewblock LKM parameters
  */
-#define DEWB_REQ_TIMEOUT_DFLT		20
+#define DEWB_REQ_TIMEOUT_DFLT		30
 #define DEWB_NB_REQ_RETRIES_DFLT	3
 #define DEWB_CONN_TIMEOUT_DFLT		30
-#define DEWB_LOG_LEVEL_DFLT		DEWB_LOG_INFO
+#define DEWB_LOG_LEVEL_DFLT		DEWB_INFO
 #define DEWB_THREAD_POOL_SIZE_DFLT	8
 
 
@@ -79,16 +93,17 @@ extern unsigned int thread_pool_size;
 			(dbg)->name, __func__, __LINE__, ##a);	\
 	} while (0)
 
-#define DEWB_DEBUG(fmt, a...) DEWB_INTERNAL_DBG(dbg, fmt, ##a)
+//#define DEWB_DEBUG(fmt, a...) DEWB_INTERNAL_DBG(dbg, fmt, ##a)
 
 #define DEWB_DEV_DEBUG(fmt, a...) DEWB_INTERNAL_DBG(&dev->debug, fmt, ##a)
 
-
+/*
 #define DEWB_INFO(fmt, a...) \
 	printk(KERN_INFO "dewb: " fmt "\n" , ##a)
 
 #define DEWB_ERROR(fmt, a...) \
 	printk(KERN_ERR "dewb: " fmt "\n" , ##a)
+*/
 
 #define DEWB_MIN(x, y) ((x) < (y) ? (x) : (y))
 #define DEWB_N_JSON_TOKENS	128
@@ -226,7 +241,8 @@ int dewb_device_create(const char *filename, unsigned long long size);
 int dewb_device_extend(const char *filename, unsigned long long size);
 int dewb_device_destroy(const char *filename);
 
-int dewb_device_attach(const char *filename);
+//int dewb_device_attach(const char *filename);
+int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename);
 int dewb_device_detach_by_name(const char *filename);
 int dewb_device_detach_by_id(int dev_id);
 
@@ -266,8 +282,10 @@ int dewb_cdmi_extend(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 		     unsigned long long trunc_size);
 int dewb_cdmi_delete(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc);
 
+/* int dewb_cdmi_list(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
+		   int (*volume_cb)(const char *)); */
 int dewb_cdmi_list(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
-		   int (*volume_cb)(const char *));
+		   int (*volume_cb)(struct dewb_cdmi_desc_s *, const char *));
 
 /* dewb_http.c */
 int dewb_http_mklist(char *buff, int len, char *host, char *page);

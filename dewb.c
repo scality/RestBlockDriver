@@ -231,11 +231,12 @@ int req_flags_to_str(int flags, char *buff)
 		strncpy(&buff[size], "REQ_PM|", 7);
 		size += 7;
 	}
+#ifdef REQ_END	/* appears in 3.6.10 in linux/blk_types.h */
 	if (flags & REQ_END) {
 		strncpy(&buff[size], "REQ_END|", 8);
 		size += 8;
 	}
-
+#endif
 	if (size != 0)
 		buff[size-1] = '\0';
 
@@ -333,9 +334,8 @@ int dewb_xfer_scl(struct dewb_device_s *dev,
 	int ret;
 	int i;
 
-	if (dev->debug.level == DEWB_LOG_DEBUG) {
-		DEWB_LOG(KERN_DEBUG, "dewb_xfer_scl: CDMI request %p (%s) for device %p with cdmi %p", req, req_code_to_str(rq_data_dir(req)), dev, desc);
-	}
+	DEWB_LOG_DEBUG(dev->debug.level, "dewb_xfer_scl: CDMI request %p (%s) for device %p with cdmi %p", 
+		req, req_code_to_str(rq_data_dir(req)), dev, desc);
 
 	ret = 0;
 	/* TODO: Handle CDMI request retry (Issue #22)
@@ -356,11 +356,11 @@ int dewb_xfer_scl(struct dewb_device_s *dev,
 		if (0 == ret)
 			break;
 		else
-			DEWB_LOG(KERN_NOTICE, "Retrying CDMI request... %d", (i + 1));
+			DEWB_LOG_NOTICE(dev->debug.level, "Retrying CDMI request... %d", (i + 1));
 	}
 
 	if (ret) {
-		DEWB_LOG(KERN_ERR, "CDMI Request using scatterlist failed qith IO error: %d", ret);
+		DEWB_LOG_ERR(dev->debug.level, "CDMI Request using scatterlist failed qith IO error: %d", ret);
 		return -EIO;
 	}
 
@@ -382,8 +382,7 @@ static int dewb_thread(void *data)
 	struct bio_vec *bvec;
 	struct dewb_cdmi_desc_s *cdmi_desc;
 
-	if (dewb_log == DEWB_LOG_DEBUG || ((struct dewb_device_s *)data)->debug.level == DEWB_LOG_DEBUG)
-		DEWB_LOG(KERN_DEBUG, "dewb_thread: thread function with data %p", data);
+	DEWB_LOG_DEBUG(((struct dewb_device_s *)data)->debug.level, "dewb_thread: thread function with data %p", data);
 
 	dev = data;
 
@@ -415,19 +414,17 @@ static int dewb_thread(void *data)
 			continue;
 
 		req_flags_to_str(req->cmd_flags, buff);
-		if (dev->debug.level == DEWB_LOG_DEBUG) {
-			DEWB_LOG(KERN_DEBUG, "dewb_thread: thread %d: New REQ of type %s (%d) flags: %s (%llu)", 
-				th_id, req_code_to_str(rq_data_dir(req)), rq_data_dir(req), buff, req->cmd_flags);
-			if (req->cmd_flags & REQ_FLUSH) {
-				printk(KERN_INFO "DEBUG CMD REQ_FLUSH\n");
-			}
+		DEWB_LOG_DEBUG(dev->debug.level, "dewb_thread: thread %d: New REQ of type %s (%d) flags: %s (%llu)", 
+			th_id, req_code_to_str(rq_data_dir(req)), rq_data_dir(req), buff, req->cmd_flags);
+		if (req->cmd_flags & REQ_FLUSH) {
+			DEWB_LOG_DEBUG(dev->debug.level, "DEBUG CMD REQ_FLUSH\n");
 		}
 		/* XXX: Use iterator instead of internal function (cf linux/blkdev.h)
 		 *  __rq_for_each_bio(bio, req) {
 		 */
 		rq_for_each_segment(bvec, req, iter) {
 			if (iter.bio->bi_rw & REQ_FLUSH) {
-				printk(KERN_INFO "DEBUG VR BIO REQ_FLUSH\n");
+				DEWB_LOG_DEBUG(dev->debug.level, "DEBUG VR BIO REQ_FLUSH\n");
 			}
 		}
 
@@ -444,13 +441,8 @@ static int dewb_thread(void *data)
 		sg_init_table(dev->thread_cdmi_desc[th_id]->sgl, DEV_NB_PHYS_SEGS);
 		dev->thread_cdmi_desc[th_id]->sgl_size = blk_rq_map_sg(dev->q, req, dev->thread_cdmi_desc[th_id]->sgl);
 
-		if (dev->debug.level == DEWB_LOG_DEBUG) {
-			/* DEWB_LOG(KERN_DEBUG, "dewb_thread: scatter_list size %d [nb_seg = %d, sector = %lu, nr_sectors=%u w=%d]", 
-				DEV_NB_PHYS_SEGS, dev->thread_cdmi_desc[th_id].sgl_size, blk_rq_pos(req), blk_rq_sectors(req), rq_data_dir(req) == WRITE); */
-			DEWB_LOG(KERN_DEBUG, "dewb_thread: scatter_list size %d [nb_seg = %d, sector = %lu, nr_sectors=%u w=%d]", 
-				DEV_NB_PHYS_SEGS, dev->thread_cdmi_desc[th_id]->sgl_size, blk_rq_pos(req), blk_rq_sectors(req), rq_data_dir(req) == WRITE);
-
-		}
+		DEWB_LOG_DEBUG(dev->debug.level, "dewb_thread: scatter_list size %d [nb_seg = %d, sector = %lu, nr_sectors=%u w=%d]", 
+			DEV_NB_PHYS_SEGS, dev->thread_cdmi_desc[th_id]->sgl_size, blk_rq_pos(req), blk_rq_sectors(req), rq_data_dir(req) == WRITE);
 
 		/* Call scatter function */
 		//th_ret = dewb_xfer_scl(dev, &dev->thread_cdmi_desc[th_id], req);
@@ -458,9 +450,8 @@ static int dewb_thread(void *data)
 #endif	/* _DEWB_BIO_ENABLED_ */
 
 		//DEWB_DEV_DEBUG("END REQUEST [tid:%d]", th_id);
-		if (dev->debug.level == DEWB_LOG_DEBUG)
-			DEWB_LOG(KERN_DEBUG, "dewb_thread: thread %d: REQ done with returned code %d", 
-				th_id, th_ret);;
+		DEWB_LOG_DEBUG(dev->debug.level, "dewb_thread: thread %d: REQ done with returned code %d", 
+			th_id, th_ret);;
 	
 		/* No IO error testing for the moment */
 		blk_end_request_all(req, 0);
@@ -477,8 +468,7 @@ static void dewb_rq_fn(struct request_queue *q)
 
 	while ((req = blk_fetch_request(q)) != NULL) {
 		if (req->cmd_type != REQ_TYPE_FS) {
-			if (dev->debug.level == DEWB_LOG_DEBUG)
-				DEWB_LOG(KERN_DEBUG, "dewb_rq_fn: Skip non-CMD request");
+			DEWB_LOG_DEBUG(dev->debug.level, "dewb_rq_fn: Skip non-CMD request");
 
 			__blk_end_request_all(req, -EIO);
 			continue;
@@ -496,8 +486,7 @@ static int dewb_open(struct block_device *bdev, fmode_t mode)
 	//dewb_device_t *dev = bdev->bd_disk->private_data;
 	dewb_device_t *dev;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_open: opening block device %p", bdev);
+	DEWB_LOG_INFO(dewb_log, "dewb_open: opening block device %p", bdev);
 
 	dev = bdev->bd_disk->private_data;
 
@@ -523,8 +512,7 @@ static void dewb_release(struct gendisk *disk, fmode_t mode)
 {
 	dewb_device_t *dev;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_release: releasing disk %p", disk);
+	DEWB_LOG_INFO(dewb_log, "dewb_release: releasing disk %p", disk);
 
 	dev = disk->private_data;
 
@@ -551,17 +539,16 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	int i;
 	int ret;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_init_disk: initializing disk for device: %p", dev);
+	DEWB_LOG_INFO(dewb_log, "dewb_init_disk: initializing disk for device: %p", dev);
 
 	/* create gendisk info */
 	disk = alloc_disk(DEV_MINORS);
 	if (!disk) {
-		DEWB_LOG(KERN_WARNING, "dewb_init_disk: unable to allocate memory for disk for device: %p", 
+		DEWB_LOG_WARN(dewb_log, "dewb_init_disk: unable to allocate memory for disk for device: %p", 
 			dev);
 		return -ENOMEM;
 	}
-	DEWB_LOG(KERN_INFO, "Creating new disk: %p", disk);
+	DEWB_LOG_INFO(dewb_log, "Creating new disk: %p", disk);
 
 	strcpy(disk->disk_name, dev->name);
 	disk->major	   = dev->major;
@@ -572,7 +559,7 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	/* init rq */
 	q = blk_init_queue(dewb_rq_fn, &dev->rq_lock);
 	if (!q) {
-		DEWB_LOG(KERN_WARNING, "dewb_init_disk: unable to init block queue for device: %p, disk: %p", 
+		DEWB_LOG_WARN(dewb_log, "dewb_init_disk: unable to init block queue for device: %p, disk: %p", 
 			dev, disk);
 		put_disk(disk);
 		return -ENOMEM;
@@ -595,7 +582,7 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	for (i = 0; i < thread_pool_size; i++) {
 		//if ((ret = dewb_cdmi_connect(&dev->debug, &dev->thread_cdmi_desc[i]))) {
 		if ((ret = dewb_cdmi_connect(&dev->debug, dev->thread_cdmi_desc[i]))) {
-			DEWB_LOG(KERN_ERR, "Unable to connect to CDMI endpoint: %d",
+			DEWB_LOG_ERR(dewb_log, "Unable to connect to CDMI endpoint: %d",
 				ret);
 			put_disk(disk);
 			return -EIO;
@@ -605,7 +592,7 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	//ret = dewb_cdmi_getsize(&dev->debug, &dev->thread_cdmi_desc[0],
 	ret = dewb_cdmi_getsize(&dev->debug, dev->thread_cdmi_desc[0], &dev->disk_size);
 	if (ret != 0) {
-		DEWB_ERROR("Could not retrieve volume size.");
+		DEWB_LOG_ERR(dewb_log, "Could not retrieve volume size.");
 		put_disk(disk);
 		return ret;
 	}
@@ -617,9 +604,8 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	for (i = 0; i < thread_pool_size; i++) {
 		dev->thread[i] = kthread_create(dewb_thread, dev, "%s", 
 						dev->disk->disk_name);
-
 		if (IS_ERR(dev->thread[i])) {
-			DEWB_ERROR("Unable to create worker thread");
+			DEWB_LOG_ERR(dewb_log, "Unable to create worker thread (id %d)", i);
 			put_disk(disk);
 			return -EIO;
 		}
@@ -627,7 +613,7 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	}
 	add_disk(disk);
 
-	DEWB_INFO("%s: Added of size 0x%llx",
+	DEWB_LOG_INFO(dewb_log, "%s: Added of size 0x%llx",
 		disk->disk_name, (unsigned long long)dev->disk_size);
 
 	return 0;
@@ -645,9 +631,8 @@ static dewb_device_t *dewb_device_new(void)
 	dewb_device_t *dev = NULL;
 	int i;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_device_new: creating new device with %d threads", 
-			thread_pool_size);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_new: creating new device with %d threads", 
+		thread_pool_size);
 
 	/* Lock table to protect against concurrent devices
 	 * creation 
@@ -682,7 +667,7 @@ static dewb_device_t *dewb_device_new(void)
 	//dev->thread = kmalloc(sizeof(struct task_struct *) * thread_pool_size, GFP_KERNEL);
 	dev->thread_cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s *) * thread_pool_size, GFP_KERNEL); 
 	if (dev->thread_cdmi_desc == NULL) {
-		DEWB_LOG(KERN_CRIT, "dewb_device_new: Unable to allocate memory for CDMI struct pointer");
+		DEWB_LOG_CRIT(dewb_log, "dewb_device_new: Unable to allocate memory for CDMI struct pointer");
 		/* should return -ENOMEM */
 		dev->name[0] = 0;
 		dev = NULL;	
@@ -691,20 +676,20 @@ static dewb_device_t *dewb_device_new(void)
 	for (i = 0; i < thread_pool_size; i++) {
 		dev->thread_cdmi_desc[i] = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL); 
 		if (dev->thread_cdmi_desc[i] == NULL) {
-			DEWB_LOG(KERN_CRIT, "dewb_device_new: Unable to allocate memory for CDMI struct, step %d", i);
+			DEWB_LOG_CRIT(dewb_log, "dewb_device_new: Unable to allocate memory for CDMI struct, step %d", i);
 			goto err_mem;
 		}
 		/* TODO: add a socket timeout
 		 * NB: this is erased as cdmi_desc is reallocatd and rewritted
 		 */
 		/* set request timeout */
-		DEWB_LOG(KERN_INFO, "dewb_device_new: Setting CDMI request timeout: %d", req_timeout);
+		DEWB_LOG_INFO(dewb_log, "dewb_device_new: Setting CDMI request timeout: %d", req_timeout);
 		dev->thread_cdmi_desc[i]->timeout.tv_sec = req_timeout; 
 		dev->thread_cdmi_desc[i]->timeout.tv_usec = 0; 
 	}
 	dev->thread = kmalloc(sizeof(struct task_struct *) * thread_pool_size, GFP_KERNEL);
 	if (dev->thread == NULL) {
-		DEWB_LOG(KERN_CRIT, "dewb_device_new: Unable to allocate memory for kernel thread struct");
+		DEWB_LOG_CRIT(dewb_log, "dewb_device_new: Unable to allocate memory for kernel thread struct");
 	}
 
 err_mem:
@@ -718,8 +703,7 @@ out:
 */
 static void __dewb_device_free(dewb_device_t *dev)
 {
-	if (dewb_log == DEWB_LOG_DEBUG)
-		DEWB_LOG(KERN_INFO, "__dewb_device_free: freeing device: %p", dev);
+	DEWB_LOG_INFO(dewb_log, "__dewb_device_free: freeing device: %p", dev);
 
 	dev->name[0] = 0;
 }
@@ -728,10 +712,7 @@ static void dewb_device_free(dewb_device_t *dev)
 {
 	int i;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_device_free: freeing device: %p", dev);
-
-	DEWB_LOG(KERN_INFO, "dewb_device_free: freeing device: %p", dev);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_free: freeing device: %p", dev);
 
 	/* XXX: lock has been aquire at a higher level
 	 */	
@@ -758,9 +739,8 @@ static int _dewb_reconstruct_url(char *url, char *name,
 	int namelen = 0;
 	int seplen = 0;
 
-	if (dewb_log == DEWB_LOG_DEBUG)
-		DEWB_LOG(KERN_DEBUG, "_dewb_reconstruct_url: construction of URL with url: %s, name: %s, baseurl: %s, basepath: %p, filename: %s", 
-				url, name, baseurl, basepath, filename);
+	DEWB_LOG_DEBUG(dewb_log, "_dewb_reconstruct_url: construction of URL with url: %s, name: %s, baseurl: %s, basepath: %p, filename: %s", 
+		url, name, baseurl, basepath, filename);
 
 	urllen = strlen(baseurl);
 	if (baseurl[urllen - 1] != '/')
@@ -787,11 +767,10 @@ static int __dewb_device_detach(dewb_device_t *dev)
 {
 	int i;
 
-	if (dewb_log == DEWB_LOG_DEBUG)
-		DEWB_LOG(KERN_DEBUG, "__dewb_device_detach: detaching device: %p", dev);
+	DEWB_LOG_DEBUG(dewb_log, "__dewb_device_detach: detaching device %s (%p)", dev->name, dev);
 
 	if (dev->users) {
-		DEWB_ERROR("%s: Unable to remove, device still opened", dev->name);
+		DEWB_LOG_ERR(dewb_log, "%s: Unable to remove, device still opened", dev->name);
 		return -EBUSY;
 	}
 
@@ -802,10 +781,12 @@ static int __dewb_device_detach(dewb_device_t *dev)
 	}
 */
 
-	if (!dev->disk)
+	if (!dev->disk) {
+		DEWB_LOG_ERR(dewb_log, "%s: Disk is no more available", dev->name);
 		return -EINVAL;
+	}
 
-	DEWB_INFO("%s: Removing", dev->disk->disk_name);
+	DEWB_LOG_INFO(dewb_log, "%s: Removing disk", dev->disk->disk_name);
 
 	/* TODO: Make thread pool variable (Issue #33)
 	 */
@@ -838,8 +819,7 @@ static int _dewb_detach_devices(void)
 	int i = 0;
 	int errcount = 0;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "_dewb_detach_devices: detaching devices");
+	DEWB_LOG_INFO(dewb_log, "_dewb_detach_devices: detaching devices");
 
 	spin_lock(&devtab_lock);
 	for (i=0; i<DEV_MAX; ++i) {
@@ -848,7 +828,7 @@ static int _dewb_detach_devices(void)
 			if (ret != 0) {
 				/* DEWB_ERROR("Could not remove device %s for volume at unload %s",
 					   devtab[i].name, devtab[i].thread_cdmi_desc ? devtab[i].thread_cdmi_desc[0].filename : "NULL"); */
-				DEWB_ERROR("Could not remove device %s for volume at unload %s",
+				DEWB_LOG_ERR(dewb_log, "Could not remove device %s for volume at unload %s",
 					   devtab[i].name, devtab[i].thread_cdmi_desc ? devtab[i].thread_cdmi_desc[0]->filename : "NULL");
 			}
 		}
@@ -862,8 +842,7 @@ static void _dewb_mirror_free(dewb_mirror_t *mirror)
 {
 	/* XXX: should have a dewb_debug_t params
 	 */
-	if (dewb_log == DEWB_LOG_DEBUG)
-		DEWB_LOG(KERN_DEBUG, "_dewb_mirror_free: deleting mirror %p", mirror);
+	DEWB_LOG_DEBUG(dewb_log, "_dewb_mirror_free: deleting mirror %p", mirror);
 
 	if (mirror)
 		kfree(mirror);
@@ -874,26 +853,22 @@ static int _dewb_mirror_new(dewb_debug_t *dbg, const char *url, dewb_mirror_t **
 	dewb_mirror_t	*new = NULL;
 	int		ret = 0;
 
-	if (dbg->level == DEWB_LOG_DEBUG)
-		DEWB_LOG(KERN_DEBUG, "_dewb_mirror_new: creating mirror with url: %s, mirrors: %p", url, *mirror);
+	DEWB_LOG_DEBUG(dbg->level, "_dewb_mirror_new: creating mirror with url: %s, mirrors: %p", url, *mirror);
 
 	new = kcalloc(1, sizeof(*new), GFP_KERNEL);
-	if (new == NULL)
-	{
-		DEWB_ERROR("Cannot allocate memory to add a new mirror.");
+	if (new == NULL) {
+		DEWB_LOG_ERR(dbg->level, "Cannot allocate memory to add a new mirror.");
 		ret = -ENOMEM;
 		goto end;
 	}
 
 	ret = dewb_cdmi_init(dbg, &new->cdmi_desc, url);
-	if (ret != 0)
-	{
-		DEWB_ERROR("Could not initialize mirror descriptor (parse URL).");
+	if (ret != 0) {
+		DEWB_LOG_ERR(dbg->level, "Could not initialize mirror descriptor (parse URL).");
 		goto end;
 	}
 
-	if (mirror)
-	{
+	if (mirror) {
 		*mirror = new;
 		new = NULL;
 	}
@@ -921,26 +896,25 @@ static int _dewb_mirror_pick(const char *filename, struct dewb_cdmi_desc_s *pick
 
 	/* XXX: should have a dewb_debug_t param
 	 */
-	if (dewb_log == DEWB_LOG_DEBUG)
-		DEWB_LOG(KERN_DEBUG, "_dewb_mirror_pick: picking mirror with filename: %s, with CDMI pick %p", filename, pick);
+	DEWB_LOG_DEBUG(dewb_log, "_dewb_mirror_pick: picking mirror with filename: %s, with CDMI pick %p", filename, pick);
 
 	spin_lock(&devtab_lock);
 	mirror = mirrors;
 	while (mirror != NULL)
 	{
-		DEWB_INFO("Browsing mirror: %s", mirror->cdmi_desc.url);
+		DEWB_LOG_INFO(dewb_log, "Browsing mirror: %s", mirror->cdmi_desc.url);
 		ret = _dewb_reconstruct_url(url, name,
 					    mirror->cdmi_desc.url,
 					    mirror->cdmi_desc.filename,
 					    filename);
-		DEWB_INFO("Dewb reconstruct url yielded %s, %i", url, ret);
+		DEWB_LOG_INFO(dewb_log, "Dewb reconstruct url yielded %s, %i", url, ret);
 		if (ret == 0)
 		{
 			memcpy(pick, &mirror->cdmi_desc,
 			       sizeof(mirror->cdmi_desc));
 			strncpy(pick->url, url, DEWB_URL_SIZE);
 			strncpy(pick->filename, name, DEWB_URL_SIZE);
-			DEWB_INFO("Copied into pick: url=%s, name=%s", pick->url, pick->filename);
+			DEWB_LOG_INFO(dewb_log, "Copied into pick: url=%s, name=%s", pick->url, pick->filename);
 			found = 1;
 			break ;
 		}
@@ -948,11 +922,10 @@ static int _dewb_mirror_pick(const char *filename, struct dewb_cdmi_desc_s *pick
 	}
 	spin_unlock(&devtab_lock);
 
-	DEWB_INFO("Browsed all mirrors");
+	DEWB_LOG_INFO(dewb_log, "Browsed all mirrors");
 
-	if (!found)
-	{
-		DEWB_ERROR("Could not match any mirror for filename %s", filename);
+	if (!found) {
+		DEWB_LOG_ERR(dewb_log, "Could not match any mirror for filename %s", filename);
 		// No such device or adress seems to match 'missing mirror'
 		ret = -ENXIO;
 		goto end;
@@ -977,8 +950,7 @@ int dewb_mirror_add(const char *url)
 	dewb_debug_t debug;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_mirror_add: adding mirror %s", url);
+	DEWB_LOG_INFO(dewb_log, "dewb_mirror_add: adding mirror %s", url);
 
 	//dewb_debug_t debug;
 	//struct dewb_cdmi_desc_s *cdmi_desc = NULL;
@@ -989,9 +961,8 @@ int dewb_mirror_add(const char *url)
 	//debug.level = DEWB_DEBUG_LEVEL;
 	debug.level = dewb_log;
 
-	if (strlen(url) >= DEWB_URL_SIZE)
-	{
-		DEWB_ERROR("Url too big: '%s'", url);
+	if (strlen(url) >= DEWB_URL_SIZE) {
+		DEWB_LOG_ERR(dewb_log, "Url too big: '%s'", url);
 		ret = -EINVAL;
 		goto err_out_dev;
 	}
@@ -1001,8 +972,7 @@ int dewb_mirror_add(const char *url)
 		goto err_out_dev;
 
 	cdmi_desc = kcalloc(1, sizeof(*cdmi_desc), GFP_KERNEL);
-	if (cdmi_desc == NULL)
-	{
+	if (cdmi_desc == NULL) {
 		ret = -ENOMEM;
 		goto err_out_mirror_alloc;
 	}
@@ -1010,8 +980,7 @@ int dewb_mirror_add(const char *url)
 
 	spin_lock(&devtab_lock);
 	cur = mirrors;
-	while (cur != NULL)
-	{
+	while (cur != NULL) {
 		if (strcmp(url, cur->cdmi_desc.url) == 0)
 		{
 			found = 1;
@@ -1020,8 +989,7 @@ int dewb_mirror_add(const char *url)
 		last = cur;
 		cur = cur->next;
 	}
-	if (found == 0)
-	{
+	if (found == 0) {
 		if (mirrors == NULL)
 			was_first = 1;
 		if (last != NULL)
@@ -1032,8 +1000,7 @@ int dewb_mirror_add(const char *url)
 	}
 	spin_unlock(&devtab_lock);
 
-	if (was_first)
-	{
+	if (was_first) {
 		ret = dewb_cdmi_connect(&debug, cdmi_desc);
 		if (ret != 0)
 			goto err_out_cdmi_alloc;
@@ -1066,12 +1033,10 @@ int dewb_mirror_remove(const char *url)
 	dewb_mirror_t	*cur = NULL;
 	dewb_mirror_t	*prev = NULL;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_mirror_remove: removing mirror %s", url);
+	DEWB_LOG_INFO(dewb_log, "dewb_mirror_remove: removing mirror %s", url);
 
-	if (strlen(url) >= DEWB_URL_SIZE)
-	{
-		DEWB_ERROR("Url too big: '%s'", url);
+	if (strlen(url) >= DEWB_URL_SIZE) {
+		DEWB_LOG_ERR(dewb_log, "Url too big: '%s'", url);
 		ret = -EINVAL;
 		goto end;
 	}
@@ -1087,30 +1052,26 @@ int dewb_mirror_remove(const char *url)
 	//spin_unlock(&devtab_lock);
 
 	if (ret != 0) {
-		DEWB_ERROR("Could not remove all devices; not removing mirror.");
+		DEWB_LOG_ERR(dewb_log, "Could not remove all devices; not removing mirror.");
 		ret = -EBUSY;
 		goto end;
 	}
 
 	spin_lock(&devtab_lock);
 	cur = mirrors;
-	while (cur != NULL)
-	{
-		if (strcmp(url, cur->cdmi_desc.url) == 0)
-		{
+	while (cur != NULL) {
+		if (strcmp(url, cur->cdmi_desc.url) == 0) {
 			found = 1;
-			break ;
+			break;
 		}
 		prev = cur;
 		cur = cur->next;
 	}
-	if (found == 0)
-	{
-		DEWB_ERROR("Cannot remove mirror: Url is not part of mirrors");
+	if (found == 0) {
+		DEWB_LOG_ERR(dewb_log, "Cannot remove mirror: Url is not part of mirrors");
 		ret = -ENOENT;
 	}
-	else
-	{
+	else {
 		if (prev)
 			prev->next = cur->next;
 		else
@@ -1131,31 +1092,26 @@ ssize_t dewb_mirrors_dump(char *buf, ssize_t max_size)
 	ssize_t		len = 0;
 	ssize_t		ret = 0;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_mirrors_dump: dumping mirrors: buf: %p, max_size: %ld", buf, max_size);
+	DEWB_LOG_INFO(dewb_log, "dewb_mirrors_dump: dumping mirrors: buf: %p, max_size: %ld", buf, max_size);
 
 	spin_lock(&devtab_lock);
 	cur = mirrors;
-	while (cur)
-	{
-		if (printed != 0)
-		{
+	while (cur) {
+		if (printed != 0) {
 			len = snprintf(buf + printed, max_size - printed, ",");
-			if (len == -1 || len != 1)
-			{
-				DEWB_ERROR("Not enough space to print mirrors list in buffer.");
+			if (len == -1 || len != 1) {
+				DEWB_LOG_ERR(dewb_log, "Not enough space to print mirrors list in buffer.");
 				ret = -ENOMEM;
-				break ;
+				break;
 			}
 			printed += len;
 		}
 
 		len = snprintf(buf + printed, max_size - printed, "%s", cur->cdmi_desc.url);
-		if (len == -1 || len > (max_size - printed))
-		{
-			DEWB_ERROR("Not enough space to print mirrors list in buffer.");
+		if (len == -1 || len > (max_size - printed)) {
+			DEWB_LOG_ERR(dewb_log, "Not enough space to print mirrors list in buffer.");
 			ret = -ENOMEM;
-			break ;
+			break;
 		}
 		printed += len;
 
@@ -1164,9 +1120,8 @@ ssize_t dewb_mirrors_dump(char *buf, ssize_t max_size)
 	spin_unlock(&devtab_lock);
 
 	len = snprintf(buf + printed, max_size - printed, "\n");
-	if (len == -1 || len != 1)
-	{
-		DEWB_ERROR("Not enough space to print mirrors list in buffer.");
+	if (len == -1 || len != 1) {
+		DEWB_LOG_ERR(dewb_log, "Not enough space to print mirrors list in buffer.");
 		ret = -ENOMEM;
 	}
 	printed += len;
@@ -1179,25 +1134,19 @@ int dewb_device_detach_by_name(const char *filename)
 	int ret;
 	int i;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_device_detach_by_name: detaching device name %s", filename);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_detach_by_name: detaching device name %s", filename);
 
 	spin_lock(&devtab_lock);
-	for (i = 0; i < DEV_MAX; ++i)
-	{
-		if (!device_free_slot(&devtab[i]))
-		{
+	for (i = 0; i < DEV_MAX; ++i) {
+		if (!device_free_slot(&devtab[i])) {
 			/* const char *fname
 			    = kbasename(devtab[i].thread_cdmi_desc[0].filename); */
 			const char *fname = kbasename(devtab[i].thread_cdmi_desc[0]->filename);
-			if (strcmp(filename, fname) == 0)
-			{
+			if (strcmp(filename, fname) == 0) {
 				ret = __dewb_device_detach(&devtab[i]);
-				if (ret != 0)
-				{
-					DEWB_ERROR("Cannot detach"
-						   " volume automatically.");
-					break ;
+				if (ret != 0) {
+					DEWB_LOG_ERR(dewb_log, "Cannot detach volume automatically.");
+					break;
 				}
 			}
 		}
@@ -1212,8 +1161,7 @@ int dewb_device_detach_by_id(int dev_id)
 	dewb_device_t *dev;
 	int ret;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_device_detach_by_id: detaching device id %d", dev_id);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_detach_by_id: detaching device id %d", dev_id);
 
 	spin_lock(&devtab_lock);
 
@@ -1225,24 +1173,24 @@ int dewb_device_detach_by_id(int dev_id)
 	return ret;
 }
 
-int dewb_device_attach(const char *filename)
+/* TODO: Remove useless memory allocation
+ */
+//int dewb_device_attach(const char *filename)
+int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename)
 {
 	dewb_device_t *dev;
 	ssize_t rc;
 	int irc;
 	int i;
-	struct dewb_cdmi_desc_s *cdmi_desc;
+	//struct dewb_cdmi_desc_s *cdmi_desc;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_device_attach: attaching filename %s", filename);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_attach: attaching filename %s", filename);
 
-	/* TODO: Remove useless memory allocation
-	 */
-	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
+	/* cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
 	if (cdmi_desc == NULL) {
 		rc = -ENOMEM;
 		goto err_out_mod;
-	}
+	} */
 
 	/* Allocate dev structure */
 	dev = dewb_device_new();
@@ -1267,7 +1215,7 @@ int dewb_device_attach(const char *filename)
 	if (rc != 0) { 
 		goto err_out_dev;
 	}
-	DEWB_INFO("Adding Device: Picked mirror [ip=%s port=%d fullpath=%s]",
+	DEWB_LOG_INFO(dewb_log, "Adding Device: Picked mirror [ip=%s port=%d fullpath=%s]",
 		  cdmi_desc->ip_addr, cdmi_desc->port, cdmi_desc->filename);
 
 	/* set timeout value */
@@ -1280,7 +1228,7 @@ int dewb_device_attach(const char *filename)
 	//for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++) {
 	for (i = 0; i < thread_pool_size; i++) {	
 		memcpy(dev->thread_cdmi_desc[i], cdmi_desc, sizeof(*cdmi_desc));
-		DEWB_LOG(KERN_INFO, "thread CDMI timeout: %lu", dev->thread_cdmi_desc[i]->timeout.tv_sec);
+		DEWB_LOG_INFO(dewb_log, "thread CDMI timeout: %lu", dev->thread_cdmi_desc[i]->timeout.tv_sec);
 	}
 	irc = register_blkdev(0, dev->name);
 	if (irc < 0) {
@@ -1296,7 +1244,7 @@ int dewb_device_attach(const char *filename)
 
 	dewb_sysfs_device_init(dev);
 
-	DEWB_DEV_DEBUG("Added device (major:%d)", dev->major);
+	DEWB_LOG_INFO(dewb_log, "Added device (major:%d)", dev->major);
 
 	return rc;
 
@@ -1305,10 +1253,10 @@ err_out_unregister:
 err_out_dev:
 	if (NULL != dev)
 		dewb_device_free(dev);
-	if (NULL != cdmi_desc)
-		kfree(cdmi_desc);
-err_out_mod:
-	DEWB_ERROR("Error adding device %s", filename);
+	/*if (NULL != cdmi_desc)
+		kfree(cdmi_desc); */
+//err_out_mod:
+	DEWB_LOG_ERR(dewb_log, "Error adding device %s", filename);
 
 	return rc;
 }
@@ -1319,8 +1267,7 @@ int dewb_device_create(const char *filename, unsigned long long size)
 	struct dewb_cdmi_desc_s *cdmi_desc;
 	int rc;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_device_create: creating filename %s of size %llu", filename, size);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_create: creating filename %s of size %llu", filename, size);
 
 	/* TODO: Inherit log level from dewblock LKM (Issue #28)
 	 */
@@ -1349,9 +1296,10 @@ int dewb_device_create(const char *filename, unsigned long long size)
 
 	dewb_cdmi_disconnect(&debug, cdmi_desc);
 
-	rc = dewb_device_attach(filename);
+	//rc = dewb_device_attach(filename);
+	rc = dewb_device_attach(cdmi_desc, filename);
 	if (rc != 0) {
-		DEWB_ERROR("Cannot add created volume automatically.");
+		DEWB_LOG_ERR(dewb_log, "Cannot add created volume automatically.");
 		goto err_out_cdmi;
 	}
 
@@ -1364,7 +1312,8 @@ err_out_cdmi:
 err_out_alloc:
 	kfree(cdmi_desc);
 err_out_mod:
-	DEWB_ERROR("Error creating device %s", filename);
+	DEWB_LOG_ERR(dewb_log, "Error creating device %s", filename);
+
 	return rc;
 }
 
@@ -1375,8 +1324,7 @@ int dewb_device_extend(const char *filename, unsigned long long size)
 	int i;
 	int rc;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_device_extend: extending filename %s to %llu size", filename, size);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_extend: extending filename %s to %llu size", filename, size);
 
 	/* TODO: Inherit log level from dewblock LKM (Issue #28)
 	 */
@@ -1385,8 +1333,7 @@ int dewb_device_extend(const char *filename, unsigned long long size)
 	debug.level = dewb_log;
 
 	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
-	if (cdmi_desc == NULL)
-	{
+	if (cdmi_desc == NULL) {
 		rc = -ENOMEM;
 		goto err_out_mod;
 	}
@@ -1435,7 +1382,8 @@ err_out_cdmi:
 err_out_alloc:
 	kfree(cdmi_desc);
 err_out_mod:
-	DEWB_ERROR("Error creating device %s", filename);
+	DEWB_LOG_ERR(dewb_log, "Error creating device %s", filename);
+
 	return rc;
 }
 
@@ -1447,8 +1395,7 @@ int dewb_device_destroy(const char *filename)
 	int remove_err = 0;
 	int i;
 
-	if (dewb_log >= DEWB_LOG_INFO)
-		DEWB_LOG(KERN_INFO, "dewb_device_destroy: destroying filename: %s", filename);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_destroy: destroying filename: %s", filename);
 
 	/* TODO: Inherit log level from dewblock LKM (Issue #8)
 	 */
@@ -1456,9 +1403,9 @@ int dewb_device_destroy(const char *filename)
 	//debug.level = 0;
 	debug.level = dewb_log;
 
-	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
-	if (cdmi_desc == NULL)
-	{
+	cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL);
+	if (cdmi_desc == NULL) {
+		DEWB_LOG_ERR(dewb_log, "unable to allocate memory for temporary CDMI");
 		rc = -ENOMEM;
 		goto err_out_mod;
 	}
@@ -1473,10 +1420,10 @@ int dewb_device_destroy(const char *filename)
 			if (strcmp(filename, fname) == 0) {
 				rc = __dewb_device_detach(&devtab[i]);
 				if (rc != 0) {
-					DEWB_ERROR("Cannot add created"
-						   " volume automatically.");
+					DEWB_LOG_ERR(dewb_log, "Cannot remove created"
+						   " volume automatically: %s", fname);
 					remove_err = 1;
-					break ;
+					break;
 				}
 			}
 		}
@@ -1484,7 +1431,7 @@ int dewb_device_destroy(const char *filename)
 	spin_unlock(&devtab_lock);
 
 	if (remove_err) {
-		DEWB_ERROR("Could not remove every device associated to "
+		DEWB_LOG_ERR(dewb_log, "Could not remove every device associated to "
 			   "volume %s", filename);
 		goto err_out_alloc;
 	}
@@ -1513,7 +1460,8 @@ err_out_cdmi:
 err_out_alloc:
 	kfree(cdmi_desc);
 err_out_mod:
-	DEWB_ERROR("Error destroying volume %s", filename);
+	DEWB_LOG_ERR(dewb_log, "Error destroying volume %s", filename);
+
 	return rc;
 }
 
@@ -1521,14 +1469,14 @@ static int __init dewblock_init(void)
 {
 	int rc;
 
-	DEWB_LOG(KERN_INFO, "Initializing %s block device driver version %s", DEV_NAME, DEV_REL_VERSION);
+	DEWB_LOG_NOTICE(dewb_log, "Initializing %s block device driver version %s", DEV_NAME, DEV_REL_VERSION);
 
 	/* Zeroing device tab */
 	memset(devtab, 0, sizeof(devtab));
 
 	rc = dewb_sysfs_init();
 	if (rc) {
-		printk(KERN_ERR "Failed to initialize with code: %d", rc);
+		DEWB_LOG_ERR(dewb_log, "Failed to initialize with code: %d", rc);
 		return rc;
 	}
 
@@ -1537,7 +1485,7 @@ static int __init dewblock_init(void)
  
 static void __exit dewblock_cleanup(void)
 {
-	DEWB_LOG(KERN_INFO, "Cleaning up %s block device driver", DEV_NAME);
+	DEWB_LOG_NOTICE(dewb_log, "Cleaning up %s block device driver", DEV_NAME);
 
 	/* XXX: Only lock while detaching device
 	 */

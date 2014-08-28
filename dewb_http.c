@@ -54,7 +54,7 @@ int dewb_http_get_status(char *buf, int len, enum dewb_http_statuscode *code)
 		ret = kstrtol(codebuf, 10, &status);
 		if (ret != 0)
 		{
-			DEWB_ERROR("Could not retrieve HTTP status code: err %i (buf=%.*s)", ret, 5, buf);
+			DEWB_LOG_ERR(dewb_log, "Could not retrieve HTTP status code: err %i (buf=%.*s)", ret, 5, buf);
 			return -1;
 		}
 
