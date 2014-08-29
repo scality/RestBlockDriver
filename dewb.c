@@ -491,9 +491,7 @@ static int dewb_open(struct block_device *bdev, fmode_t mode)
 	dev = bdev->bd_disk->private_data;
 
 	spin_lock(&devtab_lock);
-
 	dev->users++;
-
 	spin_unlock(&devtab_lock);
 
 	return 0;
@@ -517,9 +515,7 @@ static void dewb_release(struct gendisk *disk, fmode_t mode)
 	dev = disk->private_data;
 
 	spin_lock(&devtab_lock);
-
 	dev->users--;
-
 	spin_unlock(&devtab_lock);
 
 	//return 0;
@@ -659,6 +655,9 @@ static dewb_device_t *dewb_device_new(void)
 	dev->users = 0;
 	sprintf(dev->name, DEV_NAME "%c", (char)(i + 'a'));
 
+	/* Table can be unlocked because device is reserved (name not empty) */
+	spin_unlock(&devtab_lock);
+
 	/* XXX: dynamic allocation of thread pool and cdmi connection pool
 	 * NB: The memory allocation for the thread is an array of pointer 
 	 *     whereas the allocation for the cdmi connection pool is an array
@@ -692,10 +691,19 @@ static dewb_device_t *dewb_device_new(void)
 		DEWB_LOG_CRIT(dewb_log, "dewb_device_new: Unable to allocate memory for kernel thread struct");
 	}
 
+	return dev;
+
 err_mem:
+	if (NULL != dev->thread_cdmi_desc) {
+		for (i = 0; i < thread_pool_size; i++) {
+			kfree(dev->thread_cdmi_desc[i]);
+		}
+		kfree(dev->thread_cdmi_desc);
+	}
 out:
 	spin_unlock(&devtab_lock);
-	return dev;
+
+	return NULL;
 }
 
 /* This helper marks the given device slot as empty 
@@ -822,7 +830,7 @@ static int _dewb_detach_devices(void)
 	DEWB_LOG_INFO(dewb_log, "_dewb_detach_devices: detaching devices");
 
 	spin_lock(&devtab_lock);
-	for (i=0; i<DEV_MAX; ++i) {
+	for (i = 0; i < DEV_MAX; ++i) {
 		if (!device_free_slot(&devtab[i])) {
 			ret = __dewb_device_detach(&devtab[i]);
 			if (ret != 0) {
