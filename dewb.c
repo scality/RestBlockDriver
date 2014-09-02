@@ -1,3 +1,20 @@
+/*
+   This file is part of RestBlockDriver.
+
+   RestBlockDriver is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   RestBlockDriver is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+
+ */
 
 // Defining __KERNEL__ and MODULE allows us to access kernel-level
 // code not usually available to userspace programs.
@@ -355,12 +372,12 @@ int dewb_xfer_scl(struct dewb_device_s *dev,
 		}
 		if (0 == ret)
 			break;
-		else
+		else if (i < nb_req_retries - 1)
 			DEWB_LOG_NOTICE(dev->debug.level, "Retrying CDMI request... %d", (i + 1));
 	}
 
 	if (ret) {
-		DEWB_LOG_ERR(dev->debug.level, "CDMI Request using scatterlist failed qith IO error: %d", ret);
+		DEWB_LOG_ERR(dev->debug.level, "CDMI Request using scatterlist failed with IO error: %d", ret);
 		return -EIO;
 	}
 
@@ -682,9 +699,9 @@ static dewb_device_t *dewb_device_new(void)
 		 * NB: this is erased as cdmi_desc is reallocatd and rewritted
 		 */
 		/* set request timeout */
-		DEWB_LOG_INFO(dewb_log, "dewb_device_new: Setting CDMI request timeout: %d", req_timeout);
+		/* DEWB_LOG_INFO(dewb_log, "dewb_device_new: Setting CDMI request timeout: %d", req_timeout);
 		dev->thread_cdmi_desc[i]->timeout.tv_sec = req_timeout; 
-		dev->thread_cdmi_desc[i]->timeout.tv_usec = 0; 
+		dev->thread_cdmi_desc[i]->timeout.tv_usec = 0; */
 	}
 	dev->thread = kmalloc(sizeof(struct task_struct *) * thread_pool_size, GFP_KERNEL);
 	if (dev->thread == NULL) {
@@ -895,6 +912,7 @@ end:
  * space in the URL buffer to append the filename.
  */
 static int _dewb_mirror_pick(const char *filename, struct dewb_cdmi_desc_s *pick)
+//int _dewb_mirror_pick(const char *filename, struct dewb_cdmi_desc_s *pick)
 {
 	char url[DEWB_URL_SIZE];
 	char name[DEWB_URL_SIZE];
@@ -1219,6 +1237,8 @@ int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename)
 	 * TODO: #13 We need to manage failover by using every mirror
 	 * NB: _dewb_mirror_pick rewrite the cdmi_desc sruct
 	 */
+	/* NB: do it outside this function
+	 */
 	rc = _dewb_mirror_pick(filename, cdmi_desc);
 	if (rc != 0) { 
 		goto err_out_dev;
@@ -1252,7 +1272,8 @@ int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename)
 
 	dewb_sysfs_device_init(dev);
 
-	DEWB_LOG_INFO(dewb_log, "Added device (major:%d)", dev->major);
+	DEWB_LOG_INFO(dewb_log, "Added device %s (major:%d) for mirror [ip=%s port=%d fullpath=%s]", 
+		dev->name, dev->major, cdmi_desc->ip_addr, cdmi_desc->port, cdmi_desc->filename);
 
 	return rc;
 

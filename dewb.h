@@ -1,3 +1,21 @@
+/*
+   This file is part of RestBlockDriver.
+
+   RestBlockDriver is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   RestBlockDriver is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+
+ */
+
 #ifndef __DEWBLOCK_H__
 # define  __DEWBLOCK_H__
 
@@ -304,5 +322,8 @@ int dewb_http_mkmetadata(char *buff, int len, char *host, char *page);
 
 int dewb_http_get_status(char *buf, int len, enum dewb_http_statuscode *code);
 enum dewb_http_statusrange dewb_http_get_status_range(enum dewb_http_statuscode status);
+
+/**/
+//int _dewb_mirror_pick(const char *filename, struct dewb_cdmi_desc_s *pick);
 
 #endif

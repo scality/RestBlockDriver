@@ -1,3 +1,21 @@
+/*
+   This file is part of RestBlockDriver.
+
+   RestBlockDriver is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   RestBlockDriver is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+
+ */
+
 #include <linux/module.h>    // included for all kernel modules
 #include <linux/kernel.h>    // included for KERN_INFO
 #include <linux/types.h>     // for uintx_t
@@ -314,10 +332,10 @@ static int sock_xmit(dewb_debug_t *dbg,
 		size -= result;
 		buf += result;
 	} while (size > 0);
-	
+
 	sigprocmask(SIG_SETMASK, &oldset, NULL);
 	tsk_restore_flags(current, pflags, PF_MEMALLOC);
-	
+
 	return result;
 }
 
@@ -378,6 +396,7 @@ static int sock_send_sglist_receive(dewb_debug_t *dbg,
 	int strict_rcv = (rcv_size) ? 1 : 0;
 	int i;
 	int ret;
+
 	if (rcv_size == 0)
 		rcv_size = DEWB_XMIT_BUFFER_SIZE;
 
@@ -419,7 +438,7 @@ xmit_again:
 			goto xmit_again;
 		}
 		if (ret != length) {
-			DEWB_LOG_ERR(dbg->level, "Unable to send all : %d instead of %d bytes",
+			DEWB_LOG_ERR(dbg->level, "Unable to send all: %d instead of %d bytes",
 				ret, length);
 			return -EIO;
 		}
@@ -434,7 +453,6 @@ xmit_again:
 	}
 	if (ret != 2)
 		return -EIO;
-	
 
 	/* Receive response */
 	ret = sock_xmit(dbg, desc, 0, buff, rcv_size, strict_rcv);

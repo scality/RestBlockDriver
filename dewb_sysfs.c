@@ -1,3 +1,21 @@
+/*
+   This file is part of RestBlockDriver.
+
+   RestBlockDriver is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   RestBlockDriver is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+
+ */
+
 #include <linux/module.h>    // included for all kernel modules
 #include <linux/kernel.h>    // included for KERN_INFO
 #include <linux/device.h>
@@ -388,6 +406,8 @@ static ssize_t class_dewb_attach_store(struct class *c,
 	char filename[DEWB_URL_SIZE + 1];
 	struct dewb_cdmi_desc_s *cdmi_desc;
 
+	cdmi_desc = NULL;
+
 	/* Sanity check URL size */
 	if ((count == 0) || (count > DEWB_URL_SIZE)) {
 		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
@@ -403,9 +423,17 @@ static ssize_t class_dewb_attach_store(struct class *c,
 
 	cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s *), GFP_KERNEL);
 	if (cdmi_desc == NULL) {
+		DEWB_LOG_ERR(dewb_log, "Failed to allocate memory for CDMI struct");
 		ret = -ENOMEM;
                 goto out;
 	}
+
+	/* ret = _dewb_mirror_pick(filename, cdmi_desc);
+	if (ret != 0) {
+		DEWB_LOG_ERR(dewb_log, "Failed to get mirror from filename: %s", filename);
+		ret = -EINVAL;
+		goto out;
+	} */
 
 	DEWB_LOG_INFO(dewb_log, "Attaching device %s", filename);
 	ret = dewb_device_attach(cdmi_desc, filename);
@@ -414,6 +442,8 @@ static ssize_t class_dewb_attach_store(struct class *c,
 		return count;
 	}
 out:
+	if (NULL != cdmi_desc)
+		kfree(cdmi_desc);
 
 	return ret;
 }
