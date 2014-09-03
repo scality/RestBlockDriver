@@ -565,7 +565,7 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 			dev->name);
 		return -ENOMEM;
 	}
-	DEWB_LOG_INFO(dewb_log, "Creating new disk: %p", disk);
+	DEWB_LOG_DEBUG(dewb_log, "Creating new disk: %p", disk);
 
 	strcpy(disk->disk_name, dev->name);
 	disk->major	   = dev->major;
@@ -1260,7 +1260,6 @@ int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename)
 	//for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++) {
 	for (i = 0; i < thread_pool_size; i++) {	
 		memcpy(dev->thread_cdmi_desc[i], cdmi_desc, sizeof(*cdmi_desc));
-		DEWB_LOG_INFO(dewb_log, "thread CDMI timeout: %lu", dev->thread_cdmi_desc[i]->timeout.tv_sec);
 	}
 	irc = register_blkdev(0, dev->name);
 	if (irc < 0) {

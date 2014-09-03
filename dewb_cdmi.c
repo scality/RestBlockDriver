@@ -421,13 +421,16 @@ static int sock_send_sglist_receive(dewb_debug_t *dbg,
 xmit_again:
 	ret = sock_xmit(dbg, desc, 1, buff, send_size, 0);
 	if (ret == -EPIPE) {
+		DEWB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
 		dewb_cdmi_disconnect(dbg, desc);
 		ret = dewb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 		goto xmit_again;
 	}
-	if (ret != send_size)
+	if (ret != send_size) {
+		DEWB_LOG_ERR(dbg->level, "Incomplete transmission (%d of %d), returning", ret, send_size);
 		return -EIO;
+	}
 
 	/* Now iterate through the sglist */
 	for (i = 0; i < desc->sgl_size; i++) {
@@ -436,13 +439,14 @@ xmit_again:
 
 		ret = sock_xmit(dbg, desc, 1, buff, length, 0);
 		if (ret == -EPIPE) {
+			DEWB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
 			dewb_cdmi_disconnect(dbg, desc);
 			ret = dewb_cdmi_connect(dbg, desc);
 			if (ret) return ret;
 			goto xmit_again;
 		}
 		if (ret != length) {
-			DEWB_LOG_ERR(dbg->level, "Unable to send all: %d instead of %d bytes",
+			DEWB_LOG_ERR(dbg->level, "Incomplete transmission (%d of %d), returning",
 				ret, length);
 			return -EIO;
 		}
@@ -450,18 +454,22 @@ xmit_again:
 	
 	ret = sock_xmit(dbg, desc, 1, "\r\n", 2, 0);
 	if (ret == -EPIPE) {
+		DEWB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
 		dewb_cdmi_disconnect(dbg, desc);
 		ret = dewb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 		goto xmit_again;
 	}
-	if (ret != 2)
+	if (ret != 2) {
+		DEWB_LOG_ERR(dbg->level, "Incomplete transmission %d of %d), returning", ret, 2);
 		return -EIO;
+	}
 
 	/* Receive response */
 	ret = sock_xmit(dbg, desc, 0, buff, rcv_size, strict_rcv);
 	/* Is the connection to be reopened ? */
 	if (ret == -EPIPE) {
+		DEWB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
 		dewb_cdmi_disconnect(dbg, desc);
 		ret = dewb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
