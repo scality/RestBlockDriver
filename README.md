@@ -18,9 +18,9 @@ INSTRUCTIONS
 Prerequisites
 ---------
 
-Ubuntu 12.04.4 LTS system supported
+Ubuntu 12.04.4 LTS or CentOS 7 system supported
 
-Minimal Linux kernel version: v3.8
+Minimal Linux kernel version: v3.10
 
 Installing the driver
 ---------------------
