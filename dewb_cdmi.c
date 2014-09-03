@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2014 SCALITY SA. All rights reserved.
  * http://www.scality.com
+ * Copyright (c) 2010 Serge A. Zaitsev
  *
  * This file is part of RestBlockDriver.
  *
@@ -201,7 +202,7 @@ int dewb_cdmi_connect(dewb_debug_t *dbg,
 
 	/* TODO: set request timeout value (Issue #22) */
 	if (desc->timeout.tv_sec > 0) {
-		DEWB_LOG_INFO(dbg->level, "dewb_cdmi_connect: set socket timeout %lu", desc->timeout.tv_sec);
+		DEWB_LOG_DEBUG(dbg->level, "dewb_cdmi_connect: set socket timeout %lu", desc->timeout.tv_sec);
 		ret = kernel_setsockopt(desc->socket, SOL_SOCKET, SO_RCVTIMEO, 
 			(char *)&desc->timeout, sizeof(struct timeval));
 		if (ret < 0) {

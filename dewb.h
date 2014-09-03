@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2014 SCALITY SA. All rights reserved.
  * http://www.scality.com
+ * Copyright (c) 2010 Serge A. Zaitsev
  *
  * This file is part of RestBlockDriver.
  *
@@ -29,6 +30,7 @@
 #include <linux/net.h>
 #include <linux/scatterlist.h>
 #include <net/sock.h>
+#include <linux/genhd.h>
 
 /* Constants */
 #define kB			1024
@@ -219,7 +221,9 @@ typedef struct dewb_device_s {
 	/* Device subsystem related data */
 	int			id;		/* device ID */
 	int			major;		/* blkdev assigned major */
-	char			name[32];	/* blkdev name, e.g. dewba */
+	//char			name[32];	/* blkdev name, e.g. dewba */
+	//XXX: use const from ./linux/genhd.h
+	char			name[DISK_NAME_LEN];	/* blkdev name, e.g. dewba */
 	struct gendisk		*disk;
 	uint64_t		disk_size;	/* Size in bytes */
 	int			users;		/* Number of users who

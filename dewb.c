@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2014 SCALITY SA. All rights reserved.
  * http://www.scality.com
+ * Copyright (c) 2010 Serge A. Zaitsev
  *
  * This file is part of RestBlockDriver.
  *
@@ -506,7 +507,7 @@ static int dewb_open(struct block_device *bdev, fmode_t mode)
 	//dewb_device_t *dev = bdev->bd_disk->private_data;
 	dewb_device_t *dev;
 
-	DEWB_LOG_INFO(dewb_log, "dewb_open: opening block device %p", bdev);
+	DEWB_LOG_INFO(dewb_log, "dewb_open: opening block device %s", bdev->bd_disk->disk_name);
 
 	dev = bdev->bd_disk->private_data;
 
@@ -530,7 +531,7 @@ static void dewb_release(struct gendisk *disk, fmode_t mode)
 {
 	dewb_device_t *dev;
 
-	DEWB_LOG_INFO(dewb_log, "dewb_release: releasing disk %p", disk);
+	DEWB_LOG_INFO(dewb_log, "dewb_release: releasing disk %s", disk->disk_name);
 
 	dev = disk->private_data;
 
@@ -555,13 +556,13 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	int i;
 	int ret;
 
-	DEWB_LOG_INFO(dewb_log, "dewb_init_disk: initializing disk for device: %p", dev);
+	DEWB_LOG_INFO(dewb_log, "dewb_init_disk: initializing disk for device: %s", dev->name);
 
 	/* create gendisk info */
 	disk = alloc_disk(DEV_MINORS);
 	if (!disk) {
-		DEWB_LOG_WARN(dewb_log, "dewb_init_disk: unable to allocate memory for disk for device: %p", 
-			dev);
+		DEWB_LOG_WARN(dewb_log, "dewb_init_disk: unable to allocate memory for disk for device: %s", 
+			dev->name);
 		return -ENOMEM;
 	}
 	DEWB_LOG_INFO(dewb_log, "Creating new disk: %p", disk);
@@ -731,7 +732,7 @@ out:
 */
 static void __dewb_device_free(dewb_device_t *dev)
 {
-	DEWB_LOG_INFO(dewb_log, "__dewb_device_free: freeing device: %p", dev);
+	DEWB_LOG_INFO(dewb_log, "__dewb_device_free: freeing device: %s", dev->name);
 
 	dev->name[0] = 0;
 }
@@ -740,7 +741,7 @@ static void dewb_device_free(dewb_device_t *dev)
 {
 	int i;
 
-	DEWB_LOG_INFO(dewb_log, "dewb_device_free: freeing device: %p", dev);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_free: freeing device: %s", dev->name);
 
 	/* XXX: lock has been aquire at a higher level
 	 */	
@@ -870,7 +871,7 @@ static void _dewb_mirror_free(dewb_mirror_t *mirror)
 {
 	/* XXX: should have a dewb_debug_t params
 	 */
-	DEWB_LOG_DEBUG(dewb_log, "_dewb_mirror_free: deleting mirror %p", mirror);
+	DEWB_LOG_DEBUG(dewb_log, "_dewb_mirror_free: deleting mirror url %s (%p)", mirror->cdmi_desc.url, mirror);
 
 	if (mirror)
 		kfree(mirror);
@@ -1335,6 +1336,8 @@ int dewb_device_create(const char *filename, unsigned long long size)
 		goto err_out_cdmi;
 	}
 
+	DEWB_LOG_INFO(dewb_log, "Created device with filename %s", filename); 
+
 	kfree(cdmi_desc);
 
 	return rc;
@@ -1407,6 +1410,8 @@ int dewb_device_extend(const char *filename, unsigned long long size)
 	}
 	spin_unlock(&devtab_lock);
 
+	DEWB_LOG_INFO(dewb_log, "Extended filename %s", filename);
+
 	return rc;
 
 err_out_cdmi:
@@ -1414,7 +1419,7 @@ err_out_cdmi:
 err_out_alloc:
 	kfree(cdmi_desc);
 err_out_mod:
-	DEWB_LOG_ERR(dewb_log, "Error creating device %s", filename);
+	DEWB_LOG_ERR(dewb_log, "Error extending device %s", filename);
 
 	return rc;
 }
@@ -1484,6 +1489,8 @@ int dewb_device_destroy(const char *filename)
 
 	dewb_cdmi_disconnect(&debug, cdmi_desc);
 	kfree(cdmi_desc);
+
+	DEWB_LOG_INFO(dewb_log, "Destroyed filename %s", filename);
 
 	return rc;
 

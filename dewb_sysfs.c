@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2014 SCALITY SA. All rights reserved.
  * http://www.scality.com
+ * Copyright (c) 2010 Serge A. Zaitsev
  *
  * This file is part of RestBlockDriver.
  *
