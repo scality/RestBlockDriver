@@ -425,7 +425,7 @@ static ssize_t class_dewb_attach_store(struct class *c,
 	else
 		filename[count] = 0;
 
-	cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s *), GFP_KERNEL);
+	cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL);
 	if (cdmi_desc == NULL) {
 		DEWB_LOG_ERR(dewb_log, "Failed to allocate memory for CDMI struct");
 		ret = -ENOMEM;
