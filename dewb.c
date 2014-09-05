@@ -875,8 +875,13 @@ static void _dewb_mirror_free(dewb_mirror_t *mirror)
 	 */
 	DEWB_LOG_DEBUG(dewb_log, "_dewb_mirror_free: deleting mirror url %s (%p)", mirror->cdmi_desc.url, mirror);
 
-	if (mirror)
+	/* printk(KERN_DEBUG "DEBUG: mirror_free: mirror: %p", mirror); */
+
+	if (mirror) {
+		mirror->next = NULL;
 		kfree(mirror);
+		mirror = NULL;
+	}
 }
 
 static int _dewb_mirror_new(dewb_debug_t *dbg, const char *url, dewb_mirror_t **mirror)
@@ -886,7 +891,9 @@ static int _dewb_mirror_new(dewb_debug_t *dbg, const char *url, dewb_mirror_t **
 
 	DEWB_LOG_DEBUG(dbg->level, "_dewb_mirror_new: creating mirror with url: %s, mirrors: %p", url, *mirror);
 
-	new = kcalloc(1, sizeof(*new), GFP_KERNEL);
+	/* printk(KERN_DEBUG "DEBUG: mirror_new: *mirror: %p, mirror: %p\n", *mirror, mirror); */
+
+	new = kcalloc(1, sizeof(struct dewb_mirror_s), GFP_KERNEL);
 	if (new == NULL) {
 		DEWB_LOG_ERR(dbg->level, "Cannot allocate memory to add a new mirror.");
 		ret = -ENOMEM;
@@ -900,14 +907,16 @@ static int _dewb_mirror_new(dewb_debug_t *dbg, const char *url, dewb_mirror_t **
 	}
 
 	if (mirror) {
+		new->next = NULL;
 		*mirror = new;
-		new = NULL;
+		//new = NULL;
 	}
 
-	ret = 0;
+	/* printk(KERN_DEBUG "DEBUG: mirror_new: *mirror: %p, mirror: %p, new: %p\n", *mirror, mirror, new); */
+
+	return 0;
 end:
-	if (new)
-		_dewb_mirror_free(new);
+	_dewb_mirror_free(new);
 
 	return ret;
 }
@@ -967,6 +976,7 @@ end:
 
 /* XXX: Respect ISO C90
  *      Fix compilation warning: ISO C90 forbids mixed declarations and code
+ *      Fix design: only create new mirror if not found in the list
  */
 int dewb_mirror_add(const char *url)
 {
@@ -980,6 +990,9 @@ int dewb_mirror_add(const char *url)
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_mirror_add: adding mirror %s", url);
+
+	/* printk(KERN_DEBUG "DEBUG: mirror_add: linked list: mirrors: %p, mirrors->next: %p\n", 
+		mirrors, mirrors ? mirrors->next:NULL); */
 
 	//dewb_debug_t debug;
 	//struct dewb_cdmi_desc_s *cdmi_desc = NULL;
@@ -1010,10 +1023,9 @@ int dewb_mirror_add(const char *url)
 	spin_lock(&devtab_lock);
 	cur = mirrors;
 	while (cur != NULL) {
-		if (strcmp(url, cur->cdmi_desc.url) == 0)
-		{
+		if (strcmp(url, cur->cdmi_desc.url) == 0) {
 			found = 1;
-			break ;
+			break;
 		}
 		last = cur;
 		cur = cur->next;
@@ -1025,9 +1037,11 @@ int dewb_mirror_add(const char *url)
 			last->next = new;
 		else
 			mirrors = new;
-		new = NULL;
+		//new = NULL;
 	}
 	spin_unlock(&devtab_lock);
+
+	/* printk(KERN_DEBUG "DEBUG: mirror_add: mirrors: %p, new: %p, last: %p, cur: %p", mirrors, new, last, cur); */
 
 	if (was_first) {
 		ret = dewb_cdmi_connect(&debug, cdmi_desc);
@@ -1042,6 +1056,9 @@ int dewb_mirror_add(const char *url)
 	}
 	kfree(cdmi_desc);
 
+	/* printk(KERN_DEBUG "DEBUG: mirror_add: linked list: mirrors: %p, mirrors->next: %p, cur: %p\n", 
+		mirrors, mirrors ? mirrors->next:NULL, cur); */
+
 	return 0;
 
 err_out_cdmi:
@@ -1049,8 +1066,15 @@ err_out_cdmi:
 err_out_cdmi_alloc:
 	kfree(cdmi_desc);
 err_out_mirror_alloc:
-	_dewb_mirror_free(new);
+	if (0 == found) {
+		mirrors = cur;
+		/* printk(KERN_DEBUG "DEBUG: mirror_add: mirrors: %p, new: %p\n", mirrors, new); */
+		_dewb_mirror_free(new);
+	}
 err_out_dev:
+
+	/* printk(KERN_DEBUG "DEBUG: mirror_add: fault linked list: mirrors: %p, mirrors->next: %p, cur: %p\n",
+		mirrors, mirrors ? mirrors->next:NULL, cur); */
 
 	return ret;
 }
@@ -1063,6 +1087,8 @@ int dewb_mirror_remove(const char *url)
 	dewb_mirror_t	*prev = NULL;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_mirror_remove: removing mirror %s", url);
+
+	/* printk(KERN_DEBUG "DEBUG: mirror_remove: mirrors: %p, mirrors->next: %p\n", mirrors, mirrors ? mirrors->next:NULL); */
 
 	if (strlen(url) >= DEWB_URL_SIZE) {
 		DEWB_LOG_ERR(dewb_log, "Url too big: '%s'", url);
@@ -1105,9 +1131,15 @@ int dewb_mirror_remove(const char *url)
 			prev->next = cur->next;
 		else
 			mirrors = cur->next;
+
+		/* printk(KERN_DEBUG "DEBUG: mirror_remove: linked list: mirrors: %p, mirrors->next: %p, cur: %p\n", 
+			mirrors, mirrors ? mirrors->next:NULL, cur); */
 		_dewb_mirror_free(cur);
 	}
 	spin_unlock(&devtab_lock);
+
+	/* printk(KERN_DEBUG "DEBUG: mirror_remove: linked list: mirrors: %p, mirrors->next: %p\n", 
+		mirrors, mirrors ? mirrors->next:NULL); */
 
 	ret = 0;
 end:

@@ -515,26 +515,22 @@ static ssize_t class_dewb_addmirror_store(struct class *c,
 	const char	*tmpend = tmp;
 	int		errcount = 0;
 
-	while (tmp != NULL)
-	{
+	while (tmp != NULL) {
 		while (*tmp != 0 && *tmp == ',')
 			++tmp;
 
 		tmpend = strchr(tmp, ',');
-		if (tmpend != NULL)
-		{
+		if (tmpend != NULL) {
 			memcpy(url, tmp, (tmpend - tmp));
 			url[(tmpend - tmp)] = 0;
 		}
-		else
-		{
+		else {
 			// Strip the ending newline
 			tmpend = tmp;
 			while (*tmpend && *tmpend != '\n')
 				tmpend++;
 
-			if ((tmpend - tmp) > DEWB_URL_SIZE)
-			{
+			if ((tmpend - tmp) > DEWB_URL_SIZE) {
 				DEWB_LOG_ERR(dewb_log, "Url too big: '%s'", tmp);
 				ret = -EINVAL;
 				goto end;
@@ -553,8 +549,7 @@ static ssize_t class_dewb_addmirror_store(struct class *c,
 	}
 
 	ret = count;
-	if (errcount > 0)
-	{
+	if (errcount > 0) {
 		DEWB_LOG_ERR(dewb_log, "Could not add every mirror to driver.");
 		ret = -EINVAL;
 	}
