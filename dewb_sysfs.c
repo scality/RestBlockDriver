@@ -218,7 +218,7 @@ static ssize_t class_dewb_create_store(struct class *c,
 	size_t len = 0;
 	char *size_str = NULL;
 	char *params[2];
-	char delim = ' ';
+	const char *delim = " ";
 	char *tmp_buf;
 	(void)c;
 	(void)attr;
@@ -244,7 +244,7 @@ static ssize_t class_dewb_create_store(struct class *c,
 	}
 	memcpy(tmp_buf, buf, count);
 	tmp_buf[count - 1] = 0;
-	parse_params(tmp_buf, &delim, params, 2, count);
+	parse_params(tmp_buf, delim, params, 2, count);
 	/* sanity check */
 	len = strlen(params[0]);
 	if (len >= DEWB_URL_SIZE) {
@@ -297,7 +297,7 @@ static ssize_t class_dewb_extend_store(struct class *c,
 	size_t len = 0;
 	char *size_str = NULL;
 	char *params[2];
-	char delim = ' ';
+	const char *delim = " ";
 	char *tmp_buf;
 	(void)c;
 	(void)attr;
@@ -319,7 +319,7 @@ static ssize_t class_dewb_extend_store(struct class *c,
 	}
 	memcpy(tmp_buf, buf, count);
 	tmp_buf[count - 1] = 0;
-	parse_params(tmp_buf, &delim, params, 2, count);
+	parse_params(tmp_buf, delim, params, 2, count);
 	/* sanity check */
 	len = strlen(params[0]);
 	if (len >= DEWB_URL_SIZE) {
