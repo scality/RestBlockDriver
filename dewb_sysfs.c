@@ -40,6 +40,8 @@ int parse_params(char *params, const char *delim, char **param_tbl, int param_nb
 	int j;
 	char *tmp;
 
+	//printk(KERN_DEBUG "DEBUG: parse_params: params(%d): %s\n", max, params);
+
 	j = 0;
 	for (i = 0; i < max && j < param_nb; i++) {
 		tmp = strsep(&params, delim);
@@ -49,13 +51,18 @@ int parse_params(char *params, const char *delim, char **param_tbl, int param_nb
 		}
 	}
 
+	//printk(KERN_DEBUG "DEBUG: parse_params: params: %s, %s\n", param_tbl[0], param_tbl[1]);
+
 	return 0;
 }
+
 int human_to_bytes(char *size_str, unsigned long long *size)
 {
 	char h;
 	unsigned long long coef;
 	int ret;
+
+	//printk(KERN_DEBUG "DEBUG: human_to_bytes: buff: %s\n", size_str);
 
 	coef = 1;
 	h = size_str[strlen(size_str) - 1];
@@ -243,7 +250,15 @@ static ssize_t class_dewb_create_store(struct class *c,
 		goto out;
 	}
 	memcpy(tmp_buf, buf, count);
-	tmp_buf[count - 1] = 0;
+
+	//printk(KERN_DEBUG "DEBUG: class_dewb_create_store: buff (%lu:%lu): '%c':%x", count, sizeof(buf), buf[count - 1], buf[count - 1]);
+
+	/* remove CR or LF if any and end string */
+	if (tmp_buf[count - 1] == '\n' || tmp_buf[count - 1] == '\r')
+		tmp_buf[count - 1] = 0;
+	else
+		tmp_buf[count] = 0;
+
 	parse_params(tmp_buf, delim, params, 2, count);
 	/* sanity check */
 	len = strlen(params[0]);
@@ -252,7 +267,11 @@ static ssize_t class_dewb_create_store(struct class *c,
 		ret = -EINVAL;
 		goto out;
 	}
-	human_to_bytes(params[1], &size);
+	ret = human_to_bytes(params[1], &size);
+	if (ret != 0) {
+		DEWB_LOG_ERR(dewb_log, "Invalid volume size: %s", params[1]);
+		goto out;
+	}
 
 	DEWB_LOG_INFO(dewb_log, "Creating volume %s of size %llu (bytes)", params[0], size);
 
@@ -318,7 +337,13 @@ static ssize_t class_dewb_extend_store(struct class *c,
 		goto out;
 	}
 	memcpy(tmp_buf, buf, count);
-	tmp_buf[count - 1] = 0;
+
+	/* remove CR or LF if any and end string */
+	if (tmp_buf[count - 1] == '\n' || tmp_buf[count - 1] == '\r')
+		tmp_buf[count - 1] = 0;
+	else
+		tmp_buf[count] = 0;
+
 	parse_params(tmp_buf, delim, params, 2, count);
 	/* sanity check */
 	len = strlen(params[0]);
@@ -327,7 +352,11 @@ static ssize_t class_dewb_extend_store(struct class *c,
 		ret = -EINVAL;
 		goto out;
 	}
-	human_to_bytes(params[1], &size);
+	ret = human_to_bytes(params[1], &size);
+	if (ret != 0) {
+		DEWB_LOG_ERR(dewb_log, "Invalid volume size: %s", params[1]);
+		goto out;
+	}
 
 	DEWB_LOG_INFO(dewb_log, "Creating volume %s of size %llu (bytes)", params[0], size);
 
