@@ -243,7 +243,7 @@ static ssize_t class_dewb_create_store(struct class *c,
 		goto out;
 	}
 	
-	tmp_buf = kmalloc(count, GFP_KERNEL);
+	tmp_buf = kmalloc(count + 1, GFP_KERNEL);
 	if (NULL == tmp_buf) {
 		DEWB_LOG_ERR(dewb_log, "Unable to allocate memory for parameters");
 		ret = -ENOMEM;
