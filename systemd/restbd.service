@@ -1,0 +1,33 @@
+[Unit]
+Description=Scality RestBlockDriver
+After=syslog.target network.target
+
+# Check if configuration file exists
+ConditionFileNotEmpty=/etc/restbd.conf
+
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=/etc/restbd.conf
+
+#
+# Start
+#
+ExecStart=/usr/sbin/insmod ${KMOD_PATH}/${KMOD_NAME}.ko
+ExecStart=/usr/bin/cp /sys/class/dewb/add_mirrors /tmp/add_mirrors
+ExecStart=/usr/bin/sed -r -e "s,.*,${MIRRORS}," -i /tmp/add_mirrors
+ExecStart=/usr/bin/cp /tmp/add_mirrors /sys/class/dewb/add_mirrors
+ExecStart=/usr/bin/rm -f /tmp/add_mirrors
+
+#
+# Stop
+#
+ExecStop=/usr/bin/touch /tmp/add_mirrors
+ExecStop=/usr/bin/cp /tmp/add_mirrors /sys/class/dewb/add_mirrors
+ExecStop=/usr/sbin/rmmod $KMOD_NAME
+ExecStop=/usr/bin/rm -f /tmp/add_mirrors
+
+
+[Install]
+WantedBy=multi-user.target

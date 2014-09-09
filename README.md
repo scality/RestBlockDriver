@@ -18,9 +18,9 @@ INSTRUCTIONS
 Prerequisites
 ---------
 
-Ubuntu 12.04.4 LTS system supported
+Ubuntu 12.04.4 LTS or CentOS 7 system supported
 
-Minimal Linux kernel version: v3.8
+Minimal Linux kernel version: v3.10
 
 Installing the driver
 ---------------------
@@ -50,6 +50,16 @@ Then the next and last step is to load the kernel module into the linux kernel:
 Now, the Rest Block Driver is set for use, and you only need to know how to
 control the driver to do the management tasks. To learn that, please continue
 reading.
+
+In order to set parameters, this can be done during the load of the driver as folow:
+
+    # insmod dewblock.ko thread_pool_size=16
+
+The following parameters are available:
+  * thread_pool_size: size of the thread pool
+  * dewb_log: log level of the driver that is inherited for each device
+  * req_timeout: timeout for socket connection
+  * nb_req_retries: number of retries before aborting a Rest request
 
 Semi-automatic provisionning
 ============================
@@ -279,19 +289,24 @@ For each device, an entry is created in /sys/block
 And so on...
 
 
-Debugging
----------
+Log & Debug
+-----------
 
-It is possible to enable/disable debug trace with the following command:
+Logs are enable in the Linux Kernel Module and default is set to INFO. In order
+to change the log level of the driver you can do it while loading it as follow:
 
-activate:
+    # insmod dewblock.ko dewb_log=3
 
-    # echo 1 > /sys/block/dewb?/dewb\_debug
+The log level can also be changed using sysfs as follow:
 
-disable:
+    # echo 3 > /sys/module/dewblock/parameters/debug
 
-    # echo 0 > /sys/block/dewb?/dewb\_debug
+Each device inherit the Linux Kernel Module log level. The log level of a device
+can be changed as follow:
 
+    # echo 6 > /sys/block/dewb?/dewb\_debug
+
+The log level can be set from debug(7), info(6) ... to emergency (0).
 
 Get information on the device
 ----------------------------------

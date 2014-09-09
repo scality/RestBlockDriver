@@ -1,3 +1,27 @@
+/*
+ * Copyright (C) 2014 SCALITY SA. All rights reserved.
+ * http://www.scality.com
+ * Copyright (c) 2010 Serge A. Zaitsev
+ * Copyright 1997-2000, 2008 Pavel Machek <pavel@ucw.cz>
+ * Parts copyright 2001 Steven Whitehouse <steve@chygwyn.com>
+ *
+ * This file is part of RestBlockDriver.
+ *
+ * RestBlockDriver is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * RestBlockDriver is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 #ifndef __DEWBLOCK_H__
 # define  __DEWBLOCK_H__
 
@@ -8,14 +32,16 @@
 #include <linux/net.h>
 #include <linux/scatterlist.h>
 #include <net/sock.h>
+#include <linux/genhd.h>
 
 /* Constants */
-
-#define MB			(1024 * 1024)
+#define kB			1024
+#define MB			(1024 * kB)
 #define GB			(1024 * MB)
 
 /* Unix device constants */
 #define DEV_NAME		"dewb"
+#define DEV_REL_VERSION		"0.1.0"		// Set version of dewb LKM
 #define DEV_MINORS		256
 #define DEV_DEFAULT_DISKSIZE	(50 * MB)
 #define DEV_MAX			16
@@ -30,13 +56,61 @@
 				     * restarting a new one.
 				     */
 
+/* TODO: Retry CDMI request (Issue #22)
+ * Linux Kernel Module (LKM) parameters
+ */
+extern unsigned short dewb_log;
+extern unsigned short req_timeout;
+extern unsigned short nb_req_retries;
+extern unsigned short mirror_conn_timeout;
+extern unsigned int thread_pool_size;
+
+/* TODO: LKM logging (Issue #28 and Issue #3)
+ * Standard Kernel value for log level
+ */
+#define DEWB_DEBUG		7
+#define DEWB_INFO		6
+#define DEWB_NOTICE		5
+#define DEWB_WARN		4
+#define DEWB_ERR		3
+#define DEWB_CRIT		2
+#define DEWB_ALERT		1
+#define DEWB_EMERG		0
+/* 
+ * Dewblock log function
+ */
+#define DEWB_LOG_DEBUG(level, fmt, a...) \
+	if (level >= DEWB_DEBUG) printk(KERN_DEBUG "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_INFO(level, fmt, a...) \
+	if (level >= DEWB_INFO) printk(KERN_INFO "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_NOTICE(level, fmt, a...) \
+	if (level >= DEWB_NOTICE) printk(KERN_NOTICE "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_WARN(level, fmt, a...) \
+	if (level >= DEWB_WARN) printk(KERN_WARNING "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_ERR(level, fmt, a...) \
+	if (level >= DEWB_ERR) printk(KERN_ERR "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_CRIT(level, fmt, a...) \
+	if (level >= DEWB_CRIT) printk(KERN_CRIT "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_ALERT(level, fmt, a...) \
+	if (level >= DEWB_ALERT) printk(KERN_ALERT "dewb: " fmt "\n", ##a)
+#define DEWB_LOG_EMERG(level, fmt, a...) \
+	if (level >= DEWB_EMERG) printk(KERN_EMERG "dewb: " fmt "\n", ##a)
+
+/* 
+ * Default values for Dewblock LKM parameters
+ */
+#define DEWB_REQ_TIMEOUT_DFLT		30
+#define DEWB_NB_REQ_RETRIES_DFLT	3
+#define DEWB_CONN_TIMEOUT_DFLT		30
+#define DEWB_LOG_LEVEL_DFLT		DEWB_INFO
+#define DEWB_THREAD_POOL_SIZE_DFLT	8
+
+
 #define DEWB_DEBUG_LEVEL	0   /* We do not want to be polluted
 				     * by default */
 
 
 #define DEWB_XMIT_BUFFER_SIZE	(DEWB_HTTP_HEADER_SIZE + DEV_SECTORSIZE)
-
-#define DEWB_THREAD_POOL_SIZE	8
 
 #define DEWB_INTERNAL_DBG(dbg, fmt, a...) \
 	do { if ((dbg)->level)					\
@@ -44,16 +118,17 @@
 			(dbg)->name, __func__, __LINE__, ##a);	\
 	} while (0)
 
-#define DEWB_DEBUG(fmt, a...) DEWB_INTERNAL_DBG(dbg, fmt, ##a)
+//#define DEWB_DEBUG(fmt, a...) DEWB_INTERNAL_DBG(dbg, fmt, ##a)
 
 #define DEWB_DEV_DEBUG(fmt, a...) DEWB_INTERNAL_DBG(&dev->debug, fmt, ##a)
 
-
+/*
 #define DEWB_INFO(fmt, a...) \
 	printk(KERN_INFO "dewb: " fmt "\n" , ##a)
 
 #define DEWB_ERROR(fmt, a...) \
 	printk(KERN_ERR "dewb: " fmt "\n" , ##a)
+*/
 
 #define DEWB_MIN(x, y) ((x) < (y) ? (x) : (y))
 #define DEWB_N_JSON_TOKENS	128
@@ -135,6 +210,7 @@ struct dewb_cdmi_desc_s {
 	int			sgl_size;
 	struct socket		*socket;
 	struct sockaddr_in	sockaddr;
+	struct timeval		timeout;
 };
 
 /* dewb device definition */
@@ -144,11 +220,12 @@ typedef struct dewb_debug_s {
 } dewb_debug_t;
 
 typedef struct dewb_device_s {
-
 	/* Device subsystem related data */
 	int			id;		/* device ID */
 	int			major;		/* blkdev assigned major */
-	char			name[32];	/* blkdev name, e.g. dewba */
+	//char			name[32];	/* blkdev name, e.g. dewba */
+	//XXX: use const from ./linux/genhd.h
+	char			name[DISK_NAME_LEN];	/* blkdev name, e.g. dewba */
 	struct gendisk		*disk;
 	uint64_t		disk_size;	/* Size in bytes */
 	int			users;		/* Number of users who
@@ -157,11 +234,17 @@ typedef struct dewb_device_s {
 	struct request_queue	*q;
 	spinlock_t		rq_lock;	/* request queue lock */
 
-	struct task_struct	*thread[DEWB_THREAD_POOL_SIZE];
+	/* TODO: Use a dynamic thread pool (Issue #33)
+         */
+	//struct task_struct	*thread[DEWB_THREAD_POOL_SIZE_DFLT];
+	struct task_struct	**thread;	/* allow dynamic allocation during device creation */
 	int			nb_threads;
 
 	/* Dewpoint specific data */
-	struct dewb_cdmi_desc_s	thread_cdmi_desc[DEWB_THREAD_POOL_SIZE];
+	/* TODO: Use a dynamic CDMI pool due to the 1 <-> 1 relation with thread (Issue #33)
+	 */
+	//struct dewb_cdmi_desc_s	thread_cdmi_desc[DEWB_THREAD_POOL_SIZE_DFLT];
+	struct dewb_cdmi_desc_s	 **thread_cdmi_desc;	/* allow dynamic allocation during device creation*/
 
 	/* 
 	** List of requests received by the drivers, but still to be
@@ -185,7 +268,8 @@ int dewb_device_create(const char *filename, unsigned long long size);
 int dewb_device_extend(const char *filename, unsigned long long size);
 int dewb_device_destroy(const char *filename);
 
-int dewb_device_attach(const char *filename);
+//int dewb_device_attach(const char *filename);
+int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename);
 int dewb_device_detach_by_name(const char *filename);
 int dewb_device_detach_by_id(int dev_id);
 
@@ -225,8 +309,10 @@ int dewb_cdmi_extend(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 		     unsigned long long trunc_size);
 int dewb_cdmi_delete(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc);
 
+/* int dewb_cdmi_list(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
+		   int (*volume_cb)(const char *)); */
 int dewb_cdmi_list(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
-		   int (*volume_cb)(const char *));
+		   int (*volume_cb)(struct dewb_cdmi_desc_s *, const char *));
 
 /* dewb_http.c */
 int dewb_http_mklist(char *buff, int len, char *host, char *page);
@@ -245,5 +331,8 @@ int dewb_http_mkmetadata(char *buff, int len, char *host, char *page);
 
 int dewb_http_get_status(char *buf, int len, enum dewb_http_statuscode *code);
 enum dewb_http_statusrange dewb_http_get_status_range(enum dewb_http_statuscode status);
+
+/**/
+//int _dewb_mirror_pick(const char *filename, struct dewb_cdmi_desc_s *pick);
 
 #endif

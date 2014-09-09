@@ -1,3 +1,26 @@
+/*
+ * Copyright (C) 2014 SCALITY SA. All rights reserved.
+ * http://www.scality.com
+ * Copyright (c) 2010 Serge A. Zaitsev
+ * Copyright 1997-2000, 2008 Pavel Machek <pavel@ucw.cz>
+ * Parts copyright 2001 Steven Whitehouse <steve@chygwyn.com>
+ *
+ * This file is part of RestBlockDriver.
+ *
+ * RestBlockDriver is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * RestBlockDriver is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 #include <linux/string.h>
 #include <linux/errno.h>
@@ -54,7 +77,7 @@ int dewb_http_get_status(char *buf, int len, enum dewb_http_statuscode *code)
 		ret = kstrtol(codebuf, 10, &status);
 		if (ret != 0)
 		{
-			DEWB_ERROR("Could not retrieve HTTP status code: err %i (buf=%.*s)", ret, 5, buf);
+			DEWB_LOG_ERR(dewb_log, "Could not retrieve HTTP status code: err %i (buf=%.*s)", ret, 5, buf);
 			return -1;
 		}
 
