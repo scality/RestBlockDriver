@@ -400,10 +400,11 @@ static int dewb_thread(void *data)
 	char buff[256];
 #ifdef DEWB_BIO_ENABLED
 	struct bio *bio;
-#endif
 	struct req_iterator iter;
 	struct bio_vec *bvec;
+#endif
 	struct dewb_cdmi_desc_s *cdmi_desc;
+	int ret;
 
 	DEWB_LOG_DEBUG(((struct dewb_device_s *)data)->debug.level, "dewb_thread: thread function with data %p", data);
 
@@ -432,23 +433,51 @@ static int dewb_thread(void *data)
 				queuelist);
 		list_del_init(&req->queuelist);
 		spin_unlock_irqrestore(&dev->waiting_lock, flags);
-		
+
+			
+		/* According to
+		 * <kern_src>/Documentation/block/writeback_cache_control.txt
+		 * For a request_fn based driver like this one, struct
+		 * request carrying REQ_FLUSH flag are always empty
+		 */
+		if (req->cmd_flags & REQ_FLUSH)
+		{
+			/* 0. This request is empty, we won't
+			 * processing bios */
+			
+			/* 1. Waiting for all the pending writes to be
+			 * completed */
+			DEWB_DEV_DEBUG("Thread %d, waiting other threads " \
+				       "to complete", th_id);
+		again:
+			
+			wait_event(dev->writes_completed_wq, 
+				atomic_read(&dev->nb_writes_pending) == 0);
+
+			if  (atomic_read(&dev->nb_writes_pending) != 0)
+				goto again;
+
+			/* 2. send the CDMI sync primitive */
+			ret = dewb_cdmi_flush(&dev->debug, 
+					dev->thread_cdmi_desc[th_id]);
+			
+			/* 3. Report completion for the request */
+			blk_end_request_all(req, ret);
+
+			/* 4. FLUSH END : Re enable requests entry in queue */
+			dev->flush_pending = 0;
+			continue;
+		}
+	
+				
 		if (blk_rq_sectors(req) == 0)
 			continue;
 
 		req_flags_to_str(req->cmd_flags, buff);
 		DEWB_LOG_DEBUG(dev->debug.level, "dewb_thread: thread %d: New REQ of type %s (%d) flags: %s (%llu)", 
-			th_id, req_code_to_str(rq_data_dir(req)), rq_data_dir(req), buff, req->cmd_flags);
+			th_id, req_code_to_str(rq_data_dir(req)), rq_data_dir(req), buff, (unsigned long long)req->cmd_flags);
 		if (req->cmd_flags & REQ_FLUSH) {
 			DEWB_LOG_DEBUG(dev->debug.level, "DEBUG CMD REQ_FLUSH\n");
-		}
-		/* XXX: Use iterator instead of internal function (cf linux/blkdev.h)
-		 *  __rq_for_each_bio(bio, req) {
-		 */
-		rq_for_each_segment(bvec, req, iter) {
-			if (iter.bio->bi_rw & REQ_FLUSH) {
-				DEWB_LOG_DEBUG(dev->debug.level, "DEBUG VR BIO REQ_FLUSH\n");
-			}
 		}
 
 #ifdef DEWB_BIO_ENABLED
@@ -475,9 +504,28 @@ static int dewb_thread(void *data)
 		//DEWB_DEV_DEBUG("END REQUEST [tid:%d]", th_id);
 		DEWB_LOG_DEBUG(dev->debug.level, "dewb_thread: thread %d: REQ done with returned code %d", 
 			th_id, th_ret);;
-	
+		/* Here handle the REQ_FUA flag */
+		if (req->cmd_flags & REQ_FUA) {
+			dewb_cdmi_fua(&dev->debug, 
+				dev->thread_cdmi_desc[th_id], 
+				blk_rq_pos(req) * 512ULL, 
+				blk_rq_sectors(req) * 512ULL);
+		}
+
 		/* No IO error testing for the moment */
 		blk_end_request_all(req, 0);
+		
+		/* if request is for write, decrement the pending write request
+		** counter.
+		*/
+		if (((rq_data_dir(req)) == WRITE) &&
+			atomic_dec_and_test(&dev->nb_writes_pending)) {
+			DEWB_LOG_DEBUG(dev->debug.level, "[tid=%d] waking up master thread", th_id);
+			wake_up_nr(&dev->writes_completed_wq, 1);
+		} else
+			DEWB_LOG_DEBUG(dev->debug.level, "[tid=%d] still %d writes to process", 
+				th_id, atomic_read(&dev->nb_writes_pending));
+
 	}
 	return 0;
 }
@@ -489,6 +537,12 @@ static void dewb_rq_fn(struct request_queue *q)
 	struct request *req;
 	unsigned long flags;
 
+	/* If a flush is still in progress, do not accept requests in the
+	** process queue until the end.
+	*/
+	if (dev->flush_pending)
+		return;
+
 	while ((req = blk_fetch_request(q)) != NULL) {
 		if (req->cmd_type != REQ_TYPE_FS) {
 			DEWB_LOG_DEBUG(dev->debug.level, "dewb_rq_fn: Skip non-CMD request");
@@ -496,6 +550,13 @@ static void dewb_rq_fn(struct request_queue *q)
 			__blk_end_request_all(req, -EIO);
 			continue;
 		}
+		
+		if (req->cmd_flags & REQ_FLUSH)
+			dev->flush_pending = 1;
+
+		if ((rq_data_dir(req)) == WRITE && 
+			!(req->cmd_flags & REQ_FLUSH))
+			atomic_inc(&dev->nb_writes_pending);
 
 		spin_lock_irqsave(&dev->waiting_lock, flags);
 		list_add_tail(&req->queuelist, &dev->waiting_queue);
@@ -590,7 +651,9 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	dev->disk	= disk;
 	dev->q		= disk->queue = q;
 	dev->nb_threads = 0;
-	//blk_queue_flush(q, REQ_FLUSH | REQ_FUA);
+	
+	//blk_queue_flush(q, REQ_FLUSH);
+	blk_queue_flush(q, REQ_FLUSH | REQ_FUA);
 	//blk_queue_max_phys_segments(q, DEV_NB_PHYS_SEGS);
 
 	//TODO: Enable flush and bio (Issue #21)
@@ -677,6 +740,8 @@ static dewb_device_t *dewb_device_new(void)
 	dev->debug.level = dewb_log;
 	dev->users = 0;
 	sprintf(dev->name, DEV_NAME "%c", (char)(i + 'a'));
+	atomic_set(&dev->nb_writes_pending, 0);
+	dev->flush_pending = 0;
 
 	/* Table can be unlocked because device is reserved (name not empty) */
 	spin_unlock(&devtab_lock);
@@ -1261,6 +1326,7 @@ int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename)
 	}
 
 	init_waitqueue_head(&dev->waiting_wq);
+	init_waitqueue_head(&dev->writes_completed_wq);
 	INIT_LIST_HEAD(&dev->waiting_queue);
 	spin_lock_init(&dev->waiting_lock);
 

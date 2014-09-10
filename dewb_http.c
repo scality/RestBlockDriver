@@ -28,7 +28,7 @@
 #include "dewb.h"
 
 #define HTTP_VER	"HTTP/1.1"
-#define HTTP_OK		"HTTP/1.1 200 OK"
+#define HTTP_OK		"HTTP/1.1 2"
 #define HTTP_METADATA	"?metadata"
 
 #define HTTP_KEEPALIVE	"Connection: keep-alive" CRLF \
@@ -36,6 +36,8 @@
 #define HTTP_TRUNCATE	"X-Scal-Truncate"
 #define HTTP_USER_AGENT "User-Agent: dewblock_driver/1.0"
 #define HTTP_CDMI_VERS	"X-CDMI-Specification-Version: 1.0.1"
+#define HTTP_FLUSH	"X-Scal-Synchronize: data"
+#define HTTP_FUA	"X-Scal-Synchronize: bytes"
 
 #define CRLF "\r\n"
 
@@ -181,6 +183,118 @@ int dewb_http_mkhead(char *buff, int len, char *host, char *page)
 		return -ENOMEM;
 
 	ret = add_buffer(&bufp, &mylen, CRLF CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	return (len - mylen);
+}
+
+
+int dewb_http_mkflush(char *buff, int len, char *host, char *page)
+{
+	char *bufp = buff;
+	int mylen = len;
+	int ret;
+
+	*buff = 0;
+	ret = add_buffer(&bufp, &mylen, "HEAD ");
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, page);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, " " HTTP_VER CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_KEEPALIVE CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_USER_AGENT CRLF);
+	if (ret)
+		return -ENOMEM;
+	
+	ret = add_buffer(&bufp, &mylen, "Host: ");
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, host);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_FLUSH);
+	if (ret)
+		return -ENOMEM;
+	
+	ret = add_buffer(&bufp, &mylen, CRLF CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	return (len - mylen);
+}
+
+int dewb_http_mkfua(char *buff, int len, char *host, char *page,
+		uint64_t start, uint64_t end)
+{
+	char *bufp = buff;
+	char range_str[64];
+	int mylen = len;
+	int ret;
+
+	*buff = 0;
+	ret = add_buffer(&bufp, &mylen, "HEAD ");
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, page);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, " " HTTP_VER CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_KEEPALIVE CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_USER_AGENT CRLF);
+	if (ret)
+		return -ENOMEM;
+	
+	ret = add_buffer(&bufp, &mylen, "Host: ");
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, host);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen,  CRLF);
+	if (ret)
+		return -ENOMEM;
+
+	ret = add_buffer(&bufp, &mylen, HTTP_FUA);
+	if (ret)
+		return -ENOMEM;
+	
+	/* Construct range info */
+	sprintf(range_str, " %lu-%lu" CRLF, 
+		(unsigned long )start, (unsigned long )end);
+
+	ret = add_buffer(&bufp, &mylen, range_str);
+	if (ret)
+		return -ENOMEM;
+
+
+	ret = add_buffer(&bufp, &mylen, CRLF);
 	if (ret)
 		return -ENOMEM;
 

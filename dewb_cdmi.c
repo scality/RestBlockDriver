@@ -687,9 +687,44 @@ err:
 	return ret;
 }
 
+int dewb_cdmi_fua(dewb_debug_t *dbg,
+		struct dewb_cdmi_desc_s *desc,
+		uint64_t offset, int size)
+{
+	char *buff = desc->xmit_buff;
+	int len;
+	int ret;
+	uint64_t start, end;
+	uint64_t ret_size;
+
+	/* Calculate start, end */
+	start = offset;
+	end   = offset + size - 1;
+
+	if (!desc->socket)
+		return 0;
+
+	/* Construct HTTP truncate */
+	len = dewb_http_mkfua(buff, DEWB_XMIT_BUFFER_SIZE, 
+			desc->ip_addr, desc->filename,
+			start, end);
+	
+	if (len <= 0) return len;
+	
+	len = sock_send_receive(dbg, desc, len, 0);
+	if (len < 0) return len;
+
+	buff[len] = 0;
+	ret = dewb_http_header_get_uint64(buff, len, "Content-Length", 
+					&ret_size);
+	if (ret)
+		return -EIO;
+
+	return 0;
+}
+
 int dewb_cdmi_flush(dewb_debug_t *dbg,
-		struct dewb_cdmi_desc_s *desc, 
-		unsigned long flush_size)
+		struct dewb_cdmi_desc_s *desc)
 {
 	char *buff = desc->xmit_buff;
 	uint64_t size;
@@ -699,9 +734,8 @@ int dewb_cdmi_flush(dewb_debug_t *dbg,
 	if (!desc->socket)
 		return 0;
 
-	/* Construct HTTP truncate */
-	len = dewb_http_mktruncate(buff, DEWB_XMIT_BUFFER_SIZE, 
-				desc->ip_addr, desc->filename, flush_size);
+	len = dewb_http_mkflush(buff, DEWB_XMIT_BUFFER_SIZE, 
+				desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 	
 	len = sock_send_receive(dbg, desc, len, 0);

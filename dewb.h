@@ -31,6 +31,7 @@
 #include <linux/in.h>
 #include <linux/net.h>
 #include <linux/scatterlist.h>
+#include <asm/atomic.h>
 #include <net/sock.h>
 #include <linux/genhd.h>
 
@@ -254,6 +255,14 @@ typedef struct dewb_device_s {
 	wait_queue_head_t	waiting_wq;
 	struct list_head	waiting_queue; /* Requests to be sent */
 
+
+	/* Number of writes placed in waiting_queue and not yet
+	 * completed by a worker thread.
+	 */
+	atomic_t		nb_writes_pending;
+	wait_queue_head_t	writes_completed_wq;
+	char			flush_pending;
+
 	/* Debug traces */
 	dewb_debug_t		debug;
 } dewb_device_t;
@@ -297,8 +306,9 @@ int dewb_cdmi_getrange(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 int dewb_cdmi_putrange(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 		uint64_t offset, int size);
 
-int dewb_cdmi_flush(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
-		unsigned long flush_size);
+int dewb_cdmi_flush(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc);
+int dewb_cdmi_fua(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
+		uint64_t offset, int size);
 
 int dewb_cdmi_truncate(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 		unsigned long trunc_size);
@@ -317,6 +327,11 @@ int dewb_cdmi_list(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 /* dewb_http.c */
 int dewb_http_mklist(char *buff, int len, char *host, char *page);
 int dewb_http_mkhead(char *buff, int len, char *host, char *page);
+
+int dewb_http_mkflush(char *buff, int len, char *host, char *page);
+int dewb_http_mkfua(char *buff, int len, char *host, char *page,
+		uint64_t start, uint64_t end);
+
 int dewb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page, 
 		uint64_t start, uint64_t end);
 
