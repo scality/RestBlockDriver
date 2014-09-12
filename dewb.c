@@ -1340,13 +1340,6 @@ int dewb_device_create(const char *filename, unsigned long long size)
 
 	dewb_cdmi_disconnect(&debug, cdmi_desc);
 
-	//rc = dewb_device_attach(filename);
-	rc = dewb_device_attach(cdmi_desc, filename);
-	if (rc != 0) {
-		DEWB_LOG_ERR(dewb_log, "Cannot add created volume automatically.");
-		goto err_out_cdmi;
-	}
-
 	DEWB_LOG_INFO(dewb_log, "Created device with filename %s", filename); 
 
 	kfree(cdmi_desc);
@@ -1440,7 +1433,7 @@ int dewb_device_destroy(const char *filename)
 	dewb_debug_t debug;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 	int rc;
-	int remove_err = 0;
+	int device_exists = 0;
 	int i;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_device_destroy: destroying filename: %s", filename);
@@ -1458,29 +1451,26 @@ int dewb_device_destroy(const char *filename)
 		goto err_out_mod;
 	}
 
-	// Remove every device (normally only 1) associated to filename
+	// Check that there is no device associated to filename
 	spin_lock(&devtab_lock);
 	for (i = 0; i < DEV_MAX; ++i) {
 		if (!device_free_slot(&devtab[i])) {
-			/* const char *fname
-			    = kbasename(devtab[i].thread_cdmi_desc[0].filename); */
-			const char *fname = kbasename(devtab[i].thread_cdmi_desc[0]->filename);
+			const char *fname = kbasename(
+				devtab[i].thread_cdmi_desc[0]->filename);
 			if (strcmp(filename, fname) == 0) {
-				rc = __dewb_device_detach(&devtab[i]);
-				if (rc != 0) {
-					DEWB_LOG_ERR(dewb_log, "Cannot remove created"
-						   " volume automatically: %s", fname);
-					remove_err = 1;
-					break;
-				}
+				DEWB_LOG_ERR(dewb_log,
+					"Cannot destroy attached volume: %s"
+					" (attached as %s)",
+					fname, devtab[i].name);
+				device_exists = 1;
+				break;
 			}
 		}
 	}
 	spin_unlock(&devtab_lock);
 
-	if (remove_err) {
-		DEWB_LOG_ERR(dewb_log, "Could not remove every device associated to "
-			   "volume %s", filename);
+	if (device_exists) {
+		rc = -EBUSY;
 		goto err_out_alloc;
 	}
 
