@@ -982,25 +982,19 @@ int dewb_mirror_add(const char *url)
 {
 	int		ret = 0;
 	int		found = 0;
-	int		was_first = 0;
 	dewb_mirror_t	*cur = NULL;
 	dewb_mirror_t	*last = NULL;
 	dewb_mirror_t	*new = NULL;
-	dewb_debug_t debug;
-	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
+	dewb_debug_t	debug;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_mirror_add: adding mirror %s", url);
 
 	/* printk(KERN_DEBUG "DEBUG: mirror_add: linked list: mirrors: %p, mirrors->next: %p\n", 
 		mirrors, mirrors ? mirrors->next:NULL); */
 
-	//dewb_debug_t debug;
-	//struct dewb_cdmi_desc_s *cdmi_desc = NULL;
-
 	debug.name = "<Mirror-Adder>";
 	/* TODO: Inherit log level from dewblock (Issue #28)
 	 */
-	//debug.level = DEWB_DEBUG_LEVEL;
 	debug.level = dewb_log;
 
 	if (strlen(url) >= DEWB_URL_SIZE) {
@@ -1013,13 +1007,6 @@ int dewb_mirror_add(const char *url)
 	if (ret != 0)
 		goto err_out_dev;
 
-	cdmi_desc = kcalloc(1, sizeof(*cdmi_desc), GFP_KERNEL);
-	if (cdmi_desc == NULL) {
-		ret = -ENOMEM;
-		goto err_out_mirror_alloc;
-	}
-	memcpy(cdmi_desc, &new->cdmi_desc, sizeof(new->cdmi_desc));
-
 	spin_lock(&devtab_lock);
 	cur = mirrors;
 	while (cur != NULL) {
@@ -1031,46 +1018,22 @@ int dewb_mirror_add(const char *url)
 		cur = cur->next;
 	}
 	if (found == 0) {
-		if (mirrors == NULL)
-			was_first = 1;
 		if (last != NULL)
 			last->next = new;
 		else
 			mirrors = new;
-		//new = NULL;
+		new = NULL;
 	}
 	spin_unlock(&devtab_lock);
-
-	/* printk(KERN_DEBUG "DEBUG: mirror_add: mirrors: %p, new: %p, last: %p, cur: %p", mirrors, new, last, cur); */
-
-	if (was_first) {
-		ret = dewb_cdmi_connect(&debug, cdmi_desc);
-		if (ret != 0)
-			goto err_out_cdmi_alloc;
-
-		ret = dewb_cdmi_list(&debug, cdmi_desc, &dewb_device_attach);
-		if (ret != 0)
-			goto err_out_cdmi;
-
-		dewb_cdmi_disconnect(&debug, cdmi_desc);
-	}
-	kfree(cdmi_desc);
 
 	/* printk(KERN_DEBUG "DEBUG: mirror_add: linked list: mirrors: %p, mirrors->next: %p, cur: %p\n", 
 		mirrors, mirrors ? mirrors->next:NULL, cur); */
 
+	if (found)
+		_dewb_mirror_free(new);
+
 	return 0;
 
-err_out_cdmi:
-	dewb_cdmi_disconnect(&debug, cdmi_desc);
-err_out_cdmi_alloc:
-	kfree(cdmi_desc);
-err_out_mirror_alloc:
-	if (0 == found) {
-		mirrors = cur;
-		/* printk(KERN_DEBUG "DEBUG: mirror_add: mirrors: %p, new: %p\n", mirrors, new); */
-		_dewb_mirror_free(new);
-	}
 err_out_dev:
 
 	/* printk(KERN_DEBUG "DEBUG: mirror_add: fault linked list: mirrors: %p, mirrors->next: %p, cur: %p\n",
@@ -1079,12 +1042,65 @@ err_out_dev:
 	return ret;
 }
 
-int dewb_mirror_remove(const char *url)
+static int _locked_mirror_remove(const char *url)
 {
 	int		ret = 0;
+	int		i;
 	int		found = 0;
 	dewb_mirror_t	*cur = NULL;
 	dewb_mirror_t	*prev = NULL;
+
+	cur = mirrors;
+	while (cur != NULL) {
+		if (strcmp(url, cur->cdmi_desc.url) == 0) {
+			found = 1;
+			break;
+		}
+		prev = cur;
+		cur = cur->next;
+	}
+
+	if (found == 0) {
+		DEWB_LOG_ERR(dewb_log, "Cannot remove mirror: "
+			     "Url is not part of mirrors");
+		ret = -ENOENT;
+		goto end;
+	}
+
+	/* Only one mirror == Last mirror, make sure there are no devices
+	 * attached anymore before removing */
+	if (mirrors != NULL && mirrors->next == NULL) {
+		for (i = 0; i < DEV_MAX; ++i) {
+			if (!device_free_slot(&devtab[i])) {
+				DEWB_LOG_ERR(dewb_log,
+					     "Could not remove all devices; "
+					     "not removing mirror.");
+				ret = -EBUSY;
+				goto end;
+			}
+		}
+	}
+
+
+	if (prev)
+		prev->next = cur->next;
+	else
+		mirrors = cur->next;
+
+	/* printk(KERN_DEBUG "DEBUG: mirror_remove: linked list: mirrors: %p,"
+		  " mirrors->next: %p, cur: %p\n",
+	          mirrors, mirrors ? mirrors->next:NULL, cur); */
+	_dewb_mirror_free(cur);
+
+	ret = 0;
+
+end:
+	return ret;
+}
+
+int dewb_mirror_remove(const char *url)
+{
+	int		ret = 0;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_mirror_remove: removing mirror %s", url);
 
@@ -1096,52 +1112,13 @@ int dewb_mirror_remove(const char *url)
 		goto end;
 	}
 
-	// Check if it's the last mirror. If yes, remove all devices.
-	/* XXX: Only lock while detaching device
-	 */
-	//spin_lock(&devtab_lock);
-	ret = 0;
-	if (mirrors != NULL && mirrors->next == NULL) {
-		ret = _dewb_detach_devices();
-	}
-	//spin_unlock(&devtab_lock);
-
-	if (ret != 0) {
-		DEWB_LOG_ERR(dewb_log, "Could not remove all devices; not removing mirror.");
-		ret = -EBUSY;
-		goto end;
-	}
-
 	spin_lock(&devtab_lock);
-	cur = mirrors;
-	while (cur != NULL) {
-		if (strcmp(url, cur->cdmi_desc.url) == 0) {
-			found = 1;
-			break;
-		}
-		prev = cur;
-		cur = cur->next;
-	}
-	if (found == 0) {
-		DEWB_LOG_ERR(dewb_log, "Cannot remove mirror: Url is not part of mirrors");
-		ret = -ENOENT;
-	}
-	else {
-		if (prev)
-			prev->next = cur->next;
-		else
-			mirrors = cur->next;
-
-		/* printk(KERN_DEBUG "DEBUG: mirror_remove: linked list: mirrors: %p, mirrors->next: %p, cur: %p\n", 
-			mirrors, mirrors ? mirrors->next:NULL, cur); */
-		_dewb_mirror_free(cur);
-	}
+	ret = _locked_mirror_remove(url);
 	spin_unlock(&devtab_lock);
 
 	/* printk(KERN_DEBUG "DEBUG: mirror_remove: linked list: mirrors: %p, mirrors->next: %p\n", 
 		mirrors, mirrors ? mirrors->next:NULL); */
 
-	ret = 0;
 end:
 	return ret;
 }
