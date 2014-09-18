@@ -32,7 +32,8 @@
 
 
 /* Function for parsing params and reading humand readable size format
- * 
+ *
+ * Returns number of parameters found, and fills up to param_nb parameters.
  */
 int parse_params(char *params, const char *delim, char **param_tbl, int param_nb, int max)
 {
@@ -43,17 +44,18 @@ int parse_params(char *params, const char *delim, char **param_tbl, int param_nb
 	//printk(KERN_DEBUG "DEBUG: parse_params: params(%d): %s\n", max, params);
 
 	j = 0;
-	for (i = 0; i < max && j < param_nb; i++) {
+	for (i = 0; i < max; i++) {
 		tmp = strsep(&params, delim);
 		if (NULL != tmp && *tmp != '\0') {
-			param_tbl[j] = tmp;
+			if (j < param_nb)
+				param_tbl[j] = tmp;
 			j++;
 		}
 	}
 
 	//printk(KERN_DEBUG "DEBUG: parse_params: params: %s, %s\n", param_tbl[0], param_tbl[1]);
 
-	return 0;
+	return j;
 }
 
 int human_to_bytes(char *size_str, unsigned long long *size)
