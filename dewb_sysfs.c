@@ -430,7 +430,7 @@ static ssize_t class_dewb_attach_show(struct class *c, struct class_attribute *a
 	(void)c;
 	(void)attr;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo VolumeName > attach\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo VolumeName DeviceName > attach\n");
 
 	return strlen(buf);
 }
@@ -440,30 +440,66 @@ static ssize_t class_dewb_attach_store(struct class *c,
 			const char *buf, size_t count)
 {
 	int ret;
-	char filename[DEWB_URL_SIZE + 1];
+	const char *delim = " ";
+	char *tmp_buf = NULL;
+	char *params[2];
+	const char **filename = (const char **)&params[0];
+	const char **devname = (const char **)&params[1];
 
+	memset(params, 0, sizeof(params));
 
-	/* Sanity check URL size */
-	if ((count == 0) || (count > DEWB_URL_SIZE)) {
-		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
+	tmp_buf = kmalloc(count + 1, GFP_KERNEL);
+	if (NULL == tmp_buf) {
+		DEWB_LOG_ERR(dewb_log, "Unable to allocate memory for parameters");
+		ret = -ENOMEM;
+		goto out;
+	}
+	memcpy(tmp_buf, buf, count + 1);
+
+	/* remove CR or LF if any and end string */
+	if (tmp_buf[count - 1] == '\n' || tmp_buf[count - 1] == '\r')
+		tmp_buf[count - 1] = 0;
+	else
+		tmp_buf[count] = 0;
+
+	ret = parse_params(tmp_buf, delim, params, 2, count);
+	if (ret != 2)
+	{
+		DEWB_LOG_ERR(dewb_log, "Invalid parameters: %i instead of 2",
+			     ret);
 		ret = -EINVAL;
 		goto out;
 	}
-	
-	memcpy(filename, buf, count);
-	if (filename[count - 1] == '\n')
-		filename[count - 1] = 0;
-	else
-		filename[count] = 0;
 
-	DEWB_LOG_INFO(dewb_log, "Attaching device '%s'",
-		      filename);
-	ret = dewb_device_attach(filename);
-	if (ret == 0) {
-		return count;
+	/* Sanity check params sizes */
+	if (NULL == *filename || strlen(*filename) > DEWB_URL_SIZE)
+	{
+		DEWB_LOG_ERR(dewb_log, "Invalid parameter #1: "
+			     "'%s'(%lu characters)", *filename,
+			     strlen(*filename));
+		ret = -EINVAL;
+		goto out;
 	}
 
+	if (NULL == *devname || strlen(*devname) > DISK_NAME_LEN)
+	{
+		DEWB_LOG_ERR(dewb_log, "Invalid parameter #2: "
+			     "'%s'(%lu characters)", *devname,
+			     strlen(*devname));
+		ret = -EINVAL;
+		goto out;
+	}
+
+	DEWB_LOG_INFO(dewb_log, "Attaching device '%s' as '%s'",
+		      *filename, *devname);
+	ret = dewb_device_attach(*filename, *devname);
+	if (ret != 0)
+		goto out;
+
+	ret = count;
 out:
+	if (NULL != tmp_buf)
+		kfree(tmp_buf);
 
 	return ret;
 }

@@ -271,7 +271,7 @@ int dewb_device_destroy(const char *filename);
 //int dewb_device_attach(const char *filename);
 int dewb_device_detach_by_name(const char *filename);
 int dewb_device_detach_by_id(int dev_id);
-int dewb_device_attach(const char *filename);
+int dewb_device_attach(const char *filename, const char *devname);
 
 int dewb_mirror_add(const char *url);
 int dewb_mirror_remove(const char *url);

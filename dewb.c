@@ -645,14 +645,14 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 ** Note : all the remaining fields states are undefived, it is
 ** the caller responsability to set them.
 */
-static int dewb_device_new(dewb_device_t **devp)
+static int dewb_device_new(const char *devname, dewb_device_t **devp)
 {
 	int ret = 0;
 	dewb_device_t *dev = NULL;
 	int i;
 
-	DEWB_LOG_INFO(dewb_log, "dewb_device_new: creating new device"
-		      " with %d threads", thread_pool_size);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_new: creating new device %s"
+		      " with %d threads", devname, thread_pool_size);
 
 	if (NULL == devp)
 	{
@@ -660,8 +660,17 @@ static int dewb_device_new(dewb_device_t **devp)
 		goto out;
 	}
 
+	if (NULL == devname || strlen(devname) >= DISK_NAME_LEN)
+	{
+		DEWB_LOG_ERR(dewb_log, "dewb_device_new: "
+			     "Invalid (or too long) device name '%s'",
+			     devname == NULL ? "" : devname);
+		ret = -EINVAL;
+		goto out;
+	}
+
 	/* Lock table to protect against concurrent devices
-	 * creation 
+	 * creation
 	 */
 	spin_lock(&devtab_lock);
 
@@ -686,18 +695,18 @@ static int dewb_device_new(dewb_device_t **devp)
 	 */
 	dev->debug.level = dewb_log;
 	dev->users = 0;
-	sprintf(dev->name, DEV_NAME "%c", (char)(i + 'a'));
+	strncpy(dev->name, devname, DISK_NAME_LEN);
 
 	/* Table can be unlocked because device is reserved (name not empty) */
 	spin_unlock(&devtab_lock);
 
 	/* XXX: dynamic allocation of thread pool and cdmi connection pool
-	 * NB: The memory allocation for the thread is an array of pointer 
+	 * NB: The memory allocation for the thread is an array of pointer
 	 *     whereas the allocation for the cdmi connection pool is an array
 	 *     of cmdi connection structure
 	 */
 	//dev->thread = kmalloc(sizeof(struct task_struct *) * thread_pool_size, GFP_KERNEL);
-	dev->thread_cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s *) * thread_pool_size, GFP_KERNEL); 
+	dev->thread_cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s *) * thread_pool_size, GFP_KERNEL);
 	if (dev->thread_cdmi_desc == NULL) {
 		DEWB_LOG_CRIT(dewb_log, "dewb_device_new: Unable to allocate memory for CDMI struct pointer");
 		/* should return -ENOMEM */
@@ -707,7 +716,7 @@ static int dewb_device_new(dewb_device_t **devp)
 		goto err_mem;
 	}
 	for (i = 0; i < thread_pool_size; i++) {
-		dev->thread_cdmi_desc[i] = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL); 
+		dev->thread_cdmi_desc[i] = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL);
 		if (dev->thread_cdmi_desc[i] == NULL) {
 			DEWB_LOG_CRIT(dewb_log, "dewb_device_new: Unable to allocate memory for CDMI struct, step %d", i);
 			ret = -ENOMEM;
@@ -718,7 +727,7 @@ static int dewb_device_new(dewb_device_t **devp)
 		 */
 		/* set request timeout */
 		/* DEWB_LOG_INFO(dewb_log, "dewb_device_new: Setting CDMI request timeout: %d", req_timeout);
-		dev->thread_cdmi_desc[i]->timeout.tv_sec = req_timeout; 
+		dev->thread_cdmi_desc[i]->timeout.tv_sec = req_timeout;
 		dev->thread_cdmi_desc[i]->timeout.tv_usec = 0; */
 	}
 	dev->thread = kmalloc(sizeof(struct task_struct *) * thread_pool_size, GFP_KERNEL);
@@ -1227,25 +1236,28 @@ int dewb_device_detach_by_id(int dev_id)
 
 /* TODO: Remove useless memory allocation
  */
-int dewb_device_attach(const char *filename)
+int dewb_device_attach(const char *filename, const char *devname)
 {
 	dewb_device_t *dev = NULL;
-	int rc = -1;
+	int rc = 0;
 	int i;
+	int do_unregister = 0;
 	struct dewb_cdmi_desc_s *cdmi_desc;
 
-	DEWB_LOG_INFO(dewb_log, "dewb_device_attach: attaching filename %s", filename);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_attach: attaching "
+		      "filename %s as device %s",
+		      filename, devname);
 
 	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
 	if (cdmi_desc == NULL) {
 		rc = -ENOMEM;
-		goto err_out_mod;
+		goto cleanup;
 	}
 
 	/* Allocate dev structure */
-	rc = dewb_device_new(&dev);
+	rc = dewb_device_new(devname, &dev);
 	if (rc != 0) {
-		goto err_out_dev;
+		goto cleanup;
 	}
 
 	init_waitqueue_head(&dev->waiting_wq);
@@ -1257,56 +1269,63 @@ int dewb_device_attach(const char *filename)
 	 * NB: _dewb_mirror_pick fills the cdmi_desc sruct
 	 */
 	rc = _dewb_mirror_pick(filename, cdmi_desc);
-	if (rc != 0) { 
+	if (rc != 0) {
 		DEWB_LOG_ERR(dewb_log, "Unable to get mirror: %i", rc);
-		goto err_out_dev;
+		goto cleanup;
 	}
-	DEWB_LOG_INFO(dewb_log, "Adding Device: Picked mirror [ip=%s port=%d fullpath=%s]",
-		  cdmi_desc->ip_addr, cdmi_desc->port, cdmi_desc->filename);
+	DEWB_LOG_INFO(dewb_log, "Adding Device: Picked mirror "
+		      "[ip=%s port=%d fullpath=%s]",
+		      cdmi_desc->ip_addr, cdmi_desc->port,
+		      cdmi_desc->filename);
 
 	/* set timeout value */
 	cdmi_desc->timeout.tv_sec = req_timeout;
 	cdmi_desc->timeout.tv_usec = 0;
 
-	/* Parse add command */
-	/* TODO: copy CDMI struct to for each thread
-	 */
-	//for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++) {
 	for (i = 0; i < thread_pool_size; i++) {	
-		memcpy(dev->thread_cdmi_desc[i], cdmi_desc, sizeof(struct dewb_cdmi_desc_s));
+		memcpy(dev->thread_cdmi_desc[i], cdmi_desc,
+		       sizeof(struct dewb_cdmi_desc_s));
 	}
 	rc = register_blkdev(0, dev->name);
 	if (rc < 0) {
-		//rc = rc;
-		goto err_out_dev;
+		DEWB_LOG_ERR(dewb_log, "Could not register_blkdev()");
+		goto cleanup;
 	}
 
 	dev->major = rc;
 
 	rc = dewb_init_disk(dev);
 	if (rc < 0)
-		goto err_out_unregister;
+	{
+		do_unregister = 1;
+		goto cleanup;
+	}
 
 	dewb_sysfs_device_init(dev);
 
-	DEWB_LOG_INFO(dewb_log, "Added device %s (major:%d) for mirror [ip=%s port=%d fullpath=%s]", 
-		dev->name, dev->major, cdmi_desc->ip_addr, cdmi_desc->port, cdmi_desc->filename);
+	DEWB_LOG_INFO(dewb_log, "Added device %s (major:%d) for mirror "
+		      "[ip=%s port=%d fullpath=%s]",
+		      dev->name, dev->major, cdmi_desc->ip_addr,
+		      cdmi_desc->port, cdmi_desc->filename);
 
-	return rc;
+	// Prevent releasing device <=> Validate operation
+	dev = NULL;
 
-err_out_unregister:
-	unregister_blkdev(dev->major, dev->name);
-err_out_dev:
+	rc = 0;
+
+cleanup:
+	if (do_unregister)
+		unregister_blkdev(dev->major, dev->name);
 	if (NULL != dev) {
 		spin_lock(&devtab_lock);
 		dewb_device_free(dev);
 		spin_unlock(&devtab_lock);
 	}
-err_out_mod:
-	DEWB_LOG_ERR(dewb_log, "Error adding device %s", filename);
-
 	if (NULL != cdmi_desc)
 		kfree(cdmi_desc);
+
+	if (rc < 0)
+		DEWB_LOG_ERR(dewb_log, "Error adding device %s", filename);
 
 	return rc;
 }
