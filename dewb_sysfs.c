@@ -441,9 +441,7 @@ static ssize_t class_dewb_attach_store(struct class *c,
 {
 	int ret;
 	char filename[DEWB_URL_SIZE + 1];
-	struct dewb_cdmi_desc_s *cdmi_desc;
 
-	cdmi_desc = NULL;
 
 	/* Sanity check URL size */
 	if ((count == 0) || (count > DEWB_URL_SIZE)) {
@@ -458,29 +456,14 @@ static ssize_t class_dewb_attach_store(struct class *c,
 	else
 		filename[count] = 0;
 
-	cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL);
-	if (cdmi_desc == NULL) {
-		DEWB_LOG_ERR(dewb_log, "Failed to allocate memory for CDMI struct");
-		ret = -ENOMEM;
-                goto out;
-	}
-
-	/* ret = _dewb_mirror_pick(filename, cdmi_desc);
-	if (ret != 0) {
-		DEWB_LOG_ERR(dewb_log, "Failed to get mirror from filename: %s", filename);
-		ret = -EINVAL;
-		goto out;
-	} */
-
-	DEWB_LOG_INFO(dewb_log, "Attaching device %s", filename);
-	ret = dewb_device_attach(cdmi_desc, filename);
+	DEWB_LOG_INFO(dewb_log, "Attaching device '%s'",
+		      filename);
+	ret = dewb_device_attach(filename);
 	if (ret == 0) {
-		kfree(cdmi_desc);
 		return count;
 	}
+
 out:
-	if (NULL != cdmi_desc)
-		kfree(cdmi_desc);
 
 	return ret;
 }

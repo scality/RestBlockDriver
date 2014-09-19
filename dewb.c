@@ -1227,21 +1227,20 @@ int dewb_device_detach_by_id(int dev_id)
 
 /* TODO: Remove useless memory allocation
  */
-//int dewb_device_attach(const char *filename)
-int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename)
+int dewb_device_attach(const char *filename)
 {
 	dewb_device_t *dev = NULL;
 	int rc = -1;
 	int i;
-	//struct dewb_cdmi_desc_s *cdmi_desc;
+	struct dewb_cdmi_desc_s *cdmi_desc;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_device_attach: attaching filename %s", filename);
 
-	/* cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
+	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
 	if (cdmi_desc == NULL) {
 		rc = -ENOMEM;
 		goto err_out_mod;
-	} */
+	}
 
 	/* Allocate dev structure */
 	rc = dewb_device_new(&dev);
@@ -1253,15 +1252,9 @@ int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename)
 	INIT_LIST_HEAD(&dev->waiting_queue);
 	spin_lock_init(&dev->waiting_lock);
 
-	/* set first CDMI struct */
-	//cdmi_desc = &dev->thread_cdmi_desc[0];
-	//cdmi_desc = dev->thread_cdmi_desc[0];
-
 	/* Pick a convenient mirror to get dewb_cdmi_desc
 	 * TODO: #13 We need to manage failover by using every mirror
-	 * NB: _dewb_mirror_pick rewrite the cdmi_desc sruct
-	 */
-	/* NB: do it outside this function
+	 * NB: _dewb_mirror_pick fills the cdmi_desc sruct
 	 */
 	rc = _dewb_mirror_pick(filename, cdmi_desc);
 	if (rc != 0) { 
@@ -1309,10 +1302,11 @@ err_out_dev:
 		dewb_device_free(dev);
 		spin_unlock(&devtab_lock);
 	}
-	/*if (NULL != cdmi_desc)
-		kfree(cdmi_desc); */
-//err_out_mod:
+err_out_mod:
 	DEWB_LOG_ERR(dewb_log, "Error adding device %s", filename);
+
+	if (NULL != cdmi_desc)
+		kfree(cdmi_desc);
 
 	return rc;
 }
