@@ -828,13 +828,6 @@ static int __dewb_device_detach(dewb_device_t *dev)
 		return -EBUSY;
 	}
 
-/*
-	if (device_free_slot(dev)) {
-		DEWB_ERROR("Unable to remove: aldready freed");
-		return -EINVAL;
-	}
-*/
-
 	if (!dev->disk) {
 		DEWB_LOG_ERR(dewb_log, "%s: Disk is no more available", dev->name);
 		return -EINVAL;
@@ -844,7 +837,6 @@ static int __dewb_device_detach(dewb_device_t *dev)
 
 	/* TODO: Make thread pool variable (Issue #33)
 	 */
-	//for (i = 0; i < DEWB_THREAD_POOL_SIZE; i++)
 	for (i = 0; i < thread_pool_size; i++)
 		kthread_stop(dev->thread[i]);
 
@@ -860,7 +852,6 @@ static int __dewb_device_detach(dewb_device_t *dev)
 	unregister_blkdev(dev->major, dev->name);
 
 	/* Mark slot as empty */
-	//__dewb_device_free(dev);
 	if (NULL != dev)
 		dewb_device_free(dev);
 
@@ -1190,23 +1181,22 @@ ssize_t dewb_mirrors_dump(char *buf, ssize_t max_size)
 	return ret < 0 ? ret : printed;
 }
 
-int dewb_device_detach_by_name(const char *filename)
+int dewb_device_detach(const char *devname)
 {
-	int ret;
+	int ret = -ENOENT;
 	int i;
 
-	DEWB_LOG_INFO(dewb_log, "dewb_device_detach_by_name: detaching device name %s", filename);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_detach: detaching device name %s",
+		      devname);
 
 	spin_lock(&devtab_lock);
 	for (i = 0; i < DEV_MAX; ++i) {
 		if (!device_free_slot(&devtab[i])) {
-			/* const char *fname
-			    = kbasename(devtab[i].thread_cdmi_desc[0].filename); */
-			const char *fname = kbasename(devtab[i].thread_cdmi_desc[0]->filename);
-			if (strcmp(filename, fname) == 0) {
+			if (strcmp(devname, devtab[i].name) == 0) {
 				ret = __dewb_device_detach(&devtab[i]);
 				if (ret != 0) {
-					DEWB_LOG_ERR(dewb_log, "Cannot detach volume automatically.");
+					DEWB_LOG_ERR(dewb_log, "Cannot detach"
+						     " volume automatically.");
 					break;
 				}
 			}
@@ -1215,23 +1205,6 @@ int dewb_device_detach_by_name(const char *filename)
 	spin_unlock(&devtab_lock);
 
 	return ret;	
-}
-
-int dewb_device_detach_by_id(int dev_id)
-{
-	dewb_device_t *dev;
-	int ret;
-
-	DEWB_LOG_INFO(dewb_log, "dewb_device_detach_by_id: detaching device id %d", dev_id);
-
-	spin_lock(&devtab_lock);
-
-	dev = &devtab[dev_id];
-	ret = __dewb_device_detach(dev);
-
-	spin_unlock(&devtab_lock);
-
-	return ret;
 }
 
 /* TODO: Remove useless memory allocation

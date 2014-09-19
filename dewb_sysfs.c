@@ -510,7 +510,7 @@ static ssize_t class_dewb_detach_show(struct class *c, struct class_attribute *a
 	(void)c;
 	(void)attr;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo VolumeName > detach\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo DeviceName > detach\n");
 
 	return strlen(buf);
 }
@@ -521,22 +521,22 @@ static ssize_t class_dewb_detach_store(struct class *c,
 				size_t count)
 {
 	int ret;
-	char filename[DEWB_URL_SIZE + 1];
+	char devname[DISK_NAME_LEN + 1];
 
-	/* Sanity check URL size */
-	if ((count == 0) || (count > DEWB_URL_SIZE)) {
+	/* Sanity check device name size */
+	if ((count == 0) || (count >= sizeof(devname))) {
 		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
 		return -EINVAL;
 	}
 	
-	memcpy(filename, buf, count);
-	if (filename[count - 1] == '\n')
-		filename[count - 1] = 0;
+	memcpy(devname, buf, count);
+	if (devname[count - 1] == '\n')
+		devname[count - 1] = 0;
 	else
-		filename[count] = 0;
+		devname[count] = 0;
 
-	DEWB_LOG_INFO(dewb_log, "Detaching device %s", filename);
-	ret = dewb_device_detach_by_name(filename);
+	DEWB_LOG_INFO(dewb_log, "Detaching device %s", devname);
+	ret = dewb_device_detach(devname);
 	if (ret == 0)
 		return count;
 
