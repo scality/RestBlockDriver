@@ -645,13 +645,20 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 ** Note : all the remaining fields states are undefived, it is
 ** the caller responsability to set them.
 */
-static dewb_device_t *dewb_device_new(void)
+static int dewb_device_new(dewb_device_t **devp)
 {
+	int ret = 0;
 	dewb_device_t *dev = NULL;
 	int i;
 
-	DEWB_LOG_INFO(dewb_log, "dewb_device_new: creating new device with %d threads", 
-		thread_pool_size);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_new: creating new device"
+		      " with %d threads", thread_pool_size);
+
+	if (NULL == devp)
+	{
+		ret = -EINVAL;
+		goto out;
+	}
 
 	/* Lock table to protect against concurrent devices
 	 * creation 
@@ -668,7 +675,10 @@ static dewb_device_t *dewb_device_new(void)
 
 	/* If no room left, return NULL */
 	if (!dev)
-		goto out;
+	{
+		ret = -ENOSPC;
+		goto spin_out;
+	}
 
 	dev->id = i;
 	dev->debug.name = &dev->name[0];
@@ -692,13 +702,15 @@ static dewb_device_t *dewb_device_new(void)
 		DEWB_LOG_CRIT(dewb_log, "dewb_device_new: Unable to allocate memory for CDMI struct pointer");
 		/* should return -ENOMEM */
 		dev->name[0] = 0;
-		dev = NULL;	
+		dev = NULL;
+		ret = -ENOMEM;
 		goto err_mem;
 	}
 	for (i = 0; i < thread_pool_size; i++) {
 		dev->thread_cdmi_desc[i] = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL); 
 		if (dev->thread_cdmi_desc[i] == NULL) {
 			DEWB_LOG_CRIT(dewb_log, "dewb_device_new: Unable to allocate memory for CDMI struct, step %d", i);
+			ret = -ENOMEM;
 			goto err_mem;
 		}
 		/* TODO: add a socket timeout
@@ -714,19 +726,21 @@ static dewb_device_t *dewb_device_new(void)
 		DEWB_LOG_CRIT(dewb_log, "dewb_device_new: Unable to allocate memory for kernel thread struct");
 	}
 
-	return dev;
+	*devp = dev;
 
+	return 0;
+
+spin_out:
+	spin_unlock(&devtab_lock);
 err_mem:
-	if (NULL != dev->thread_cdmi_desc) {
+	if (NULL != dev && NULL != dev->thread_cdmi_desc) {
 		for (i = 0; i < thread_pool_size; i++) {
 			kfree(dev->thread_cdmi_desc[i]);
 		}
 		kfree(dev->thread_cdmi_desc);
 	}
 out:
-	spin_unlock(&devtab_lock);
-
-	return NULL;
+	return ret;
 }
 
 /* This helper marks the given device slot as empty 
@@ -1230,9 +1244,8 @@ int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename)
 	} */
 
 	/* Allocate dev structure */
-	dev = dewb_device_new();
-	if (!dev) {
-		rc = -ENOMEM;
+	rc = dewb_device_new(&dev);
+	if (rc != 0) {
 		goto err_out_dev;
 	}
 
