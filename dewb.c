@@ -1216,9 +1216,8 @@ int dewb_device_detach_by_id(int dev_id)
 //int dewb_device_attach(const char *filename)
 int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename)
 {
-	dewb_device_t *dev;
-	ssize_t rc;
-	int irc = -1;
+	dewb_device_t *dev = NULL;
+	int rc = -1;
 	int i;
 	//struct dewb_cdmi_desc_s *cdmi_desc;
 
@@ -1253,7 +1252,7 @@ int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename)
 	 */
 	rc = _dewb_mirror_pick(filename, cdmi_desc);
 	if (rc != 0) { 
-		DEWB_LOG_ERR(dewb_log, "Unable to get mirror: %lu", rc);
+		DEWB_LOG_ERR(dewb_log, "Unable to get mirror: %i", rc);
 		goto err_out_dev;
 	}
 	DEWB_LOG_INFO(dewb_log, "Adding Device: Picked mirror [ip=%s port=%d fullpath=%s]",
@@ -1270,16 +1269,16 @@ int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename)
 	for (i = 0; i < thread_pool_size; i++) {	
 		memcpy(dev->thread_cdmi_desc[i], cdmi_desc, sizeof(struct dewb_cdmi_desc_s));
 	}
-	irc = register_blkdev(0, dev->name);
-	if (irc < 0) {
-		//rc = irc;
+	rc = register_blkdev(0, dev->name);
+	if (rc < 0) {
+		//rc = rc;
 		goto err_out_dev;
 	}
 
-	dev->major = irc;
+	dev->major = rc;
 
-	irc = dewb_init_disk(dev);
-	if (irc < 0)
+	rc = dewb_init_disk(dev);
+	if (rc < 0)
 		goto err_out_unregister;
 
 	dewb_sysfs_device_init(dev);
@@ -1287,7 +1286,7 @@ int dewb_device_attach(struct dewb_cdmi_desc_s *cdmi_desc, const char *filename)
 	DEWB_LOG_INFO(dewb_log, "Added device %s (major:%d) for mirror [ip=%s port=%d fullpath=%s]", 
 		dev->name, dev->major, cdmi_desc->ip_addr, cdmi_desc->port, cdmi_desc->filename);
 
-	return irc;
+	return rc;
 
 err_out_unregister:
 	unregister_blkdev(dev->major, dev->name);
@@ -1302,7 +1301,7 @@ err_out_dev:
 //err_out_mod:
 	DEWB_LOG_ERR(dewb_log, "Error adding device %s", filename);
 
-	return irc;
+	return rc;
 }
 
 int dewb_device_create(const char *filename, unsigned long long size)
