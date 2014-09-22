@@ -1,5 +1,0 @@
-KERNEL=="dewb[a-z]*", ENV{DEVTYPE}=="disk", PROGRAM=="/bin/cat /sys/block/%k/dewb_name", SYMLINK+="dewb/%c{1}/device"
-
-# for partitions, import parent info
-ENV{DEVTYPE}=="partition", IMPORT{parent}="KERNEL"
-KERNEL=="dewb[a-z]*[0-9]*", ENV{DEVTYPE}=="partition", PROGRAM=="/bin/cat /sys/block/$parent/dewb_name", SYMLINK+="dewb/%c{1}/part-$attr{partition}"

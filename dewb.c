@@ -1610,12 +1610,7 @@ static void __exit dewblock_cleanup(void)
 {
 	DEWB_LOG_NOTICE(dewb_log, "Cleaning up %s block device driver", DEV_NAME);
 
-	/* XXX: Only lock while detaching device
-	 */
-	//spin_lock(&devtab_lock);
-	//(void)_dewb_detach_devices();
 	_dewb_detach_devices();
-	//spin_unlock(&devtab_lock);
 
 	dewb_sysfs_cleanup();
 }

@@ -25,25 +25,10 @@ Minimal Linux kernel version: v3.10
 Installing the driver
 ---------------------
 
-Two things are required to install the driver properly:
- * Setting up the udev configuration file
- * inserting the module in linux's kernel
+Installing the driver is relatively simple, as it's essentially done by
+loading the module into the linux kernel.
 
-First, to add our udev configuration file, you need to copy the file
-udev/50-restblock.rules into the /etc/udev/rules.d directory, and then
-reload the udev rules:
-
-    # cp udev/50-restblock.rules /etc/udev/rules.d/
-    # udevadm control --reload-rules
-
-The reload of the rules through udevadm is only necessary to avoid rebooting.
-At the next boot, the file shall be loaded automatically, and you will only
-need to load the kernel module manually if you didn't setup the module for
-automated loading at boot-time. Those rules will be used by udev to create
-symlinks from the devices and partitions in /dev into /dev/dewb/<VolumeName>/,
-for ease of use.
-
-Then the next and last step is to load the kernel module into the linux kernel:
+Here is how it's done:
 
     # insmod dewblock.ko
 
@@ -51,28 +36,28 @@ Now, the Rest Block Driver is set for use, and you only need to know how to
 control the driver to do the management tasks. To learn that, please continue
 reading.
 
-In order to set parameters, this can be done during the load of the driver as folow:
+In order to set the driver's parameters, you can add those to the loading
+command line of the driver as follows:
 
     # insmod dewblock.ko thread_pool_size=16
 
 The following parameters are available:
-  * thread_pool_size: size of the thread pool
-  * dewb_log: log level of the driver that is inherited for each device
-  * req_timeout: timeout for socket connection
-  * nb_req_retries: number of retries before aborting a Rest request
+  * debug: log level for the LKM (integer number, 0 to 7: emergency,
+                                  alert, critical, error, warning,
+                                  notice, info, debug)
+  * req_timeout: timeout for requests
+  * nb_req_retries: number of retries before aborting a Request
+  * mirror_conn_timeout: timeout for connecting to a mirror
+  * thread_pool_size: size of the thread pool of each device
 
-Semi-automatic provisionning
-============================
+Volume provisionning
+====================
 
 Currently, the driver does not yet support failover between multiple mirrors
 providing the same repository of volumes, but it is nonetheless a feature that
 we are aiming for. For this reason, we chose to provide a facility to manage
 the mirrors the driver is associated to, and then the usual operations will
 operate one one of those mirrors.
-
-Also, the driver automatically attaches the existing volumes when adding a new
-mirror, and will automatically detach the attached volumes when removing the
-last associated mirror (or unloading the driver).
 
 For this reason we provide you with three /sys files controlling the mirrors:
  * mirrors: allows listing the mirrors currently available/configured
@@ -126,13 +111,6 @@ not be added to the mirror list. All valid mirrors that did not yield any error
 will be properly added. You might want to check which ones could be added by
 listing the mirrors if you cannot add all your mirrors.
 
-Also, the volumes present in the repository of the first mirror added will be
-automatically attached as devices by the driver. In case some devices might
-fail to attach, the operation isn't atomic and the driver will try to attach
-all volumes anyways. Any failure might just lead to some missing attached
-volumes. To fix that, please refer to the debug/rescue /sys files "attach" and
-"detach"
-
 Be careful, though:
  * Every mirror must point to the same volume repository. Doing otherwise is
 an unsupported use, and behavior is undefined and untested
@@ -150,10 +128,12 @@ removing mirrors can be done as follows:
 
     # echo "http://127.0.0.1:443/volumes" > /sys/class/dewb/remove_mirrors
 
-Please note that when removing the last mirror, every attached devices will be
-detached. If this cannot be done, the removal will fail, and it will be up to
-you to unblock the situation manually (umount mounted partitions before
-retrying, for instance).
+Please note that if a device is attached, you will not be able to remove the
+last mirror. You need to detach manually every device attached by the module
+before manually removing the last mirror.
+
+Note also that when unloading the module, the devices are detached
+automatically before the module can actually be unloaded.
 
 
 Creating a new volume
@@ -162,18 +142,20 @@ Creating a new volume
 To create a volume, just give the name of the file to create to the driver,
 accompanied by a byte size, such as in the following example:
 
-    # echo "filename filesize\_in\_bytes" > /sys/class/dewb/create
+    # echo "filename human\_readable\_size" > /sys/class/dewb/create
 
 The volume will be created on the storage with the requested size.
 But beware:
-  * There is currently no easy format to give a Kilo/Mega/Giga byte size
+  * The human readable size formats understood by the LKM are the following:
+    * [integer number]: size in bytes
+    * [integer number]k: size in Kilobytes
+    * [integer number]M: size in Megabytes
+    * [integer number]G: size in Gigabytes
   * At least one mirror must exist and be valid for the volume to be created
-  * Create volume automatically attaches the device for the system to use
-(a wild /dev/dewb\* appears).
+  * Created volume are not automatically attached as a device on the system.
 
-It is now possible to use the volume using the associated /dev device file.
-When you'll tire of it, you will be able to destroy the volume, effectively
-deleting the file from the storage.
+Before you can use the volume, you have to attach it through the attach /sys
+file (see below).
 
 Extending a volume
 ------------------
@@ -183,7 +165,7 @@ need. For this reason, you can actually extend it through the extend /sys
 control file. This command follows the same usage as the create command, thus
 using it is simple:
 
-    # echo "volumename filesize\_in\_bytes" > /sys/class/dewb/extend
+    # echo "volumename human\_readable\_size" > /sys/class/dewb/extend
 
 Be aware that this command can only extend a volume, meaning the size you give
 there must be higher than the current size. Also, this is a supported operation
@@ -197,6 +179,9 @@ system without any additional administrative task. For instance, displaying the
 contents of the file /proc/partitions will show you the updated size of the
 volume.
 
+Note that the humand readable size format of the extend command follows the
+same rules as that of the create command.
+
 Destruction of an existing volume
 ---------------------------------
 
@@ -208,59 +193,70 @@ file to remove from the storage as the following example shows:
 
 The volume is then removed from storage and is no longer accessible.
 But beware:
-  * The destroyed volume (if attached to the system) will be automatically
-removed.
   * The destroyed volume must exist beforehand
   * Destroying a volume used by other drivers on other machines dewblock
 can lead to errors and unexpected behaviors; this is untested.
 
 
-Debug or manual provisionning
-=============================
+Attaching and Detaching devices
+===============================
 
-The driver currently does not support automatic detection of new volumes on the
-storage. For this reason, if you happen to create a file through another mean
-that the one provided through this driver, you might need to attach it manually
-to the system. It can also be useful in case of automatic attach/detach failure
-to operate on the volume.
+For multiple reasons, the driver does not attach automatically the devices when
+adding a mirror or creating a new volume. Those reasons include:
+  * automatization does not always gain from having generated device names
+  * it's sometimes more a pain to synchronize with a generated name than define
+it yourself
 
-For this reason, two last management files are available:
- * attach: Attached an already provisionned volume as a device
+For those reason, you need to attach the volumes manually to the system, using
+the three following management files are available:
+ * volumes: Reading the file lists the volumes available on the mirrors
+ * attach: Attaches an already provisionned volume as a device
  * detach: Detaches an attached device from the system
 (does not delete the volume)
 
 They are described in detail in the following sections.
 
-
-Attaching a new device
+Listing the volumes
 -------------------
 
-In order to attach an existing Volume file in the system (if it could not be
-done automatically), you simply need to write the name of the Volume to the
-attach control file, as the example indicates:
+Since you might not know from memory which volumes exist on your mirrors,
+you might want a way to list those, to attach them easily. One of the ways
+provided is to read the content of the volumes /sys file:
 
-    # echo VolumeName > /sys/class/dewb/attach
+ # cat /sys/class/dewb/volumes
+ Volume1
+ Foo
+ Bar
+ Baz
+ Qux
 
-Then, a device is created in /dev:
-  * /dev/dewba for the first attach operation
-  * /dev/dewbb for the 2nd
-And so on...
+This way, you can know that you have five volumes available on your mirror,
+and know their names, which will allow you to either attach, extend or destroy
+them.
 
-The symlink created by udev (using our rules) uses the name of the volume file,
-so that attaching a volume named "Disk1" will create the following additional
-symlink:
- * /dev/dewb/Disk1/device
+Attaching a device
+------------------
+
+In order to attach an existing Volume file in the system, you simply need to
+write the name of the Volume to the attach control file, followed by the name
+of the device you want to appear, as the example states:
+
+    # echo VolumeName DeviceName > /sys/class/dewb/attach
+
+Then, a device named "DeviceName" is created in /dev. You can now use your
+device as you wish, be it by writing and reading data directly to it,
+creating a file system or even using LVM on top of it. 
 
 Detaching a device
------------------
+------------------
 
-A device attached may be detached by writing the volume's name into the detach
+A device attached may be detached by writing the device's name into the detach
 control file as the example shows:
 
-    # echo VolumeName > /sys/class/dewb/detach
+    # echo DeviceName > /sys/class/dewb/detach
 
-The VolumeName is the same Volume Name used for Create/Destroy as well
-as Attach operations.
+The DeviceName is the same Device Name used as the one used for Attach
+operations.
 
 
 Using the devices
@@ -272,20 +268,17 @@ Partitioning a device
 The devices can be partitioned as conventional disks
 for instance:
 
-    # fdisk /dev/dewba
+    # fdisk /dev/DeviceName
 
-Once partitioned, the associated files in /dev are created, for instance for a
-volume named "TestVolume", mapped on the device "dewba":
-  * /dev/dewba1 also symlinked to /dev/dewb/TestVolume/part-1
-  * /dev/dewba2 also symlinked to /dev/dewb/TestVolume/part-2
-And so on...
+Then, you use it as any other device: each partition will appear with the same
+name as the device itself with a number suffix.
 
 sysfs interface
 ---------------
 
 For each device, an entry is created in /sys/block
-  * /sys/block/dewba for dewba
-  * /sys/block/dewbb for dewbb
+  * /sys/block/MySmallDevice for the volume attached as 'MySmallDevice'
+  * /sys/block/dewba for ithe volume attached as 'dewba'
 And so on...
 
 
@@ -311,7 +304,7 @@ The log level can be set from debug(7), info(6) ... to emergency (0).
 Get information on the device
 ----------------------------------
 
-The URL associated CDMI:
+The URL associated on CDMI (one mirror only):
 
     # cat /sys/block/dewb?/dewb\_urls
 
