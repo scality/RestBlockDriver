@@ -275,6 +275,7 @@ int dewb_device_detach(const char *devname);
 int dewb_mirror_add(const char *url);
 int dewb_mirror_remove(const char *url);
 ssize_t dewb_mirrors_dump(char *buf, ssize_t max_size);
+int dewb_volumes_dump(char *buf, size_t max_size);
 
 /* dewb_sysfs.c*/
 int dewb_sysfs_init(void);
@@ -308,10 +309,9 @@ int dewb_cdmi_extend(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 		     unsigned long long trunc_size);
 int dewb_cdmi_delete(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc);
 
-/* int dewb_cdmi_list(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
-		   int (*volume_cb)(const char *)); */
+typedef int (*dewb_cdmi_list_cb)(void * data, const char *);
 int dewb_cdmi_list(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
-		   int (*volume_cb)(struct dewb_cdmi_desc_s *, const char *));
+		   dewb_cdmi_list_cb cb, void *cb_data);
 
 /* dewb_http.c */
 int dewb_http_mklist(char *buff, int len, char *host, char *page);

@@ -482,12 +482,10 @@ xmit_again:
 }
 
 
-/* int dewb_cdmi_list(dewb_debug_t *dbg,
-		   struct dewb_cdmi_desc_s *desc,
-		   int (*volume_cb)(const char *)) */
 int dewb_cdmi_list(dewb_debug_t *dbg,
 		   struct dewb_cdmi_desc_s *desc,
-		   int (*volume_cb)(struct dewb_cdmi_desc_s *, const char *))
+		   int (*volume_cb)(void * data, const char *),
+		   void *cb_data)
 {
 	jsmn_parser	json_parser;
 	jsmntok_t	*json_tokens = NULL;
@@ -660,8 +658,7 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 							DEWB_MIN(DEWB_URL_SIZE, len));
 						filename[DEWB_MIN(DEWB_URL_SIZE, len)] = 0;
 
-						//if (volume_cb(filename) != 0)
-						if (volume_cb(desc, filename) != 0) {
+						if (volume_cb(cb_data, filename) != 0) {
 							cb_errcount += 1;
 						}
 					}

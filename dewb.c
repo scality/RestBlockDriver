@@ -941,7 +941,6 @@ end:
  * space in the URL buffer to append the filename.
  */
 static int _dewb_mirror_pick(const char *filename, struct dewb_cdmi_desc_s *pick)
-//int _dewb_mirror_pick(const char *filename, struct dewb_cdmi_desc_s *pick)
 {
 	char url[DEWB_URL_SIZE];
 	char name[DEWB_URL_SIZE];
@@ -1179,6 +1178,92 @@ ssize_t dewb_mirrors_dump(char *buf, ssize_t max_size)
 	printed += len;
 
 	return ret < 0 ? ret : printed;
+}
+
+struct cdmi_volume_list_data {
+	char	*buf;
+	size_t	max_size;
+	size_t	printed;
+};
+int _dewb_volume_dump(struct cdmi_volume_list_data *cb_data, const char *volname)
+{
+	int ret;
+	int len;
+
+	DEWB_LOG_DEBUG(dewb_log, "Adding volume %s to listing", volname);
+	if (cb_data->printed + strlen(volname) + 1 < cb_data->max_size)
+	{
+		len = snprintf(cb_data->buf + cb_data->printed,
+			       cb_data->max_size - cb_data->printed,
+			       "%s\n", volname);
+		if (len == -1
+		    || len > cb_data->max_size - cb_data->printed) {
+			DEWB_LOG_ERR(dewb_log, "Not enough space to print"
+				     " volume list in buffer.");
+			ret = -ENOMEM;
+			goto end;
+		}
+		cb_data->printed += len;
+	}
+
+	ret = 0;
+
+end:
+	return ret;
+}
+
+int dewb_volumes_dump(char *buf, size_t max_size)
+{
+	int			ret = 0;
+	int			connected = 0;
+	struct dewb_cdmi_desc_s *cdmi_desc;
+	struct cdmi_volume_list_data cb_data = { buf, max_size, 0};
+	dewb_debug_t debug;
+
+	DEWB_LOG_INFO(dewb_log, "dewb_volumes_dump: dumping volumes: buf: %p, max_size: %ld", buf, max_size);
+
+	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
+	if (cdmi_desc == NULL) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+
+	/* Find mirror for directory (filename must be empty, not NULL) */
+	ret = _dewb_mirror_pick("", cdmi_desc);
+	if (ret != 0) {
+		DEWB_LOG_ERR(dewb_log, "Unable to get mirror: %i", ret);
+		goto cleanup;
+	}
+	DEWB_LOG_INFO(dewb_log, "Dumping volumes: Picked mirror "
+		      "[ip=%s port=%d fullpath=%s]",
+		      cdmi_desc->ip_addr, cdmi_desc->port,
+		      cdmi_desc->filename);
+
+	/* Inherit log level from dewblock LKM */
+	debug.name = "<Volumes Dumper>";
+	debug.level = dewb_log;
+
+	ret = dewb_cdmi_connect(&debug, cdmi_desc);
+	if (ret != 0)
+		goto cleanup;
+	connected = 1;
+
+	ret = dewb_cdmi_list(&debug, cdmi_desc,
+			     (dewb_cdmi_list_cb)_dewb_volume_dump, (void*)&cb_data);
+	if (ret != 0)
+		goto cleanup;
+
+	ret = 0;
+
+cleanup:
+	if (NULL != cdmi_desc)
+	{
+		if (connected)
+			dewb_cdmi_disconnect(&debug, cdmi_desc);
+		kfree(cdmi_desc);
+	}
+
+	return ret < 0 ? ret : cb_data.printed;
 }
 
 int dewb_device_detach(const char *devname)

@@ -687,6 +687,19 @@ static ssize_t class_dewb_mirrors_show(struct class *c, struct class_attribute *
 	return ret;
 }
 
+static ssize_t class_dewb_volumes_show(struct class *c, struct class_attribute *attr,
+				       char *buf)
+{
+	ssize_t	ret = 0;
+
+	(void)c;
+	(void)attr;
+
+	ret = dewb_volumes_dump(buf, PAGE_SIZE);
+
+	return ret;
+}
+
 
 void dewb_sysfs_device_init(dewb_device_t *dev)
 {
@@ -705,6 +718,7 @@ static struct class_attribute class_dewb_attrs[] = {
 	__ATTR(add_mirrors,	0600, class_dewb_addmirror_show, class_dewb_addmirror_store),
 	__ATTR(remove_mirrors,	0600, class_dewb_removemirror_show, class_dewb_removemirror_store),
 	__ATTR(mirrors,		0400, class_dewb_mirrors_show, NULL),
+	__ATTR(volumes,		0400, class_dewb_volumes_show, NULL),
 	__ATTR_NULL
 };
 
