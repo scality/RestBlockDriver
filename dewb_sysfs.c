@@ -523,7 +523,7 @@ static ssize_t class_dewb_detach_store(struct class *c,
 				const char *buf,
 				size_t count)
 {
-	int ret = -ENOENT;;
+	int ret = -ENOENT;
 	char devname[DISK_NAME_LEN + 1];
 
 	/* Sanity check device name size */

@@ -390,6 +390,34 @@ int dewb_xfer_scl(struct dewb_device_s *dev,
 	return ret;
 }
 
+/*
+ * Free internal disk
+ */
+static int dewb_free_disk(struct dewb_device_s *dev)
+{
+	struct gendisk *disk = NULL;
+
+	disk = dev->disk;
+	if (!disk) {
+		DEWB_LOG_ERR(dev->debug.level, "%s: Disk is no more available", dev->name);
+		return -EINVAL;
+	}
+	dev->disk = NULL;
+
+	/* free disk */
+	if (disk->flags & GENHD_FL_UP)
+		del_gendisk(disk);
+	if (disk->queue)
+		blk_cleanup_queue(disk->queue);
+
+	put_disk(disk);
+
+	return 0;
+}
+
+/*
+ * Thread for dewb
+ */
 static int dewb_thread(void *data)
 {
 	struct dewb_device_s *dev;
@@ -553,10 +581,10 @@ static const struct block_device_operations dewb_fops =
 
 static int dewb_init_disk(struct dewb_device_s *dev)
 {
-	struct gendisk *disk;
+	struct gendisk *disk = NULL;
 	struct request_queue *q;
 	int i;
-	int ret;
+	int ret = 0;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_init_disk: initializing disk for device: %s", dev->name);
 
@@ -580,7 +608,8 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	if (!q) {
 		DEWB_LOG_WARN(dewb_log, "dewb_init_disk: unable to init block queue for device: %p, disk: %p", 
 			dev, disk);
-		put_disk(disk);
+		//put_disk(disk);
+		dewb_free_disk(dev);
 		return -ENOMEM;
 	}
 
@@ -603,7 +632,8 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 		if ((ret = dewb_cdmi_connect(&dev->debug, dev->thread_cdmi_desc[i]))) {
 			DEWB_LOG_ERR(dewb_log, "Unable to connect to CDMI endpoint: %d",
 				ret);
-			put_disk(disk);
+			//put_disk(disk);
+			dewb_free_disk(dev);
 			return -EIO;
 		}
 	}
@@ -612,7 +642,8 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 	ret = dewb_cdmi_getsize(&dev->debug, dev->thread_cdmi_desc[0], &dev->disk_size);
 	if (ret != 0) {
 		DEWB_LOG_ERR(dewb_log, "Could not retrieve volume size.");
-		put_disk(disk);
+		//put_disk(disk);
+		dewb_free_disk(dev);
 		return ret;
 	}
 
@@ -625,8 +656,10 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 						dev->disk->disk_name);
 		if (IS_ERR(dev->thread[i])) {
 			DEWB_LOG_ERR(dewb_log, "Unable to create worker thread (id %d)", i);
-			put_disk(disk);
-			return -EIO;
+			//put_disk(disk);
+			dev->thread[i] = NULL;
+			dewb_free_disk(dev);
+			goto err_kthread;
 		}
 		wake_up_process(dev->thread[i]);
 	}
@@ -636,6 +669,14 @@ static int dewb_init_disk(struct dewb_device_s *dev)
 		disk->disk_name, (unsigned long long)dev->disk_size);
 
 	return 0;
+
+err_kthread:
+	for (i = 0; i < thread_pool_size; i++) {
+		if (dev->thread[i] != NULL)
+			kthread_stop(dev->thread[i]);
+	}
+
+	return -EIO;
 }
 #define device_free_slot(X) ((X)->name[0] == 0)
 
@@ -683,8 +724,7 @@ static int dewb_device_new(const char *devname, dewb_device_t **devp)
 	}
 
 	/* If no room left, return NULL */
-	if (!dev)
-	{
+	if (!dev) {
 		ret = -ENOSPC;
 		goto spin_out;
 	}
@@ -744,7 +784,8 @@ spin_out:
 err_mem:
 	if (NULL != dev && NULL != dev->thread_cdmi_desc) {
 		for (i = 0; i < thread_pool_size; i++) {
-			kfree(dev->thread_cdmi_desc[i]);
+			if (dev->thread_cdmi_desc[i])
+				kfree(dev->thread_cdmi_desc[i]);
 		}
 		kfree(dev->thread_cdmi_desc);
 	}
@@ -760,6 +801,7 @@ static void __dewb_device_free(dewb_device_t *dev)
 	DEWB_LOG_INFO(dewb_log, "__dewb_device_free: freeing device: %s", dev->name);
 
 	dev->name[0] = 0;
+	dev->major = 0;
 }
 
 static void dewb_device_free(dewb_device_t *dev)
@@ -777,10 +819,13 @@ static void dewb_device_free(dewb_device_t *dev)
 	/* TODO: free kernel memory for CDMI struct (Issue #33)
 	 */
 	for (i = 0; i < thread_pool_size; i++) {
-		kfree(dev->thread_cdmi_desc[i]);
+		if (dev->thread_cdmi_desc[i])
+			kfree(dev->thread_cdmi_desc[i]);
 	}
-	kfree(dev->thread_cdmi_desc);
-	kfree(dev->thread);
+	if (dev->thread_cdmi_desc)
+		kfree(dev->thread_cdmi_desc);
+	if (dev->thread)
+		kfree(dev->thread);
 
 	//spin_unlock(&devtab_lock);
 }
@@ -820,8 +865,14 @@ static int _dewb_reconstruct_url(char *url, char *name,
 static int __dewb_device_detach(dewb_device_t *dev)
 {
 	int i;
+	int ret = 0;
 
 	DEWB_LOG_DEBUG(dewb_log, "__dewb_device_detach: detaching device %s (%p)", dev->name, dev);
+
+	if (!dev) {
+		DEWB_LOG_WARN(dewb_log, "__dewb_device_detach: empty device");
+		return -EINVAL;
+	}
 
 	if (dev->users) {
 		DEWB_LOG_ERR(dewb_log, "%s: Unable to remove, device still opened", dev->name);
@@ -837,16 +888,16 @@ static int __dewb_device_detach(dewb_device_t *dev)
 
 	/* TODO: Make thread pool variable (Issue #33)
 	 */
-	for (i = 0; i < thread_pool_size; i++)
-		kthread_stop(dev->thread[i]);
+	for (i = 0; i < thread_pool_size; i++) {
+		if (dev->thread[i])
+			kthread_stop(dev->thread[i]);
+	}
 
-	if (dev->disk->flags & GENHD_FL_UP)
-		del_gendisk(dev->disk);
-
-	if (dev->disk->queue)
-		blk_cleanup_queue(dev->disk->queue);
-
-	put_disk(dev->disk);
+	/* free disk */
+	ret = dewb_free_disk(dev);
+	if (0 != ret) {
+		DEWB_LOG_WARN(dewb_log, "%s: Failed to remove disk: %d", dev->name, ret);
+	}
 
 	/* Remove device */
 	unregister_blkdev(dev->major, dev->name);
@@ -875,6 +926,7 @@ static int _dewb_detach_devices(void)
 					   devtab[i].name, devtab[i].thread_cdmi_desc ? devtab[i].thread_cdmi_desc[0].filename : "NULL"); */
 				DEWB_LOG_ERR(dewb_log, "Could not remove device %s for volume at unload %s",
 					   devtab[i].name, devtab[i].thread_cdmi_desc ? devtab[i].thread_cdmi_desc[0]->filename : "NULL");
+				errcount++;
 			}
 		}
 	}
@@ -1270,6 +1322,7 @@ int dewb_device_detach(const char *devname)
 {
 	int ret = -ENOENT;
 	int i;
+	int found = 0;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_device_detach: detaching device name %s",
 		      devname);
@@ -1278,16 +1331,20 @@ int dewb_device_detach(const char *devname)
 	for (i = 0; i < DEV_MAX; ++i) {
 		if (!device_free_slot(&devtab[i])) {
 			if (strcmp(devname, devtab[i].name) == 0) {
+				found = 1;
 				ret = __dewb_device_detach(&devtab[i]);
 				if (ret != 0) {
-					DEWB_LOG_ERR(dewb_log, "Cannot detach"
-						     " volume automatically.");
+					DEWB_LOG_ERR(dewb_log, "Cannot detach volume %s", devname);
 					break;
 				}
 			}
 		}
 	}
 	spin_unlock(&devtab_lock);
+
+	if (0 == found) {
+		DEWB_LOG_ERR(dewb_log, "Volume %s not found as attached", devname);
+	}
 
 	return ret;	
 }
@@ -1353,8 +1410,7 @@ int dewb_device_attach(const char *filename, const char *devname)
 	dev->major = rc;
 
 	rc = dewb_init_disk(dev);
-	if (rc < 0)
-	{
+	if (rc < 0) {
 		do_unregister = 1;
 		goto cleanup;
 	}
@@ -1454,7 +1510,7 @@ int dewb_device_extend(const char *filename, unsigned long long size)
 	//debug.level = 0;
 	debug.level = dewb_log;
 
-	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
+	cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL);
 	if (cdmi_desc == NULL) {
 		rc = -ENOMEM;
 		goto err_out_mod;
@@ -1475,7 +1531,8 @@ int dewb_device_extend(const char *filename, unsigned long long size)
 
 	dewb_cdmi_disconnect(&debug, cdmi_desc);
 
-	kfree(cdmi_desc);
+	if (cdmi_desc)
+		kfree(cdmi_desc);
 
 	// Find device (normally only 1) associated to filename and update their size
 	spin_lock(&devtab_lock);
@@ -1504,7 +1561,8 @@ int dewb_device_extend(const char *filename, unsigned long long size)
 err_out_cdmi:
 	dewb_cdmi_disconnect(&debug, cdmi_desc);
 err_out_alloc:
-	kfree(cdmi_desc);
+	if (cdmi_desc)
+		kfree(cdmi_desc);
 err_out_mod:
 	DEWB_LOG_ERR(dewb_log, "Error extending device %s", filename);
 
@@ -1516,8 +1574,8 @@ int dewb_device_destroy(const char *filename)
 	dewb_debug_t debug;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 	int rc;
-	int device_exists = 0;
 	int i;
+	int found = 0;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_device_destroy: destroying filename: %s", filename);
 
@@ -1545,18 +1603,18 @@ int dewb_device_destroy(const char *filename)
 					"Cannot destroy attached volume: %s"
 					" (attached as %s)",
 					fname, devtab[i].name);
-				device_exists = 1;
+				found = 1;
 				break;
 			}
 		}
 	}
 	spin_unlock(&devtab_lock);
 
-	if (device_exists) {
+	if (found) {
+		DEWB_LOG_ERR(dewb_log, "Could not found any device associated to volume %s", filename);
 		rc = -EBUSY;
 		goto err_out_alloc;
 	}
-
 
 	/* First, setup a cdmi connection then Delete the file. */
 	rc = _dewb_mirror_pick(filename, cdmi_desc);
@@ -1572,7 +1630,8 @@ int dewb_device_destroy(const char *filename)
 		goto err_out_cdmi;
 
 	dewb_cdmi_disconnect(&debug, cdmi_desc);
-	kfree(cdmi_desc);
+	if (cdmi_desc)
+		kfree(cdmi_desc);
 
 	DEWB_LOG_INFO(dewb_log, "Destroyed filename %s", filename);
 
@@ -1581,7 +1640,8 @@ int dewb_device_destroy(const char *filename)
 err_out_cdmi:
 	dewb_cdmi_disconnect(&debug, cdmi_desc);
 err_out_alloc:
-	kfree(cdmi_desc);
+	if (cdmi_desc)
+		kfree(cdmi_desc);
 err_out_mod:
 	DEWB_LOG_ERR(dewb_log, "Error destroying volume %s", filename);
 
