@@ -202,7 +202,8 @@ static struct class *class_dewb;		/* /sys/class/dewp */
 
 static void class_dewb_release(struct class *cls)
 {
-	kfree(cls);
+	if (cls != NULL)
+		kfree(cls);
 }
 
 static ssize_t class_dewb_create_show(struct class *c, struct class_attribute *attr,
@@ -251,6 +252,7 @@ static ssize_t class_dewb_create_store(struct class *c,
 		ret = -ENOMEM;
 		goto out;
 	}
+	memset(tmp_buf, 0, count + 1);
 	memcpy(tmp_buf, buf, count);
 
 	//printk(KERN_DEBUG "DEBUG: class_dewb_create_store: buff (%lu:%lu): '%c':%x", count, sizeof(buf), buf[count - 1], buf[count - 1]);
@@ -338,6 +340,7 @@ static ssize_t class_dewb_extend_store(struct class *c,
 		ret = -ENOMEM;
 		goto out;
 	}
+	memset(tmp_buf, 0, count);
 	memcpy(tmp_buf, buf, count);
 
 	/* remove CR or LF if any and end string */
@@ -520,7 +523,7 @@ static ssize_t class_dewb_detach_store(struct class *c,
 				const char *buf,
 				size_t count)
 {
-	int ret;
+	int ret = -ENOENT;;
 	char devname[DISK_NAME_LEN + 1];
 
 	/* Sanity check device name size */
@@ -744,7 +747,8 @@ int dewb_sysfs_init(void)
 
 	ret = class_register(class_dewb);
 	if (ret) {
-		kfree(class_dewb);
+		if (class_dewb != NULL)
+			kfree(class_dewb);
 		class_dewb = NULL;
 		DEWB_LOG_CRIT(dewb_log, "Failed to create class dewb");
 		return ret;
