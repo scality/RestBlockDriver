@@ -550,6 +550,7 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 		ret = -ENOMEM;
 		goto err;
 	}
+	memset(content, 0, contentlen);
 
 	// Skip header
 	ret = dewb_http_skipheader(&buff, &len);
@@ -646,7 +647,8 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 					// List children of the array we found.
 					for (ret = 1;
 					     array + ret < json_err
-					     && json_tokens[array+ret].parent == array;
+					     && json_tokens[array+ret].parent == array
+					     && ret < DEV_MAX;
 					     ++ret)
 					{
 						len = json_tokens[array+ret].end
