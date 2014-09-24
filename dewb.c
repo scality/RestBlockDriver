@@ -356,6 +356,8 @@ int dewb_xfer_scl(struct dewb_device_s *dev,
 {
 	int ret;
 	int i;
+	struct timeval tv_start;
+	struct timeval tv_end;
 
 	DEWB_LOG_DEBUG(dev->debug.level, "dewb_xfer_scl: CDMI request %p (%s) for device %p with cdmi %p", 
 		req, req_code_to_str(rq_data_dir(req)), dev, desc);
@@ -363,6 +365,8 @@ int dewb_xfer_scl(struct dewb_device_s *dev,
 	ret = 0;
 	/* TODO: Handle CDMI request retry (Issue #22)
 	 */
+	if (DEWB_DEBUG <= dev->debug.level)
+		do_gettimeofday(&tv_start);
 	for (i = 0; i < nb_req_retries; i++) {
 		if (rq_data_dir(req) == WRITE) {
 			ret = dewb_cdmi_putrange(&dev->debug,
@@ -380,6 +384,11 @@ int dewb_xfer_scl(struct dewb_device_s *dev,
 			break;
 		else if (i < nb_req_retries - 1)
 			DEWB_LOG_NOTICE(dev->debug.level, "Retrying CDMI request... %d", (i + 1));
+	}
+	if (DEWB_DEBUG <= dev->debug.level) {
+		do_gettimeofday(&tv_end);
+		DEWB_LOG_DEBUG(dev->debug.level, "cmdi request time: %ldms", 
+			(tv_end.tv_sec - tv_start.tv_sec)*1000 + (tv_end.tv_usec - tv_start.tv_usec)/1000);
 	}
 
 	if (ret) {
@@ -737,7 +746,7 @@ static int dewb_device_new(const char *devname, dewb_device_t **devp)
 	}
 
 	dev->id = i;
-	//dev->debug.name = &dev->name[0];
+	dev->debug.name = &dev->name[0];
 	/* TODO: Inherit log level from dewblock LKM (Issue #28)
 	 */
 	dev->debug.level = dewb_log;
@@ -1369,10 +1378,28 @@ int dewb_device_attach(const char *filename, const char *devname)
 	int i;
 	int do_unregister = 0;
 	struct dewb_cdmi_desc_s *cdmi_desc;
+	int found = 0;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_device_attach: attaching "
 		      "filename %s as device %s",
 		      filename, devname);
+
+	/* check if volume is already attached */
+	spin_lock(&devtab_lock);
+	for (i = 0; i < DEV_MAX; ++i) {
+		if (!device_free_slot(&devtab[i])) {
+			const char *fname = kbasename(devtab[i].thread_cdmi_desc[0]->filename);
+			if (strncmp(filename, fname, sizeof(*fname)) == 0) {
+				found = 1;
+				break;
+			}
+		}	
+	}
+	spin_unlock(&devtab_lock);
+	if (1 == found) {
+		DEWB_LOG_ERR(dewb_log, "Volume %s already attached", filename);
+		return -EEXIST;
+	}
 
 	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
 	if (cdmi_desc == NULL) {
