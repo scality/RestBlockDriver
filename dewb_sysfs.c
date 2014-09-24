@@ -466,8 +466,7 @@ static ssize_t class_dewb_attach_store(struct class *c,
 		tmp_buf[count] = 0;
 
 	ret = parse_params(tmp_buf, delim, params, 2, count);
-	if (ret != 2)
-	{
+	if (ret != 2) {
 		DEWB_LOG_ERR(dewb_log, "Invalid parameters: %i instead of 2",
 			     ret);
 		ret = -EINVAL;
@@ -475,8 +474,7 @@ static ssize_t class_dewb_attach_store(struct class *c,
 	}
 
 	/* Sanity check params sizes */
-	if (NULL == *filename || strlen(*filename) > DEWB_URL_SIZE)
-	{
+	if (NULL == *filename || strlen(*filename) > DEWB_URL_SIZE) {
 		DEWB_LOG_ERR(dewb_log, "Invalid parameter #1: "
 			     "'%s'(%lu characters)", *filename,
 			     strlen(*filename));
@@ -484,8 +482,7 @@ static ssize_t class_dewb_attach_store(struct class *c,
 		goto out;
 	}
 
-	if (NULL == *devname || strlen(*devname) > DISK_NAME_LEN)
-	{
+	if (NULL == *devname || strlen(*devname) > DISK_NAME_LEN) {
 		DEWB_LOG_ERR(dewb_log, "Invalid parameter #2: "
 			     "'%s'(%lu characters)", *devname,
 			     strlen(*devname));
@@ -531,7 +528,7 @@ static ssize_t class_dewb_detach_store(struct class *c,
 		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
 		return -EINVAL;
 	}
-	
+
 	memcpy(devname, buf, count);
 	if (devname[count - 1] == '\n')
 		devname[count - 1] = 0;

@@ -229,7 +229,7 @@ typedef struct dewb_device_s {
 	struct gendisk		*disk;
 	uint64_t		disk_size;	/* Size in bytes */
 	int			users;		/* Number of users who
-						 * opened dev*/
+						 * opened dev */
 
 	struct request_queue	*q;
 	spinlock_t		rq_lock;	/* request queue lock */
@@ -250,9 +250,9 @@ typedef struct dewb_device_s {
 	** List of requests received by the drivers, but still to be
 	** processed. This due to network latency.
 	*/
-	spinlock_t		waiting_lock;	/* request queue lock */
+	spinlock_t		waiting_lock;	/* wait_queue lock */
 	wait_queue_head_t	waiting_wq;
-	struct list_head	waiting_queue; /* Requests to be sent */
+	struct list_head	waiting_queue;  /* Requests to be sent */
 
 	/* Debug traces */
 	dewb_debug_t		debug;

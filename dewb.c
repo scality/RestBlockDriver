@@ -405,10 +405,11 @@ static int dewb_free_disk(struct dewb_device_s *dev)
 	dev->disk = NULL;
 
 	/* free disk */
-	if (disk->flags & GENHD_FL_UP)
+	if (disk->flags & GENHD_FL_UP) {
 		del_gendisk(disk);
-	if (disk->queue)
-		blk_cleanup_queue(disk->queue);
+		if (disk->queue)
+			blk_cleanup_queue(disk->queue);
+	}
 
 	put_disk(disk);
 
@@ -449,6 +450,13 @@ static int dewb_thread(void *data)
 		wait_event_interruptible(dev->waiting_wq,
 					kthread_should_stop() ||
 					!list_empty(&dev->waiting_queue));
+
+		/* TODO: improve kthread termination, otherwise calling we can not 
+		  terminate a kthread calling kthread_stop() */
+		/* if (kthread_should_stop()) {
+			printk(KERN_INFO "dewb_thread: immediate kthread exit\n");
+			do_exit(0);
+		} */
 
 		spin_lock_irqsave(&dev->waiting_lock, flags);
 		/* extract request */
@@ -507,6 +515,7 @@ static int dewb_thread(void *data)
 		/* No IO error testing for the moment */
 		blk_end_request_all(req, 0);
 	}
+
 	return 0;
 }
 
@@ -688,21 +697,19 @@ err_kthread:
 */
 static int dewb_device_new(const char *devname, dewb_device_t **devp)
 {
-	int ret = 0;
+	int ret = -EINVAL;
 	dewb_device_t *dev = NULL;
 	int i;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_device_new: creating new device %s"
 		      " with %d threads", devname, thread_pool_size);
 
-	if (NULL == devp)
-	{
+	if (NULL == devp) {
 		ret = -EINVAL;
 		goto out;
 	}
 
-	if (NULL == devname || strlen(devname) >= DISK_NAME_LEN)
-	{
+	if (NULL == devname || strlen(devname) >= DISK_NAME_LEN) {
 		DEWB_LOG_ERR(dewb_log, "dewb_device_new: "
 			     "Invalid (or too long) device name '%s'",
 			     devname == NULL ? "" : devname);
@@ -730,7 +737,7 @@ static int dewb_device_new(const char *devname, dewb_device_t **devp)
 	}
 
 	dev->id = i;
-	dev->debug.name = &dev->name[0];
+	//dev->debug.name = &dev->name[0];
 	/* TODO: Inherit log level from dewblock LKM (Issue #28)
 	 */
 	dev->debug.level = dewb_log;
@@ -800,7 +807,8 @@ static void __dewb_device_free(dewb_device_t *dev)
 {
 	DEWB_LOG_INFO(dewb_log, "__dewb_device_free: freeing device: %s", dev->name);
 
-	dev->name[0] = 0;
+	//dev->name[0] = 0;
+	memset(dev->name, 0, DISK_NAME_LEN);
 	dev->major = 0;
 }
 
@@ -899,8 +907,10 @@ static int __dewb_device_detach(dewb_device_t *dev)
 		DEWB_LOG_WARN(dewb_log, "%s: Failed to remove disk: %d", dev->name, ret);
 	}
 
+	DEWB_LOG_INFO(dewb_log, "%s: Removing disk for major %d", dev->name, dev->major);
 	/* Remove device */
-	unregister_blkdev(dev->major, dev->name);
+	//unregister_blkdev(dev->major, dev->name);
+	unregister_blkdev(dev->major, DEV_NAME);
 
 	/* Mark slot as empty */
 	if (NULL != dev)
@@ -1335,8 +1345,9 @@ int dewb_device_detach(const char *devname)
 				ret = __dewb_device_detach(&devtab[i]);
 				if (ret != 0) {
 					DEWB_LOG_ERR(dewb_log, "Cannot detach volume %s", devname);
-					break;
+					//break;
 				}
+				break;
 			}
 		}
 	}
@@ -1365,6 +1376,7 @@ int dewb_device_attach(const char *filename, const char *devname)
 
 	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
 	if (cdmi_desc == NULL) {
+		DEWB_LOG_ERR(dewb_log, "Unable to allocate memory for cdmi struct");
 		rc = -ENOMEM;
 		goto cleanup;
 	}
@@ -1372,6 +1384,7 @@ int dewb_device_attach(const char *filename, const char *devname)
 	/* Allocate dev structure */
 	rc = dewb_device_new(devname, &dev);
 	if (rc != 0) {
+		DEWB_LOG_ERR(dewb_log, "Unable to create new device: %i", rc);
 		goto cleanup;
 	}
 
@@ -1401,7 +1414,8 @@ int dewb_device_attach(const char *filename, const char *devname)
 		memcpy(dev->thread_cdmi_desc[i], cdmi_desc,
 		       sizeof(struct dewb_cdmi_desc_s));
 	}
-	rc = register_blkdev(0, dev->name);
+	//rc = register_blkdev(0, dev->name);
+	rc = register_blkdev(0, DEV_NAME);
 	if (rc < 0) {
 		DEWB_LOG_ERR(dewb_log, "Could not register_blkdev()");
 		goto cleanup;
@@ -1429,7 +1443,8 @@ int dewb_device_attach(const char *filename, const char *devname)
 
 cleanup:
 	if (do_unregister)
-		unregister_blkdev(dev->major, dev->name);
+		//unregister_blkdev(dev->major, dev->name);
+		unregister_blkdev(dev->major, DEV_NAME);
 	if (NULL != dev) {
 		spin_lock(&devtab_lock);
 		dewb_device_free(dev);
