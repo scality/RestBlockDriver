@@ -174,8 +174,9 @@ int dewb_cdmi_connect(dewb_debug_t *dbg,
 		return -EINVAL;
 
 	/* Init socket */
-	ret = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &desc->socket);
-	if (ret) {
+	//ret = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &desc->socket);
+	ret = sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, &desc->socket);
+	if (ret < 0) {
 		DEWB_LOG_ERR(dbg->level, "Unable to create socket: %d", ret);
 		goto out_error;
 	}
@@ -189,7 +190,7 @@ int dewb_cdmi_connect(dewb_debug_t *dbg,
 				(struct sockaddr*)&desc->sockaddr, 
 				sizeof(struct sockaddr_in), !O_NONBLOCK);
 	if (ret < 0) {
-		DEWB_LOG_ERR(dbg->level, "Unable to connect to cdmi server: %d", -ret);
+		DEWB_LOG_ERR(dbg->level, "Unable to connect to cdmi server: %d", ret);
 		goto out_error;
 	}
 	desc->state = CDMI_CONNECTED;
@@ -221,6 +222,7 @@ int dewb_cdmi_connect(dewb_debug_t *dbg,
 	desc->nb_requests = 0;
 
 	return 0;
+
 out_error:
 	kernel_sock_shutdown(desc->socket, SHUT_RDWR);
 	desc->socket = NULL;
@@ -724,18 +726,16 @@ int dewb_cdmi_extend(dewb_debug_t *dbg,
 	int ret;
 	enum dewb_http_statuscode code;
 
-	if (!desc->socket)
-		return 0;
+	if (!desc || !desc->socket)
+		return -EINVAL;
 
 	ret = dewb_cdmi_getsize(dbg, desc, &cur_size);
-	if (ret != 0)
-	{
+	if (ret != 0) {
 		DEWB_LOG_ERR(dbg->level, "[extend] Could not get size of existing volume.");
 		return ret;
 	}
 
-	if (cur_size >= trunc_size)
-	{
+	if (cur_size >= trunc_size) {
 		DEWB_LOG_ERR(dbg->level, "[extend] Cannot shrink a volume.");
 		return -EINVAL;
 	}
@@ -749,14 +749,12 @@ int dewb_cdmi_extend(dewb_debug_t *dbg,
 	if (len < 0) return len;
 
 	ret = dewb_http_get_status(buff, len, &code);
-	if (ret == -1)
-	{
+	if (ret == -1) {
 		DEWB_LOG_ERR(dbg->level, "[extend] Cannot retrieve response status");
 		return -EIO;
 	}
 
-	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS)
-	{
+	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS) {
 		DEWB_LOG_ERR(dbg->level, "[extend] Status of extend operation = %i.", code);
 		return -EIO;
 	}
@@ -773,8 +771,8 @@ int dewb_cdmi_create(dewb_debug_t *dbg,
 	int ret;
 	enum dewb_http_statuscode code;
 
-	if (!desc->socket)
-		return 0;
+	if (!desc || !desc->socket)
+		return -EINVAL;
 
 	/* Construct/send HTTP create */
 	len = dewb_http_mkcreate(buff, DEWB_XMIT_BUFFER_SIZE,
@@ -785,14 +783,12 @@ int dewb_cdmi_create(dewb_debug_t *dbg,
 	if (len < 0) return len;
 
 	ret = dewb_http_get_status(buff, len, &code);
-	if (ret == -1)
-	{
+	if (ret == -1) {
 		DEWB_LOG_ERR(dbg->level, "[create] Cannot retrieve response status from %.*s", 32, buff);
 		return -EIO;
 	}
 
-	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS)
-	{
+	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS) {
 		DEWB_LOG_ERR(dbg->level, "[create] Status of create operation = %i.", code);
 		return -EIO;
 	}
@@ -806,14 +802,12 @@ int dewb_cdmi_create(dewb_debug_t *dbg,
 	if (len < 0) return len;
 
 	ret = dewb_http_get_status(buff, len, &code);
-	if (ret == -1)
-	{
+	if (ret == -1) {
 		DEWB_LOG_ERR(dbg->level, "[create] Cannot retrieve response status");
 		return -EIO;
 	}
 
-	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS)
-	{
+	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS) {
 		DEWB_LOG_ERR(dbg->level, "[create] Status of create operation = %i.", code);
 		return -EIO;
 	}
@@ -828,8 +822,8 @@ int dewb_cdmi_delete(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc)
 	int ret;
 	enum dewb_http_statuscode code;
 
-	if (!desc->socket)
-		return 0;
+	if (!desc || !desc->socket)
+		return -EINVAL;
 
 	/* Construct HTTP delete */
 	len = dewb_http_mkdelete(buff, DEWB_XMIT_BUFFER_SIZE,
@@ -840,14 +834,12 @@ int dewb_cdmi_delete(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc)
 	if (len < 0) return len;
 
 	ret = dewb_http_get_status(buff, len, &code);
-	if (ret == -1)
-	{
+	if (ret == -1) {
 		DEWB_LOG_ERR(dbg->level, "[destroy] Cannot retrieve response status");
 		return -EIO;
 	}
 
-	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS)
-	{
+	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS) {
 		DEWB_LOG_ERR(dbg->level, "[destroy] Status of delete operation = %i.", code);
 		if (code == DEWB_HTTP_STATUS_NOT_FOUND)
 			return -ENOENT;

@@ -363,7 +363,7 @@ static ssize_t class_dewb_extend_store(struct class *c,
 		goto out;
 	}
 
-	DEWB_LOG_INFO(dewb_log, "Creating volume %s of size %llu (bytes)", params[0], size);
+	DEWB_LOG_INFO(dewb_log, "Extending volume %s of size %llu (bytes)", params[0], size);
 
 	ret = dewb_device_extend(params[0], size);
 	if (ret != 0) {
@@ -405,12 +405,13 @@ static ssize_t class_dewb_destroy_store(struct class *c,
 	/* Sanity check URL size */
 	if ((count == 0) || (count >= DEWB_URL_SIZE)) {
 		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
-		ret = -ENOMEM;
+		ret = -EINVAL;
 		goto out;
 	}
-	
+
+	memset(filename, 0, count);
 	memcpy(filename, buf, count);
-	if (filename[count - 1] == '\n')
+	if (filename[count - 1] == '\n' || filename[count - 1] == '\r')
 		filename[count - 1] = 0;
 	else
 		filename[count] = 0;

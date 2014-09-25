@@ -387,7 +387,7 @@ int dewb_xfer_scl(struct dewb_device_s *dev,
 	}
 	if (DEWB_DEBUG <= dev->debug.level) {
 		do_gettimeofday(&tv_end);
-		DEWB_LOG_DEBUG(dev->debug.level, "cmdi request time: %ldms", 
+		DEWB_LOG_DEBUG(dev->debug.level, "cdmi request time: %ldms", 
 			(tv_end.tv_sec - tv_start.tv_sec)*1000 + (tv_end.tv_usec - tv_start.tv_usec)/1000);
 	}
 
@@ -759,7 +759,7 @@ static int dewb_device_new(const char *devname, dewb_device_t **devp)
 	/* XXX: dynamic allocation of thread pool and cdmi connection pool
 	 * NB: The memory allocation for the thread is an array of pointer
 	 *     whereas the allocation for the cdmi connection pool is an array
-	 *     of cmdi connection structure
+	 *     of cdmi connection structure
 	 */
 	//dev->thread = kmalloc(sizeof(struct task_struct *) * thread_pool_size, GFP_KERNEL);
 	dev->thread_cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s *) * thread_pool_size, GFP_KERNEL);
@@ -1389,7 +1389,7 @@ int dewb_device_attach(const char *filename, const char *devname)
 	for (i = 0; i < DEV_MAX; ++i) {
 		if (!device_free_slot(&devtab[i])) {
 			const char *fname = kbasename(devtab[i].thread_cdmi_desc[0]->filename);
-			if (strncmp(filename, fname, sizeof(*fname)) == 0) {
+			if (strlen(fname) == strlen(filename) && strncmp(fname, filename, strlen(filename)) == 0) {
 				found = 1;
 				break;
 			}
@@ -1523,14 +1523,16 @@ int dewb_device_create(const char *filename, unsigned long long size)
 
 	DEWB_LOG_INFO(dewb_log, "Created device with filename %s", filename); 
 
-	kfree(cdmi_desc);
+	if (cdmi_desc)
+		kfree(cdmi_desc);
 
 	return rc;
 
 err_out_cdmi:
 	dewb_cdmi_disconnect(&debug, cdmi_desc);
 err_out_alloc:
-	kfree(cdmi_desc);
+	if (cdmi_desc)
+		kfree(cdmi_desc);
 err_out_mod:
 	DEWB_LOG_ERR(dewb_log, "Error creating device %s", filename);
 
@@ -1542,7 +1544,7 @@ int dewb_device_extend(const char *filename, unsigned long long size)
 	dewb_debug_t debug;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 	int i;
-	int rc;
+	int rc = -EIO;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_device_extend: extending filename %s to %llu size", filename, size);
 
@@ -1578,19 +1580,18 @@ int dewb_device_extend(const char *filename, unsigned long long size)
 
 	// Find device (normally only 1) associated to filename and update their size
 	spin_lock(&devtab_lock);
-	for (i = 0; i < DEV_MAX; ++i)
-	{
-		if (!device_free_slot(&devtab[i]))
-		{
+	for (i = 0; i < DEV_MAX; ++i) {
+		if (!device_free_slot(&devtab[i])) {
 			/* const char *fname
 			    = kbasename(devtab[i].thread_cdmi_desc[0].filename); */
 			const char *fname
 			    = kbasename(devtab[i].thread_cdmi_desc[0]->filename);
-			if (strcmp(filename, fname) == 0)
-			{
+			//if (strcmp(filename, fname) == 0) {
+			if (strlen(fname) == strlen(filename) && strncmp(fname, filename, strlen(filename)) == 0) {
 				devtab[i].disk_size = size;
 				set_capacity(devtab[i].disk, devtab[i].disk_size / 512ULL);
-				break ;
+				revalidate_disk(devtab[i].disk);
+				break;
 			}
 		}
 	}
@@ -1615,7 +1616,7 @@ int dewb_device_destroy(const char *filename)
 {
 	dewb_debug_t debug;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
-	int rc;
+	int rc = -EIO;
 	int i;
 	int found = 0;
 
@@ -1627,24 +1628,14 @@ int dewb_device_destroy(const char *filename)
 	//debug.level = 0;
 	debug.level = dewb_log;
 
-	cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL);
-	if (cdmi_desc == NULL) {
-		DEWB_LOG_ERR(dewb_log, "unable to allocate memory for temporary CDMI");
-		rc = -ENOMEM;
-		goto err_out_mod;
-	}
-
 	// Check that there is no device associated to filename
 	spin_lock(&devtab_lock);
 	for (i = 0; i < DEV_MAX; ++i) {
 		if (!device_free_slot(&devtab[i])) {
 			const char *fname = kbasename(
 				devtab[i].thread_cdmi_desc[0]->filename);
-			if (strcmp(filename, fname) == 0) {
-				DEWB_LOG_ERR(dewb_log,
-					"Cannot destroy attached volume: %s"
-					" (attached as %s)",
-					fname, devtab[i].name);
+			//if (strcmp(filename, fname) == 0) {
+			if (strlen(fname) == strlen(filename) && strncmp(fname, filename, strlen(fname)) == 0) {
 				found = 1;
 				break;
 			}
@@ -1653,9 +1644,16 @@ int dewb_device_destroy(const char *filename)
 	spin_unlock(&devtab_lock);
 
 	if (found) {
-		DEWB_LOG_ERR(dewb_log, "Could not found any device associated to volume %s", filename);
+		DEWB_LOG_ERR(dewb_log, "Found a device associated to volume %s", filename);
 		rc = -EBUSY;
-		goto err_out_alloc;
+		goto err_out_mod;
+	}
+
+	cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL);
+	if (cdmi_desc == NULL) {
+		DEWB_LOG_ERR(dewb_log, "Unable to allocate memory for temporary CDMI");
+		rc = -ENOMEM;
+		goto err_out_mod;
 	}
 
 	/* First, setup a cdmi connection then Delete the file. */
@@ -1672,6 +1670,7 @@ int dewb_device_destroy(const char *filename)
 		goto err_out_cdmi;
 
 	dewb_cdmi_disconnect(&debug, cdmi_desc);
+
 	if (cdmi_desc)
 		kfree(cdmi_desc);
 
