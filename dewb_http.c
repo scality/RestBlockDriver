@@ -34,10 +34,11 @@
 #define HTTP_KEEPALIVE	"Connection: keep-alive" CRLF \
 	                "Keep-Alive: timeout=3600 "
 #define HTTP_TRUNCATE	"X-Scal-Truncate"
-#define HTTP_USER_AGENT "User-Agent: dewblock_driver/1.0"
+#define HTTP_USER_AGENT	"User-Agent: dewblock/0.2.0"
 #define HTTP_CDMI_VERS	"X-CDMI-Specification-Version: 1.0.1"
 
 #define CRLF "\r\n"
+
 
 static int add_buffer(char **buff, int *len, char *str)
 {
@@ -47,9 +48,10 @@ static int add_buffer(char **buff, int *len, char *str)
 	if (len_str > (*len - 1))
 		return -1;
 
-	strcpy(*buff, str);
+	strncpy(*buff, str, len_str);
 	*buff += len_str;
 	*len -= len_str;
+
 	return 0;
 }
 
@@ -384,7 +386,7 @@ int dewb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 	char *bufp = buff;
 	char range_str[64];
 	int mylen = len;
-	int ret;
+	int ret = 0;
 
 	*buff = 0;
 	ret = add_buffer(&bufp, &mylen, cmd);
@@ -429,13 +431,13 @@ int dewb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 
 	/* Construct range info */
 	sprintf(range_str, "%lu-%lu" CRLF, 
-		(unsigned long )start, (unsigned long )end);
+		(unsigned long) start, (unsigned long) end);
 
 	ret = add_buffer(&bufp, &mylen, range_str);
 	if (ret)
 		return -ENOMEM;
 
-	if (!strcmp(cmd, "PUT")) {
+	if (!strncmp("PUT", cmd, 3)) {
 		ret = add_buffer(&bufp, &mylen, "Content-Length: ");
 		if (ret)
 			return -ENOMEM;
@@ -446,15 +448,13 @@ int dewb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 		ret = add_buffer(&bufp, &mylen, range_str);
 		if (ret)
 			return -ENOMEM;
-
-
 	} else {
 		ret = add_buffer(&bufp, &mylen, CRLF);
 		if (ret)
 			return -ENOMEM;
 	}
 
-	return (len - mylen);	
+	return (len - mylen);
 }
 
 int dewb_http_mklist(char *buff, int len, char *host, char *page)

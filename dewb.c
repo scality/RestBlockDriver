@@ -704,16 +704,15 @@ err_kthread:
 ** Note : all the remaining fields states are undefived, it is
 ** the caller responsability to set them.
 */
-static int dewb_device_new(const char *devname, dewb_device_t **devp)
+static int dewb_device_new(const char *devname, dewb_device_t *dev)
 {
 	int ret = -EINVAL;
-	dewb_device_t *dev = NULL;
 	int i;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_device_new: creating new device %s"
 		      " with %d threads", devname, thread_pool_size);
 
-	if (NULL == devp) {
+	if (NULL == dev) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -729,45 +728,19 @@ static int dewb_device_new(const char *devname, dewb_device_t **devp)
 	/* Lock table to protect against concurrent devices
 	 * creation
 	 */
-	spin_lock(&devtab_lock);
-
-	/* find next empty slot in tab */
-	for (i = 0; i < DEV_MAX; i++) {
-		if (device_free_slot(&devtab[i])) {
-			dev = &devtab[i];
-			break;
-		}
-	}
-
-	/* If no room left, return NULL */
-	if (!dev) {
-		ret = -ENOSPC;
-		goto spin_out;
-	}
-
-	dev->id = i;
 	dev->debug.name = &dev->name[0];
-	/* TODO: Inherit log level from dewblock LKM (Issue #28)
-	 */
 	dev->debug.level = dewb_log;
 	dev->users = 0;
-	strncpy(dev->name, devname, DISK_NAME_LEN);
-
-	/* Table can be unlocked because device is reserved (name not empty) */
-	spin_unlock(&devtab_lock);
+	strncpy(dev->name, devname, strlen(devname));
 
 	/* XXX: dynamic allocation of thread pool and cdmi connection pool
 	 * NB: The memory allocation for the thread is an array of pointer
 	 *     whereas the allocation for the cdmi connection pool is an array
 	 *     of cdmi connection structure
 	 */
-	//dev->thread = kmalloc(sizeof(struct task_struct *) * thread_pool_size, GFP_KERNEL);
 	dev->thread_cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s *) * thread_pool_size, GFP_KERNEL);
 	if (dev->thread_cdmi_desc == NULL) {
 		DEWB_LOG_CRIT(dewb_log, "dewb_device_new: Unable to allocate memory for CDMI struct pointer");
-		/* should return -ENOMEM */
-		dev->name[0] = 0;
-		dev = NULL;
 		ret = -ENOMEM;
 		goto err_mem;
 	}
@@ -778,25 +751,16 @@ static int dewb_device_new(const char *devname, dewb_device_t **devp)
 			ret = -ENOMEM;
 			goto err_mem;
 		}
-		/* TODO: add a socket timeout
-		 * NB: this is erased as cdmi_desc is reallocatd and rewritted
-		 */
-		/* set request timeout */
-		/* DEWB_LOG_INFO(dewb_log, "dewb_device_new: Setting CDMI request timeout: %d", req_timeout);
-		dev->thread_cdmi_desc[i]->timeout.tv_sec = req_timeout;
-		dev->thread_cdmi_desc[i]->timeout.tv_usec = 0; */
 	}
 	dev->thread = kmalloc(sizeof(struct task_struct *) * thread_pool_size, GFP_KERNEL);
 	if (dev->thread == NULL) {
 		DEWB_LOG_CRIT(dewb_log, "dewb_device_new: Unable to allocate memory for kernel thread struct");
+		ret = -ENOMEM;
+		goto err_mem;
 	}
-
-	*devp = dev;
 
 	return 0;
 
-spin_out:
-	spin_unlock(&devtab_lock);
 err_mem:
 	if (NULL != dev && NULL != dev->thread_cdmi_desc) {
 		for (i = 0; i < thread_pool_size; i++) {
@@ -816,35 +780,30 @@ static void __dewb_device_free(dewb_device_t *dev)
 {
 	DEWB_LOG_INFO(dewb_log, "__dewb_device_free: freeing device: %s", dev->name);
 
-	//dev->name[0] = 0;
 	memset(dev->name, 0, DISK_NAME_LEN);
 	dev->major = 0;
+	dev->id = -1;
 }
 
 static void dewb_device_free(dewb_device_t *dev)
 {
-	int i;
+	int i = 0;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_device_free: freeing device: %s", dev->name);
-
-	/* XXX: lock has been aquire at a higher level
-	 */	
-	//spin_lock(&devtab_lock);
 
 	__dewb_device_free(dev);
 
 	/* TODO: free kernel memory for CDMI struct (Issue #33)
 	 */
-	for (i = 0; i < thread_pool_size; i++) {
-		if (dev->thread_cdmi_desc[i])
-			kfree(dev->thread_cdmi_desc[i]);
-	}
-	if (dev->thread_cdmi_desc)
+	if (dev->thread_cdmi_desc) {
+		for (i = 0; i < thread_pool_size; i++) {
+			if (dev->thread_cdmi_desc[i])
+				kfree(dev->thread_cdmi_desc[i]);
+		}
 		kfree(dev->thread_cdmi_desc);
+	}
 	if (dev->thread)
 		kfree(dev->thread);
-
-	//spin_unlock(&devtab_lock);
 }
 
 static int _dewb_reconstruct_url(char *url, char *name,
@@ -891,8 +850,8 @@ static int __dewb_device_detach(dewb_device_t *dev)
 		return -EINVAL;
 	}
 
-	if (dev->users) {
-		DEWB_LOG_ERR(dewb_log, "%s: Unable to remove, device still opened", dev->name);
+	if (dev->users > 0) {
+		DEWB_LOG_ERR(dewb_log, "%s: Unable to remove, device still opened (#users: %d)", dev->name, dev->users);
 		return -EBUSY;
 	}
 
@@ -918,7 +877,6 @@ static int __dewb_device_detach(dewb_device_t *dev)
 
 	DEWB_LOG_INFO(dewb_log, "%s: Removing disk for major %d", dev->name, dev->major);
 	/* Remove device */
-	//unregister_blkdev(dev->major, dev->name);
 	unregister_blkdev(dev->major, DEV_NAME);
 
 	/* Mark slot as empty */
@@ -933,20 +891,42 @@ static int _dewb_detach_devices(void)
 	int ret;
 	int i = 0;
 	int errcount = 0;
+	int dev_in_use[DEV_MAX];
 
 	DEWB_LOG_INFO(dewb_log, "_dewb_detach_devices: detaching devices");
 
+	/* mark all device that are not used */
 	spin_lock(&devtab_lock);
 	for (i = 0; i < DEV_MAX; ++i) {
+		dev_in_use[i] = 0;
 		if (!device_free_slot(&devtab[i])) {
+			if (devtab[i].state == DEV_IN_USE) {
+				dev_in_use[i] = 1;	
+			} else {
+				devtab[i].state = DEV_IN_USE;
+				dev_in_use[i] = 2;
+			}
+		}
+	}
+	spin_unlock(&devtab_lock);
+
+	/* detach all marked devices */
+	for (i = 0; i < DEV_MAX; ++i) {
+		if (2 == dev_in_use[i]) {
 			ret = __dewb_device_detach(&devtab[i]);
 			if (ret != 0) {
-				/* DEWB_ERROR("Could not remove device %s for volume at unload %s",
-					   devtab[i].name, devtab[i].thread_cdmi_desc ? devtab[i].thread_cdmi_desc[0].filename : "NULL"); */
 				DEWB_LOG_ERR(dewb_log, "Could not remove device %s for volume at unload %s",
-					   devtab[i].name, devtab[i].thread_cdmi_desc ? devtab[i].thread_cdmi_desc[0]->filename : "NULL");
+					devtab[i].name, devtab[i].thread_cdmi_desc ? devtab[i].thread_cdmi_desc[0]->filename : "NULL");
 				errcount++;
 			}
+		}
+	}
+
+	/* mark all device that are not used */
+	spin_lock(&devtab_lock);
+	for (i = 0; i < DEV_MAX; ++i) {
+		if (2 == dev_in_use[i]) {
+			devtab[i].state = DEV_UNUSED;
 		}
 	}
 	spin_unlock(&devtab_lock);
@@ -956,11 +936,7 @@ static int _dewb_detach_devices(void)
 
 static void _dewb_mirror_free(dewb_mirror_t *mirror)
 {
-	/* XXX: should have a dewb_debug_t params
-	 */
 	DEWB_LOG_DEBUG(dewb_log, "_dewb_mirror_free: deleting mirror url %s (%p)", mirror->cdmi_desc.url, mirror);
-
-	/* printk(KERN_DEBUG "DEBUG: mirror_free: mirror: %p", mirror); */
 
 	if (mirror) {
 		mirror->next = NULL;
@@ -975,8 +951,6 @@ static int _dewb_mirror_new(dewb_debug_t *dbg, const char *url, dewb_mirror_t **
 	int		ret = 0;
 
 	DEWB_LOG_DEBUG(dbg->level, "_dewb_mirror_new: creating mirror with url: %s, mirrors: %p", url, *mirror);
-
-	/* printk(KERN_DEBUG "DEBUG: mirror_new: *mirror: %p, mirror: %p\n", *mirror, mirror); */
 
 	new = kcalloc(1, sizeof(struct dewb_mirror_s), GFP_KERNEL);
 	if (new == NULL) {
@@ -994,10 +968,7 @@ static int _dewb_mirror_new(dewb_debug_t *dbg, const char *url, dewb_mirror_t **
 	if (mirror) {
 		new->next = NULL;
 		*mirror = new;
-		//new = NULL;
 	}
-
-	/* printk(KERN_DEBUG "DEBUG: mirror_new: *mirror: %p, mirror: %p, new: %p\n", *mirror, mirror, new); */
 
 	return 0;
 end:
@@ -1019,8 +990,6 @@ static int _dewb_mirror_pick(const char *filename, struct dewb_cdmi_desc_s *pick
 	int found = 0;
 	dewb_mirror_t *mirror = NULL;
 
-	/* XXX: should have a dewb_debug_t param
-	 */
 	DEWB_LOG_DEBUG(dewb_log, "_dewb_mirror_pick: picking mirror with filename: %s, with CDMI pick %p", filename, pick);
 
 	spin_lock(&devtab_lock);
@@ -1073,12 +1042,7 @@ int dewb_mirror_add(const char *url)
 
 	DEWB_LOG_INFO(dewb_log, "dewb_mirror_add: adding mirror %s", url);
 
-	/* printk(KERN_DEBUG "DEBUG: mirror_add: linked list: mirrors: %p, mirrors->next: %p\n", 
-		mirrors, mirrors ? mirrors->next:NULL); */
-
 	debug.name = "<Mirror-Adder>";
-	/* TODO: Inherit log level from dewblock (Issue #28)
-	 */
 	debug.level = dewb_log;
 
 	if (strlen(url) >= DEWB_URL_SIZE) {
@@ -1110,18 +1074,12 @@ int dewb_mirror_add(const char *url)
 	}
 	spin_unlock(&devtab_lock);
 
-	/* printk(KERN_DEBUG "DEBUG: mirror_add: linked list: mirrors: %p, mirrors->next: %p, cur: %p\n", 
-		mirrors, mirrors ? mirrors->next:NULL, cur); */
-
 	if (found)
 		_dewb_mirror_free(new);
 
 	return 0;
 
 err_out_dev:
-
-	/* printk(KERN_DEBUG "DEBUG: mirror_add: fault linked list: mirrors: %p, mirrors->next: %p, cur: %p\n",
-		mirrors, mirrors ? mirrors->next:NULL, cur); */
 
 	return ret;
 }
@@ -1171,9 +1129,6 @@ static int _locked_mirror_remove(const char *url)
 	else
 		mirrors = cur->next;
 
-	/* printk(KERN_DEBUG "DEBUG: mirror_remove: linked list: mirrors: %p,"
-		  " mirrors->next: %p, cur: %p\n",
-	          mirrors, mirrors ? mirrors->next:NULL, cur); */
 	_dewb_mirror_free(cur);
 
 	ret = 0;
@@ -1188,8 +1143,6 @@ int dewb_mirror_remove(const char *url)
 
 	DEWB_LOG_INFO(dewb_log, "dewb_mirror_remove: removing mirror %s", url);
 
-	/* printk(KERN_DEBUG "DEBUG: mirror_remove: mirrors: %p, mirrors->next: %p\n", mirrors, mirrors ? mirrors->next:NULL); */
-
 	if (strlen(url) >= DEWB_URL_SIZE) {
 		DEWB_LOG_ERR(dewb_log, "Url too big: '%s'", url);
 		ret = -EINVAL;
@@ -1199,9 +1152,6 @@ int dewb_mirror_remove(const char *url)
 	spin_lock(&devtab_lock);
 	ret = _locked_mirror_remove(url);
 	spin_unlock(&devtab_lock);
-
-	/* printk(KERN_DEBUG "DEBUG: mirror_remove: linked list: mirrors: %p, mirrors->next: %p\n", 
-		mirrors, mirrors ? mirrors->next:NULL); */
 
 end:
 	return ret;
@@ -1339,22 +1289,27 @@ cleanup:
 
 int dewb_device_detach(const char *devname)
 {
-	int ret = -ENOENT;
+	int ret = 0;
 	int i;
 	int found = 0;
+	struct dewb_device_s *dev = NULL;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_device_detach: detaching device name %s",
 		      devname);
 
+	/* get device to detach and mark it */
 	spin_lock(&devtab_lock);
 	for (i = 0; i < DEV_MAX; ++i) {
 		if (!device_free_slot(&devtab[i])) {
 			if (strcmp(devname, devtab[i].name) == 0) {
 				found = 1;
-				ret = __dewb_device_detach(&devtab[i]);
-				if (ret != 0) {
-					DEWB_LOG_ERR(dewb_log, "Cannot detach volume %s", devname);
-					//break;
+				if (devtab[i].state == DEV_IN_USE) {
+					ret = -EBUSY;
+				} else {
+					dev = &devtab[i];
+					/* mark it as ongoing operation */
+					dev->state = DEV_IN_USE;
+					ret = 0;
 				}
 				break;
 			}
@@ -1362,11 +1317,29 @@ int dewb_device_detach(const char *devname)
 	}
 	spin_unlock(&devtab_lock);
 
-	if (0 == found) {
-		DEWB_LOG_ERR(dewb_log, "Volume %s not found as attached", devname);
+	/* check status */
+	if (1 == found && 0 != ret) {
+		DEWB_LOG_ERR(dewb_log, "Device %s in use", devname);
+		return ret;
 	}
 
-	return ret;	
+	/* real stuff */
+	if (1 == found) {
+		ret = __dewb_device_detach(&devtab[i]);
+		if (ret != 0) {
+			DEWB_LOG_ERR(dewb_log, "Cannot detach device %s", devname);
+		}
+	} else {
+		DEWB_LOG_ERR(dewb_log, "Device %s not found as attached", devname);
+		return -EINVAL;
+	}
+
+	/* mark device as unsued == available */
+	spin_lock(&devtab_lock);
+	dev->state = DEV_UNUSED;
+	spin_unlock(&devtab_lock);
+
+	return ret;
 }
 
 /* TODO: Remove useless memory allocation
@@ -1377,31 +1350,46 @@ int dewb_device_attach(const char *filename, const char *devname)
 	int rc = 0;
 	int i;
 	int do_unregister = 0;
-	struct dewb_cdmi_desc_s *cdmi_desc;
+	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 	int found = 0;
 
 	DEWB_LOG_INFO(dewb_log, "dewb_device_attach: attaching "
 		      "filename %s as device %s",
 		      filename, devname);
 
-	/* check if volume is already attached */
+	/* check if volume is already attached, otherwise use the first empty slot */
 	spin_lock(&devtab_lock);
 	for (i = 0; i < DEV_MAX; ++i) {
 		if (!device_free_slot(&devtab[i])) {
 			const char *fname = kbasename(devtab[i].thread_cdmi_desc[0]->filename);
 			if (strlen(fname) == strlen(filename) && strncmp(fname, filename, strlen(filename)) == 0) {
 				found = 1;
+				dev = &devtab[i];
 				break;
 			}
-		}	
+		}
+	}
+	if (0 == found) {
+		for (i = 0; i < DEV_MAX; ++i) {
+			if (device_free_slot(&devtab[i])) {
+				dev = &devtab[i];
+				dev->id = i;
+				dev->state = DEV_IN_USE;
+				break;
+			}
+		}
 	}
 	spin_unlock(&devtab_lock);
+
 	if (1 == found) {
-		DEWB_LOG_ERR(dewb_log, "Volume %s already attached", filename);
+		DEWB_LOG_ERR(dewb_log, "Volume %s already attached as device %s", filename, dev->name);
+		dev = NULL;
 		return -EEXIST;
+	} else {
+		DEWB_LOG_INFO(dewb_log, "Volume %s not attached as device, using device slot %d", filename, dev->id);
 	}
 
-	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
+	cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL);
 	if (cdmi_desc == NULL) {
 		DEWB_LOG_ERR(dewb_log, "Unable to allocate memory for cdmi struct");
 		rc = -ENOMEM;
@@ -1409,10 +1397,12 @@ int dewb_device_attach(const char *filename, const char *devname)
 	}
 
 	/* Allocate dev structure */
-	rc = dewb_device_new(devname, &dev);
+	rc = dewb_device_new(devname, dev);
 	if (rc != 0) {
 		DEWB_LOG_ERR(dewb_log, "Unable to create new device: %i", rc);
 		goto cleanup;
+	} else {
+		DEWB_LOG_INFO(dewb_log, "New device created for %s", devname);
 	}
 
 	init_waitqueue_head(&dev->waiting_wq);
@@ -1447,7 +1437,6 @@ int dewb_device_attach(const char *filename, const char *devname)
 		DEWB_LOG_ERR(dewb_log, "Could not register_blkdev()");
 		goto cleanup;
 	}
-
 	dev->major = rc;
 
 	rc = dewb_init_disk(dev);
@@ -1458,10 +1447,15 @@ int dewb_device_attach(const char *filename, const char *devname)
 
 	dewb_sysfs_device_init(dev);
 
-	DEWB_LOG_INFO(dewb_log, "Added device %s (major:%d) for mirror "
+	DEWB_LOG_INFO(dewb_log, "Added device %s (id: %d, major:%d) for mirror "
 		      "[ip=%s port=%d fullpath=%s]",
-		      dev->name, dev->major, cdmi_desc->ip_addr,
+		      dev->name, dev->id, dev->major, cdmi_desc->ip_addr,
 		      cdmi_desc->port, cdmi_desc->filename);
+
+	/* mark device as unsued == available */
+	spin_lock(&devtab_lock);
+	dev->state = DEV_UNUSED;
+	spin_unlock(&devtab_lock);
 
 	// Prevent releasing device <=> Validate operation
 	dev = NULL;
@@ -1473,8 +1467,10 @@ cleanup:
 		//unregister_blkdev(dev->major, dev->name);
 		unregister_blkdev(dev->major, DEV_NAME);
 	if (NULL != dev) {
-		spin_lock(&devtab_lock);
 		dewb_device_free(dev);
+		/* mark device as unsued == available */
+		spin_lock(&devtab_lock);
+		dev->state = DEV_UNUSED;
 		spin_unlock(&devtab_lock);
 	}
 	if (NULL != cdmi_desc)
@@ -1492,12 +1488,9 @@ int dewb_device_create(const char *filename, unsigned long long size)
 	struct dewb_cdmi_desc_s *cdmi_desc;
 	int rc;
 
-	DEWB_LOG_INFO(dewb_log, "dewb_device_create: creating filename %s of size %llu", filename, size);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_create: creating volume %s of size %llu", filename, size);
 
-	/* TODO: Inherit log level from dewblock LKM (Issue #28)
-	 */
 	debug.name = NULL;
-	//debug.level = 0;
 	debug.level = dewb_log;
 
 	cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL);
@@ -1521,7 +1514,7 @@ int dewb_device_create(const char *filename, unsigned long long size)
 
 	dewb_cdmi_disconnect(&debug, cdmi_desc);
 
-	DEWB_LOG_INFO(dewb_log, "Created device with filename %s", filename); 
+	DEWB_LOG_INFO(dewb_log, "Created volume with filename %s", filename); 
 
 	if (cdmi_desc)
 		kfree(cdmi_desc);
@@ -1534,7 +1527,7 @@ err_out_alloc:
 	if (cdmi_desc)
 		kfree(cdmi_desc);
 err_out_mod:
-	DEWB_LOG_ERR(dewb_log, "Error creating device %s", filename);
+	DEWB_LOG_ERR(dewb_log, "Error creating volume %s", filename);
 
 	return rc;
 }
@@ -1544,21 +1537,42 @@ int dewb_device_extend(const char *filename, unsigned long long size)
 	dewb_debug_t debug;
 	struct dewb_cdmi_desc_s *cdmi_desc = NULL;
 	int i;
-	int rc = -EIO;
+	int rc = 0;
+	struct dewb_device_s *dev = NULL;
 
-	DEWB_LOG_INFO(dewb_log, "dewb_device_extend: extending filename %s to %llu size", filename, size);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_extend: extending volume %s to %llu size", filename, size);
 
-	/* TODO: Inherit log level from dewblock LKM (Issue #28)
-	 */
 	debug.name = NULL;
-	//debug.level = 0;
 	debug.level = dewb_log;
+
+	/* check if volume is already attached, otherwise use the first empty slot */
+	spin_lock(&devtab_lock);
+	for (i = 0; i < DEV_MAX; ++i) {
+		if (!device_free_slot(&devtab[i])) {
+			const char *fname = kbasename(devtab[i].thread_cdmi_desc[0]->filename);
+			if (strlen(fname) == strlen(filename) && strncmp(fname, filename, strlen(filename)) == 0) {
+				dev = &devtab[i];
+				if (dev->state == DEV_IN_USE)
+					rc = -EBUSY;
+				else
+					dev->state = DEV_IN_USE;
+				break;
+			}
+		}
+	}
+	spin_unlock(&devtab_lock);
+	if (0 != rc) {
+		DEWB_LOG_ERR(dewb_log, "Volume %s attached on device %s and in use", filename, dev->name);
+		dev = NULL;
+		return rc;
+	}
 
 	cdmi_desc = kmalloc(sizeof(struct dewb_cdmi_desc_s), GFP_KERNEL);
 	if (cdmi_desc == NULL) {
 		rc = -ENOMEM;
 		goto err_out_mod;
 	}
+	memset(cdmi_desc, 0, sizeof(struct dewb_cdmi_desc_s)); 
 
 	/* Now, setup a cdmi connection then Truncate(create) the file. */
 	rc = _dewb_mirror_pick(filename, cdmi_desc);
@@ -1573,27 +1587,20 @@ int dewb_device_extend(const char *filename, unsigned long long size)
 	if (rc != 0)
 		goto err_out_cdmi;
 
-	dewb_cdmi_disconnect(&debug, cdmi_desc);
+	rc = dewb_cdmi_disconnect(&debug, cdmi_desc);
+	if (rc != 0)
+		goto err_out_cdmi;
 
 	if (cdmi_desc)
 		kfree(cdmi_desc);
 
 	// Find device (normally only 1) associated to filename and update their size
 	spin_lock(&devtab_lock);
-	for (i = 0; i < DEV_MAX; ++i) {
-		if (!device_free_slot(&devtab[i])) {
-			/* const char *fname
-			    = kbasename(devtab[i].thread_cdmi_desc[0].filename); */
-			const char *fname
-			    = kbasename(devtab[i].thread_cdmi_desc[0]->filename);
-			//if (strcmp(filename, fname) == 0) {
-			if (strlen(fname) == strlen(filename) && strncmp(fname, filename, strlen(filename)) == 0) {
-				devtab[i].disk_size = size;
-				set_capacity(devtab[i].disk, devtab[i].disk_size / 512ULL);
-				revalidate_disk(devtab[i].disk);
-				break;
-			}
-		}
+	if (dev) {
+		devtab[i].disk_size = size;
+		set_capacity(devtab[i].disk, devtab[i].disk_size / 512ULL);
+		revalidate_disk(devtab[i].disk);
+		dev->state = DEV_UNUSED;
 	}
 	spin_unlock(&devtab_lock);
 
@@ -1620,12 +1627,9 @@ int dewb_device_destroy(const char *filename)
 	int i;
 	int found = 0;
 
-	DEWB_LOG_INFO(dewb_log, "dewb_device_destroy: destroying filename: %s", filename);
+	DEWB_LOG_INFO(dewb_log, "dewb_device_destroy: destroying volume: %s", filename);
 
-	/* TODO: Inherit log level from dewblock LKM (Issue #8)
-	 */
 	debug.name = NULL;
-	//debug.level = 0;
 	debug.level = dewb_log;
 
 	// Check that there is no device associated to filename
@@ -1634,7 +1638,6 @@ int dewb_device_destroy(const char *filename)
 		if (!device_free_slot(&devtab[i])) {
 			const char *fname = kbasename(
 				devtab[i].thread_cdmi_desc[0]->filename);
-			//if (strcmp(filename, fname) == 0) {
 			if (strlen(fname) == strlen(filename) && strncmp(fname, filename, strlen(fname)) == 0) {
 				found = 1;
 				break;
@@ -1674,7 +1677,7 @@ int dewb_device_destroy(const char *filename)
 	if (cdmi_desc)
 		kfree(cdmi_desc);
 
-	DEWB_LOG_INFO(dewb_log, "Destroyed filename %s", filename);
+	DEWB_LOG_INFO(dewb_log, "Destroyed volume %s", filename);
 
 	return rc;
 

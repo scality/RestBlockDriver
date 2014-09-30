@@ -170,11 +170,13 @@ int dewb_cdmi_connect(dewb_debug_t *dbg,
 	int ret;
 	int arg = 1;
 
-	if (desc->state == CDMI_CONNECTED)
+	if (!desc)
 		return -EINVAL;
 
+	if (desc->state == CDMI_CONNECTED)
+		return 0;
+
 	/* Init socket */
-	//ret = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, &desc->socket);
 	ret = sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, &desc->socket);
 	if (ret < 0) {
 		DEWB_LOG_ERR(dbg->level, "Unable to create socket: %d", ret);
@@ -224,8 +226,12 @@ int dewb_cdmi_connect(dewb_debug_t *dbg,
 	return 0;
 
 out_error:
-	kernel_sock_shutdown(desc->socket, SHUT_RDWR);
+	if (desc->socket) {
+		kernel_sock_shutdown(desc->socket, SHUT_RDWR);
+		sock_release(desc->socket);
+	}
 	desc->socket = NULL;
+	desc->state = CDMI_DISCONNECTED;
 
 	return ret;
 }
@@ -238,24 +244,19 @@ out_error:
 int dewb_cdmi_disconnect(dewb_debug_t *dbg,
 			struct dewb_cdmi_desc_s *desc)
 {
-	if (!desc->socket)
+	if (!desc)
+		return -EINVAL;
+	if (!desc->socket || desc->state == CDMI_DISCONNECTED)
 		return 0;
 
 	kernel_sock_shutdown(desc->socket, SHUT_RDWR);
+	sock_release(desc->socket);
 	desc->socket = NULL;
-	desc->state  = CDMI_DISCONNECTED;
+	desc->state = CDMI_DISCONNECTED;
+
 	return 0;
 }
 
-
-/* static void sock_xmit_timeout(unsigned long arg)
-{
-        struct task_struct *task = (struct task_struct *)arg;
-
-        DEWB_LOG(KERN_WARNING, "dewb sock: killing hung xmit (%s, pid: %d)\n",
-                task->comm, task->pid);
-        force_sig(SIGKILL, task);
-} */
 
 /*
  *  Send or receive packet.
@@ -296,21 +297,7 @@ static int sock_xmit(dewb_debug_t *dbg,
 		msg.msg_flags = MSG_NOSIGNAL;
 
 		if (send) {
-			/* TODO: add a socket timer
-			struct timer_list ti; 
-			DEWB_LOG(KERN_INFO, "Initializing request timeout: %d", desc->xmit_timeout);
-			if (desc->xmit_timeout > 0) {
-				init_timer(&ti);
-				ti.function = sock_xmit_timeout;
-				ti.data = (unsigned long) current;
-				ti.expires = jiffies + req_timeout;
-				add_timer(&ti);
-			} */
-
 			result = kernel_sendmsg(desc->socket, &msg, &iov, 1, size);
-
-			/* if (desc->xmit_timeout > 0)
-				del_timer_sync(&ti); */
 		} else
 			result = kernel_recvmsg(desc->socket, &msg, &iov, 1, size,
 						msg.msg_flags);
@@ -321,7 +308,6 @@ static int sock_xmit(dewb_debug_t *dbg,
 				task_pid_nr(current), current->comm,
 				dequeue_signal_lock(current, &current->blocked, &info));
 			result = -EINTR;
-			//sock_shutdown(nbd, !send);
 			break;
 		}
 

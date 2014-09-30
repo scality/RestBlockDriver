@@ -416,7 +416,7 @@ static ssize_t class_dewb_destroy_store(struct class *c,
 	else
 		filename[count] = 0;
 
-	DEWB_LOG_INFO(dewb_log, "Destroying device '%s'", filename);
+	DEWB_LOG_INFO(dewb_log, "Destroying volume '%s'", filename);
 	ret = dewb_device_destroy(filename);
 	if (ret != 0) {
 		goto out;
@@ -491,7 +491,7 @@ static ssize_t class_dewb_attach_store(struct class *c,
 		goto out;
 	}
 
-	DEWB_LOG_INFO(dewb_log, "Attaching device '%s' as '%s'",
+	DEWB_LOG_INFO(dewb_log, "Attaching volume '%s' as device '%s'",
 		      *filename, *devname);
 	ret = dewb_device_attach(*filename, *devname);
 	if (ret != 0)

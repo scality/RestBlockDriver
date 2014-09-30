@@ -48,6 +48,10 @@
 #define DEV_SECTORSIZE		1 * MB
 #define DEV_NB_PHYS_SEGS	512
 
+/* Device state (reduce spinlock section and avoid multiple operation on same device) */
+#define DEV_IN_USE		1
+#define DEV_UNUSED		0
+
 /* Dewpoint server related constants */
 #define DEWB_HTTP_HEADER_SIZE	1024
 #define DEWB_URL_SIZE		256
@@ -230,6 +234,7 @@ typedef struct dewb_device_s {
 	uint64_t		disk_size;	/* Size in bytes */
 	int			users;		/* Number of users who
 						 * opened dev */
+	int			state; 		/* for create extend attach detach destroy purpose */
 
 	struct request_queue	*q;
 	spinlock_t		rq_lock;	/* request queue lock */
