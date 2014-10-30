@@ -15,18 +15,8 @@ designed for Linux as a replacement of the init system inherited from
 UNIX System V.
 'systemd' Project: http://www.freedesktop.org/wiki/Software/systemd/
 
-
-In order to install the driver, you must first update the udev configuration
-and reload its rules.
-
-In order to do so, please use the following command:
-
-	# cp udev/50-restblock.rules /etc/udev/rules.d/
-	# udevadm control --reload-rules
-
-
-Once the udev rules have been updated, you can install the 'systemd' script 
-in order to configure and use the driver to access your CDMI Rest API.
+In order to install the driver as a service, you can install the 'systemd'
+script in order to configure and use the driver to access your CDMI Rest API.
 
 In order to install the system script, please use the following command:
 
