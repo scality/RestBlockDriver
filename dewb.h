@@ -319,6 +319,7 @@ int dewb_cdmi_list(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 		   dewb_cdmi_list_cb cb, void *cb_data);
 
 /* dewb_http.c */
+int dewb_http_check_response_complete(char *buff, int len);
 int dewb_http_mklist(char *buff, int len, char *host, char *page);
 int dewb_http_mkhead(char *buff, int len, char *host, char *page);
 int dewb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page, 

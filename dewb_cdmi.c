@@ -298,9 +298,12 @@ static int sock_xmit(dewb_debug_t *dbg,
 
 		if (send) {
 			result = kernel_sendmsg(desc->socket, &msg, &iov, 1, size);
-		} else
+			DEWB_LOG_DEBUG(dbg->level, "sock_xmit: Sent %d bytes->\n%.*s", result, result, (char*)buf);
+		} else {
 			result = kernel_recvmsg(desc->socket, &msg, &iov, 1, size,
 						msg.msg_flags);
+			DEWB_LOG_DEBUG(dbg->level, "sock_xmit: Received %d bytes->\n%.*s", result, result, (char*)buf);
+		}
 		DEWB_LOG_DEBUG(dbg->level, "Result for socket exchange: %d", result);
 		if (signal_pending(current)) {
 			siginfo_t info;
@@ -340,6 +343,7 @@ static int sock_send_receive(dewb_debug_t *dbg,
 	char *buff = desc->xmit_buff;
 	int strict_rcv = (rcv_size) ? 1 : 0;
 	int ret;
+	int rcvd;
 
 	if (rcv_size == 0)
 		rcv_size = DEWB_XMIT_BUFFER_SIZE;
@@ -369,14 +373,27 @@ xmit_again:
 	if (ret != send_size)
 		return -EIO;
 	
-	/* Receive response */
-	ret = sock_xmit(dbg, desc, 0, buff, rcv_size, strict_rcv);
-	/* Is the connection to be reopened ? */
-	if (ret == -EPIPE) {
-		dewb_cdmi_disconnect(dbg, desc);
-		ret = dewb_cdmi_connect(dbg, desc);
-		if (ret) return ret;
-		goto xmit_again;
+	/* Receive response - We want to make sure we received a full response */
+	rcvd = 0;
+	while (!dewb_http_check_response_complete(buff, rcvd))
+	{
+		if (rcvd)
+			DEWB_LOG_WARN(dbg->level, "Response not read fully in one go: "
+			              "read %i bytes until now", rcvd);
+
+		ret = sock_xmit(dbg, desc, 0, buff+rcvd, rcv_size-rcvd, strict_rcv);
+		/* Is the connection to be reopened ? */
+		if (ret < 0) {
+			if (ret == -EPIPE) {
+				dewb_cdmi_disconnect(dbg, desc);
+				ret = dewb_cdmi_connect(dbg, desc);
+				if (ret) return ret;
+				goto xmit_again;
+			}
+			break ;
+		}
+		rcvd += ret;
+		ret = rcvd;
 	}
 
 	return ret;
@@ -390,6 +407,7 @@ static int sock_send_sglist_receive(dewb_debug_t *dbg,
 	int strict_rcv = (rcv_size) ? 1 : 0;
 	int i;
 	int ret;
+	int rcvd;
 
 	if (rcv_size == 0)
 		rcv_size = DEWB_XMIT_BUFFER_SIZE;
@@ -456,14 +474,26 @@ xmit_again:
 	}
 
 	/* Receive response */
-	ret = sock_xmit(dbg, desc, 0, buff, rcv_size, strict_rcv);
-	/* Is the connection to be reopened ? */
-	if (ret == -EPIPE) {
-		DEWB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
-		dewb_cdmi_disconnect(dbg, desc);
-		ret = dewb_cdmi_connect(dbg, desc);
-		if (ret) return ret;
-		goto xmit_again;
+	rcvd = 0;
+	while (!dewb_http_check_response_complete(buff, rcvd))
+	{
+		if (rcvd)
+			DEWB_LOG_WARN(dbg->level, "Response not read fully in one go: "
+						  "read %i bytes until now", rcvd);
+
+		ret = sock_xmit(dbg, desc, 0, buff+rcvd, rcv_size-rcvd, strict_rcv);
+		/* Is the connection to be reopened ? */
+		if (ret < 0) {
+			if (ret == -EPIPE) {
+				dewb_cdmi_disconnect(dbg, desc);
+				ret = dewb_cdmi_connect(dbg, desc);
+				if (ret) return ret;
+				goto xmit_again;
+			}
+			break ;
+		}
+		rcvd += ret;
+		ret = rcvd;
 	}
 
 	return ret;
@@ -558,17 +588,6 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 	// Get body
 	// First, copy leftovers from buff
 	memcpy(content, buff, len);
-	// More bytes may have to be read; get them
-	while (len < contentlen) {
-		ret = sock_xmit(dbg, desc, 0, content + len, contentlen - len, 1);
-		if (ret < 0) {
-			DEWB_LOG_ERR(dbg->level, "ERROR sock xmit ret = %d", ret);
-			ret = -EIO;
-			goto err;
-		}
-		len += ret;
-	}
-
 	if (len != contentlen) {
 		DEWB_LOG_ERR(dbg->level, "getrange error: len: %d contentlen:%llu", len, contentlen);
 		ret = -EIO;
@@ -789,12 +808,12 @@ int dewb_cdmi_create(dewb_debug_t *dbg,
 
 	ret = dewb_http_get_status(buff, len, &code);
 	if (ret == -1) {
-		DEWB_LOG_ERR(dbg->level, "[create] Cannot retrieve response status");
+		DEWB_LOG_ERR(dbg->level, "[create-trunc] Cannot retrieve response status");
 		return -EIO;
 	}
 
 	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS) {
-		DEWB_LOG_ERR(dbg->level, "[create] Status of create operation = %i.", code);
+		DEWB_LOG_ERR(dbg->level, "[create-trunc] Status of create operation = %i.", code);
 		return -EIO;
 	}
 
@@ -988,19 +1007,8 @@ int dewb_cdmi_getrange(dewb_debug_t *dbg,
 		goto out;
 	}
 
-	// More bytes may have to be read
-	while (len < size) {
-		DEWB_LOG_DEBUG(dbg->level, "Have to read more [read=%d, toread=%d]",
-			len, size - len);
-		ret = sock_xmit(dbg, desc, 0, desc->xmit_buff + rcv, size - len, 0);
-		if (ret < 0) {
-			DEWB_LOG_ERR(dbg->level, "ERROR sock xmit ret = %d", ret);
-			return -EIO;
-		}
-		len += ret;
-		rcv += ret;
-	}
-
+	// sock_send_receive makes sure to read the whole response,
+	// so we shall have the whole data.
 	if (len != size) {
 		DEWB_LOG_DEBUG(dbg->level, "getrange error: len: %d size:%d", len, size);
 		ret = -EIO;

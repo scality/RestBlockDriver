@@ -37,6 +37,8 @@
 #define HTTP_USER_AGENT	"User-Agent: dewblock/0.2.0"
 #define HTTP_CDMI_VERS	"X-CDMI-Specification-Version: 1.0.1"
 
+#define CR '\r'
+#define LF '\n'
 #define CRLF "\r\n"
 
 
@@ -145,6 +147,40 @@ static int frame_status_ok(char *buff, int len)
 	if (!strncmp(buff, HTTP_OK, strlen(HTTP_OK)))
 		return 1;
 	return 0;
+}
+
+int dewb_http_check_response_complete(char *buff, int len)
+{
+	int hdr_end = 0;
+	int ret = 1;
+	uint64_t contentlen = 0;
+
+	while (hdr_end < len && ret != 0)
+	{
+		if (len - hdr_end >= 4)
+			ret = strncmp(buff+hdr_end, CRLF CRLF, 4);
+
+		if (ret != 0)
+		{
+			hdr_end += 1;
+			while (hdr_end < len && buff[hdr_end] != CR)
+				hdr_end += 1;
+		}
+	}
+	
+	if (hdr_end == len)
+		return 0;
+
+	// Go over CRLFCRLF
+	hdr_end += 4;
+
+	// NOTE: Ignore return status, we actually only need contentlen in case of
+	// success, the default value of 0 being as useful to us as the proper
+	// value.
+	(void)dewb_http_header_get_uint64(buff, len,
+	                                  "Content-Length", &contentlen);
+
+	return hdr_end + contentlen <= len;
 }
 
 int dewb_http_mkhead(char *buff, int len, char *host, char *page)
