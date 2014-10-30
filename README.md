@@ -316,6 +316,28 @@ volume name:
 
     # cat /sys/block/dewb?/dewb\_name
 
+
+Tools
+=====
+
+Playground Server
+-----------------
+
+In the playground directory, you will find a minimalistic REST server written
+in python that will allow you to try out the features of the Scality Rest Block
+Driver. It was written to support Scality's REST protocol's mandatory semantics.
+
+The Playground Server uses the filesystem to store its data, so using it too
+extensively might fill your disk up. By default, the server stores the volumes
+in the 'playground\_data' directory, within the directory you started the
+server from; and listens on the port 80 (meaning that you might have to start
+it as root). By using the options '--port' and '--datapath', you can change
+either the port it listens on, or the directory where the volumes are stored.
+
+Please keep in mind that as it is a minimal server script, it is not designed
+for performance, but for functional testing mostly.
+
+
 Remains to be done :
 --------------------
 
