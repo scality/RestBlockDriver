@@ -41,7 +41,7 @@
 
 /* Unix device constants */
 #define DEV_NAME		"dewb"
-#define DEV_REL_VERSION		"0.2.0"		// Set version of dewb LKM
+#define DEV_REL_VERSION		"0.6.0"		// Set version of dewb LKM
 #define DEV_MINORS		256
 #define DEV_DEFAULT_DISKSIZE	(50 * MB)
 #define DEV_MAX			64
