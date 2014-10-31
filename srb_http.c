@@ -5,14 +5,14 @@
  * Copyright 1997-2000, 2008 Pavel Machek <pavel@ucw.cz>
  * Parts copyright 2001 Steven Whitehouse <steve@chygwyn.com>
  *
- * This file is part of RestBlockDriver.
+ * This file is part of ScalityRestBlock.
  *
- * RestBlockDriver is free software: you can redistribute it and/or modify
+ * ScalityRestBlock is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * RestBlockDriver is distributed in the hope that it will be useful,
+ * ScalityRestBlock is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
@@ -25,7 +25,7 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 
-#include "dewb.h"
+#include "srb.h"
 
 #define HTTP_VER	"HTTP/1.1"
 #define HTTP_OK		"HTTP/1.1 200 OK"
@@ -34,7 +34,7 @@
 #define HTTP_KEEPALIVE	"Connection: keep-alive" CRLF \
 	                "Keep-Alive: timeout=3600 "
 #define HTTP_TRUNCATE	"X-Scal-Truncate"
-#define HTTP_USER_AGENT	"User-Agent: dewblock/0.2.0"
+#define HTTP_USER_AGENT	"User-Agent: srb/0.2.0"
 #define HTTP_CDMI_VERS	"X-CDMI-Specification-Version: 1.0.1"
 
 #define CR '\r'
@@ -57,7 +57,7 @@ static int add_buffer(char **buff, int *len, char *str)
 	return 0;
 }
 
-int dewb_http_get_status(char *buf, int len, enum dewb_http_statuscode *code)
+int srb_http_get_status(char *buf, int len, enum srb_http_statuscode *code)
 {
 	int ret;
 	long status;
@@ -81,7 +81,7 @@ int dewb_http_get_status(char *buf, int len, enum dewb_http_statuscode *code)
 		ret = kstrtol(codebuf, 10, &status);
 		if (ret != 0)
 		{
-			DEWB_LOG_ERR(dewb_log, "Could not retrieve HTTP status code: err %i (buf=%.*s)", ret, 5, buf);
+			SRB_LOG_ERR(srb_log, "Could not retrieve HTTP status code: err %i (buf=%.*s)", ret, 5, buf);
 			return -1;
 		}
 
@@ -98,7 +98,7 @@ int dewb_http_get_status(char *buf, int len, enum dewb_http_statuscode *code)
 			*code = status;
 			break ;
 		default:
-			*code = DEWB_HTTP_STATUS_EXTENSION;
+			*code = SRB_HTTP_STATUS_EXTENSION;
 			break ;
 		}
 
@@ -109,20 +109,20 @@ int dewb_http_get_status(char *buf, int len, enum dewb_http_statuscode *code)
 }
 
 
-enum dewb_http_statusrange dewb_http_get_status_range(enum dewb_http_statuscode status)
+enum srb_http_statusrange srb_http_get_status_range(enum srb_http_statuscode status)
 {
-	enum dewb_http_statusrange range = DEWB_HTTP_STATUSRANGE_EXTENDED;
+	enum srb_http_statusrange range = SRB_HTTP_STATUSRANGE_EXTENDED;
 
 	if (status >= 100 && status < 200)
-		range = DEWB_HTTP_STATUSRANGE_INFORMATIONAL;
+		range = SRB_HTTP_STATUSRANGE_INFORMATIONAL;
 	else if (status >= 200 && status < 300)
-		range = DEWB_HTTP_STATUSRANGE_SUCCESS;
+		range = SRB_HTTP_STATUSRANGE_SUCCESS;
 	else if (status >= 300 && status < 400)
-		range = DEWB_HTTP_STATUSRANGE_REDIRECTION;
+		range = SRB_HTTP_STATUSRANGE_REDIRECTION;
 	else if (status >= 400 && status < 500)
-		range = DEWB_HTTP_STATUSRANGE_CLIENTERROR;
+		range = SRB_HTTP_STATUSRANGE_CLIENTERROR;
 	else if (status >= 500 && status < 600)
-		range = DEWB_HTTP_STATUSRANGE_SERVERERROR;
+		range = SRB_HTTP_STATUSRANGE_SERVERERROR;
 
 	return range;
 }
@@ -149,7 +149,7 @@ static int frame_status_ok(char *buff, int len)
 	return 0;
 }
 
-int dewb_http_check_response_complete(char *buff, int len)
+int srb_http_check_response_complete(char *buff, int len)
 {
 	int hdr_end = 0;
 	int ret = 1;
@@ -177,13 +177,13 @@ int dewb_http_check_response_complete(char *buff, int len)
 	// NOTE: Ignore return status, we actually only need contentlen in case of
 	// success, the default value of 0 being as useful to us as the proper
 	// value.
-	(void)dewb_http_header_get_uint64(buff, len,
+	(void)srb_http_header_get_uint64(buff, len,
 	                                  "Content-Length", &contentlen);
 
 	return hdr_end + contentlen <= len;
 }
 
-int dewb_http_mkhead(char *buff, int len, char *host, char *page)
+int srb_http_mkhead(char *buff, int len, char *host, char *page)
 {
 	char *bufp = buff;
 	int mylen = len;
@@ -225,7 +225,7 @@ int dewb_http_mkhead(char *buff, int len, char *host, char *page)
 	return (len - mylen);
 }
 
-int dewb_http_mkcreate(char *buff, int len, char *host, char *page)
+int srb_http_mkcreate(char *buff, int len, char *host, char *page)
 {
 	char *bufp = buff;
 	int mylen = len;
@@ -275,7 +275,7 @@ int dewb_http_mkcreate(char *buff, int len, char *host, char *page)
 	return (len - mylen);
 }
 
-int dewb_http_mktruncate(char *buff, int len, char *host, char *page, unsigned long long size)
+int srb_http_mktruncate(char *buff, int len, char *host, char *page, unsigned long long size)
 {
 	char *bufp = buff;
 	int mylen = len;
@@ -328,7 +328,7 @@ int dewb_http_mktruncate(char *buff, int len, char *host, char *page, unsigned l
 	return (len - mylen);
 }
 
-int dewb_http_mkdelete(char *buff, int len, char *host, char *page)
+int srb_http_mkdelete(char *buff, int len, char *host, char *page)
 {
 	char *bufp = buff;
 	int mylen = len;
@@ -374,7 +374,7 @@ int dewb_http_mkdelete(char *buff, int len, char *host, char *page)
 	return (len - mylen);
 }
 
-int dewb_http_mkmetadata(char *buff, int len, char *host, char *page)
+int srb_http_mkmetadata(char *buff, int len, char *host, char *page)
 {
 	char *bufp = buff;
 	int mylen = len;
@@ -416,7 +416,7 @@ int dewb_http_mkmetadata(char *buff, int len, char *host, char *page)
 	return (len - mylen);
 }
 
-int dewb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page, 
+int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page, 
 		uint64_t start, uint64_t end)
 {
 	char *bufp = buff;
@@ -493,7 +493,7 @@ int dewb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 	return (len - mylen);
 }
 
-int dewb_http_mklist(char *buff, int len, char *host, char *page)
+int srb_http_mklist(char *buff, int len, char *host, char *page)
 {
 	char *bufp = buff;
 	int mylen = len;
@@ -554,7 +554,7 @@ int dewb_http_mklist(char *buff, int len, char *host, char *page)
 	return (len - mylen);
 } 
 
-int dewb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
+int srb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
 {
 	int ret;
 	char *pos;
@@ -574,7 +574,7 @@ int dewb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
 	return 0;
 }
 
-int dewb_http_skipheader(char **buff, int *len)
+int srb_http_skipheader(char **buff, int *len)
 {
 	int count = 0;
 

@@ -1,13 +1,13 @@
 #! /bin/sh
 ### BEGIN INIT INFO
-# Provides:          restbd
+# Provides:          srb
 # Required-Start:    $syslog
 # Required-Stop:     $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: Scality RestBlockDriver
-# Description:       This service loads Scality RestBlockDriver 
-#                    and configures the mirrors from /etc/restbd.conf.
+# Short-Description: Scality RestBlock Driver
+# Description:       This service loads Scality RestBlock  Driver
+#                    and configures the mirrors from /etc/srb.conf.
 ### END INIT INFO
 
 # Author: Frederic Donnat <fred@secludit.com>
@@ -17,11 +17,11 @@
 
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
-DESC="Scality RestBD driver"
-NAME=restbd
+DESC="Scality RestBlock driver"
+NAME=srb
 SCRIPTNAME=/etc/init.d/$NAME
 VERBOSE=yes
-KMOD_NAME=dewblock
+KMOD_NAME=srb
 
 # Exit if the package is not installed
 #[ -x "$DAEMON" ] || exit 0
@@ -40,10 +40,10 @@ KMOD_NAME=dewblock
 #
 # Parsing config
 #
-if [ -z $KMOD_PATH ]; then KMOD_PATH="/lib/modules/$(uname -r)/kernel/drivers/restbd/"; fi
+if [ -z $KMOD_PATH ]; then KMOD_PATH="/lib/modules/$(uname -r)/kernel/drivers/srb/"; fi
 
 #
-# Function that loads the RestBlockDriver
+# Function that loads the ScalityRestBlock
 #
 do_load_drv() {
 	# Load the driver
@@ -51,7 +51,7 @@ do_load_drv() {
 }
 
 #
-# Function that unload the RestBlockDriver
+# Function that unload the ScalityRestBlock
 #
 do_unload_drv() {
 	# Unload the driver
@@ -62,14 +62,14 @@ do_unload_drv() {
 # Function that configures the mirrors
 #
 do_config_mirrors() {
-	echo "$MIRRORS" > /sys/class/dewb/add_mirrors || return 2
+	echo "$MIRRORS" > /sys/class/srb/add_mirrors || return 2
 }
 
 #
 # Function that unconfigures the mirrors
 #
 do_deconfig_mirrors() {
-	echo "$MIRRORS" > /sys/class/dewb/remove_mirrors || return 2
+	echo "$MIRRORS" > /sys/class/srb/remove_mirrors || return 2
 }
 
 #
@@ -79,7 +79,7 @@ do_check_drv_status() {
 	lsmod | grep $KMOD_NAME > /dev/null || return 2
 }
 do_check_mirros_status() {
-	nb_mirrors=$(cat /sys/class/dewb/mirrors | wc -l)
+	nb_mirrors=$(cat /sys/class/srb/mirrors | wc -l)
 	[ $nb_mirrors -ne 0 ] && return 0 || return 2
 }
 

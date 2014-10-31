@@ -5,14 +5,14 @@
  * Copyright 1997-2000, 2008 Pavel Machek <pavel@ucw.cz>
  * Parts copyright 2001 Steven Whitehouse <steve@chygwyn.com>
  *
- * This file is part of RestBlockDriver.
+ * This file is part of ScalityRestBlock.
  *
- * RestBlockDriver is free software: you can redistribute it and/or modify
+ * ScalityRestBlock is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * RestBlockDriver is distributed in the hope that it will be useful,
+ * ScalityRestBlock is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
@@ -29,7 +29,7 @@
 #include <linux/sched.h>
 #include <linux/socket.h>
 #include <linux/tcp.h>
-#include "dewb.h"
+#include "srb.h"
 
 #include "jsmn/jsmn.h"
 
@@ -99,13 +99,13 @@ static int get_port(const char *url, int *port)
 	return i;
 }
 
-/* dewb_cdmi_init (URL)
+/* srb_cdmi_init (URL)
  *
  * Parse url and initialise cdmi structure in all threads descriptors
  * 
  */
-int dewb_cdmi_init(dewb_debug_t *dbg,
-		struct dewb_cdmi_desc_s *desc,
+int srb_cdmi_init(srb_debug_t *dbg,
+		struct srb_cdmi_desc_s *desc,
 		const char *url)
 {
 	/*          1    1 */
@@ -118,9 +118,9 @@ int dewb_cdmi_init(dewb_debug_t *dbg,
 	desc->filename[0] = 0;
 	*ip = 0;
 
-	strncpy(desc->url, url, DEWB_URL_SIZE);
+	strncpy(desc->url, url, SRB_URL_SIZE);
 
-	desc->url[DEWB_URL_SIZE] = 0;
+	desc->url[SRB_URL_SIZE] = 0;
 	/* Only 'http://' supported for the moment */
 	if (strncmp(url, PROTO_HTTP, strlen(PROTO_HTTP)))
 		return -EINVAL;
@@ -152,20 +152,20 @@ int dewb_cdmi_init(dewb_debug_t *dbg,
 	desc->port	  = port;
 	desc->state	  = CDMI_DISCONNECTED;
 
-	DEWB_LOG_DEBUG(dbg->level, "Decoded URL [ip=%s port=%d file=%s]",
+	SRB_LOG_DEBUG(dbg->level, "Decoded URL [ip=%s port=%d file=%s]",
                    desc->ip_addr, desc->port, desc->filename);
 
 	return 0;	
 }
 
-/* dewb_cdmi_connect
+/* srb_cdmi_connect
  *
  * Connect thread pools descriptors
  *
  * Returns 0 if successfull or a negative value depending the error.
  */
-int dewb_cdmi_connect(dewb_debug_t *dbg,
-		struct dewb_cdmi_desc_s *desc)
+int srb_cdmi_connect(srb_debug_t *dbg,
+		struct srb_cdmi_desc_s *desc)
 {
 	int ret;
 	int arg = 1;
@@ -179,7 +179,7 @@ int dewb_cdmi_connect(dewb_debug_t *dbg,
 	/* Init socket */
 	ret = sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, &desc->socket);
 	if (ret < 0) {
-		DEWB_LOG_ERR(dbg->level, "Unable to create socket: %d", ret);
+		SRB_LOG_ERR(dbg->level, "Unable to create socket: %d", ret);
 		goto out_error;
 	}
 	memset(&desc->sockaddr, 0, sizeof(desc->sockaddr));
@@ -192,7 +192,7 @@ int dewb_cdmi_connect(dewb_debug_t *dbg,
 				(struct sockaddr*)&desc->sockaddr, 
 				sizeof(struct sockaddr_in), !O_NONBLOCK);
 	if (ret < 0) {
-		DEWB_LOG_ERR(dbg->level, "Unable to connect to cdmi server: %d", ret);
+		SRB_LOG_ERR(dbg->level, "Unable to connect to cdmi server: %d", ret);
 		goto out_error;
 	}
 	desc->state = CDMI_CONNECTED;
@@ -201,21 +201,21 @@ int dewb_cdmi_connect(dewb_debug_t *dbg,
 		IPPROTO_TCP, TCP_NODELAY, (char *)&arg,
 		sizeof(arg));
 	if (ret < 0) {
-		DEWB_LOG_ERR(dbg->level, "setsockopt failed: %d", ret);
+		SRB_LOG_ERR(dbg->level, "setsockopt failed: %d", ret);
 		goto out_error;
 	}
 
 	/* TODO: set request timeout value (Issue #22) */
 	if (desc->timeout.tv_sec > 0) {
-		DEWB_LOG_DEBUG(dbg->level, "dewb_cdmi_connect: set socket timeout %lu", desc->timeout.tv_sec);
+		SRB_LOG_DEBUG(dbg->level, "srb_cdmi_connect: set socket timeout %lu", desc->timeout.tv_sec);
 		ret = kernel_setsockopt(desc->socket, SOL_SOCKET, SO_RCVTIMEO, 
 			(char *)&desc->timeout, sizeof(struct timeval));
 		if (ret < 0) {
-			DEWB_LOG_ERR(dbg->level, "Failed to set socket receive timeout value: %d", ret);
+			SRB_LOG_ERR(dbg->level, "Failed to set socket receive timeout value: %d", ret);
 		}
 		ret = kernel_setsockopt(desc->socket, SOL_SOCKET, SO_SNDTIMEO, (char *)&desc->timeout, sizeof(struct timeval));
 		if (ret < 0) {
-			DEWB_LOG_ERR(dbg->level, "Failed to set socket send timeout value: %d", ret);
+			SRB_LOG_ERR(dbg->level, "Failed to set socket send timeout value: %d", ret);
 		}
 	}
 
@@ -236,13 +236,13 @@ out_error:
 	return ret;
 }
 
-/* dewb_cdmi_disconnect
+/* srb_cdmi_disconnect
  *
  * Disctonnect current descriptor from CDMI server
  *
  */
-int dewb_cdmi_disconnect(dewb_debug_t *dbg,
-			struct dewb_cdmi_desc_s *desc)
+int srb_cdmi_disconnect(srb_debug_t *dbg,
+			struct srb_cdmi_desc_s *desc)
 {
 	if (!desc)
 		return -EINVAL;
@@ -261,8 +261,8 @@ int dewb_cdmi_disconnect(dewb_debug_t *dbg,
 /*
  *  Send or receive packet.
  */
-static int sock_xmit(dewb_debug_t *dbg,
-		struct dewb_cdmi_desc_s *desc,
+static int sock_xmit(srb_debug_t *dbg,
+		struct srb_cdmi_desc_s *desc,
 		int send, 
 		void *buf, int size,
 		int strict_receive)
@@ -274,7 +274,7 @@ static int sock_xmit(dewb_debug_t *dbg,
 	unsigned long pflags = current->flags;
 
 	if (unlikely(!desc->socket)) {
-		DEWB_LOG_ERR(dbg->level, "Attempted %s on closed socket in sock_xmit\n",
+		SRB_LOG_ERR(dbg->level, "Attempted %s on closed socket in sock_xmit\n",
 			(send ? "send" : "recv"));
 		return -EINVAL;
 	}
@@ -298,16 +298,16 @@ static int sock_xmit(dewb_debug_t *dbg,
 
 		if (send) {
 			result = kernel_sendmsg(desc->socket, &msg, &iov, 1, size);
-			DEWB_LOG_DEBUG(dbg->level, "sock_xmit: Sent %d bytes->\n%.*s", result, result, (char*)buf);
+			SRB_LOG_DEBUG(dbg->level, "sock_xmit: Sent %d bytes->\n%.*s", result, result, (char*)buf);
 		} else {
 			result = kernel_recvmsg(desc->socket, &msg, &iov, 1, size,
 						msg.msg_flags);
-			DEWB_LOG_DEBUG(dbg->level, "sock_xmit: Received %d bytes->\n%.*s", result, result, (char*)buf);
+			SRB_LOG_DEBUG(dbg->level, "sock_xmit: Received %d bytes->\n%.*s", result, result, (char*)buf);
 		}
-		DEWB_LOG_DEBUG(dbg->level, "Result for socket exchange: %d", result);
+		SRB_LOG_DEBUG(dbg->level, "Result for socket exchange: %d", result);
 		if (signal_pending(current)) {
 			siginfo_t info;
-			DEWB_LOG_INFO(dbg->level, "dewb (pid %d: %s) got signal %d\n",
+			SRB_LOG_INFO(dbg->level, "srb (pid %d: %s) got signal %d\n",
 				task_pid_nr(current), current->comm,
 				dequeue_signal_lock(current, &current->blocked, &info));
 			result = -EINTR;
@@ -318,7 +318,7 @@ static int sock_xmit(dewb_debug_t *dbg,
 			break;
 
 		if (result == 0)  {
-			DEWB_LOG_DEBUG(dbg->level, "Empty socket exhange (size: %d)", size);
+			SRB_LOG_DEBUG(dbg->level, "Empty socket exhange (size: %d)", size);
 			result = -EPIPE;
 			break;
 		}
@@ -336,8 +336,8 @@ static int sock_xmit(dewb_debug_t *dbg,
 	return result;
 }
 
-static int sock_send_receive(dewb_debug_t *dbg,
-			struct dewb_cdmi_desc_s *desc,
+static int sock_send_receive(srb_debug_t *dbg,
+			struct srb_cdmi_desc_s *desc,
 			int send_size, int rcv_size)
 {
 	char *buff = desc->xmit_buff;
@@ -346,16 +346,16 @@ static int sock_send_receive(dewb_debug_t *dbg,
 	int rcvd;
 
 	if (rcv_size == 0)
-		rcv_size = DEWB_XMIT_BUFFER_SIZE;
+		rcv_size = SRB_XMIT_BUFFER_SIZE;
 
 	/* Check if the connection needs to be restarted */
 	/* Reconnect the socket after a predefined number of HTTP
 	 * requests sent.
 	 */
-	if (desc->nb_requests == DEWB_REUSE_LIMIT) {
-		DEWB_LOG_DEBUG(dbg->level, "Limit of %u requests reached reconnecting socket", DEWB_REUSE_LIMIT);
-		dewb_cdmi_disconnect(dbg, desc);
-		ret = dewb_cdmi_connect(dbg, desc);
+	if (desc->nb_requests == SRB_REUSE_LIMIT) {
+		SRB_LOG_DEBUG(dbg->level, "Limit of %u requests reached reconnecting socket", SRB_REUSE_LIMIT);
+		srb_cdmi_disconnect(dbg, desc);
+		ret = srb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 	}
 	else
@@ -365,8 +365,8 @@ static int sock_send_receive(dewb_debug_t *dbg,
 xmit_again:
 	ret = sock_xmit(dbg, desc, 1, buff, send_size, 0);
 	if (ret == -EPIPE) {
-		dewb_cdmi_disconnect(dbg, desc);
-		ret = dewb_cdmi_connect(dbg, desc);
+		srb_cdmi_disconnect(dbg, desc);
+		ret = srb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 		goto xmit_again;
 	}
@@ -375,18 +375,18 @@ xmit_again:
 	
 	/* Receive response - We want to make sure we received a full response */
 	rcvd = 0;
-	while (!dewb_http_check_response_complete(buff, rcvd))
+	while (!srb_http_check_response_complete(buff, rcvd))
 	{
 		if (rcvd)
-			DEWB_LOG_WARN(dbg->level, "Response not read fully in one go: "
+			SRB_LOG_WARN(dbg->level, "Response not read fully in one go: "
 			              "read %i bytes until now", rcvd);
 
 		ret = sock_xmit(dbg, desc, 0, buff+rcvd, rcv_size-rcvd, strict_rcv);
 		/* Is the connection to be reopened ? */
 		if (ret < 0) {
 			if (ret == -EPIPE) {
-				dewb_cdmi_disconnect(dbg, desc);
-				ret = dewb_cdmi_connect(dbg, desc);
+				srb_cdmi_disconnect(dbg, desc);
+				ret = srb_cdmi_connect(dbg, desc);
 				if (ret) return ret;
 				goto xmit_again;
 			}
@@ -399,8 +399,8 @@ xmit_again:
 	return ret;
 }
 
-static int sock_send_sglist_receive(dewb_debug_t *dbg,
-				struct dewb_cdmi_desc_s *desc,
+static int sock_send_sglist_receive(srb_debug_t *dbg,
+				struct srb_cdmi_desc_s *desc,
 				int send_size, int rcv_size)
 {
 	char *buff = desc->xmit_buff;
@@ -410,16 +410,16 @@ static int sock_send_sglist_receive(dewb_debug_t *dbg,
 	int rcvd;
 
 	if (rcv_size == 0)
-		rcv_size = DEWB_XMIT_BUFFER_SIZE;
+		rcv_size = SRB_XMIT_BUFFER_SIZE;
 
 	/* Check if the connection needs to be restarted */
 	/* Reconnect the socket after a predefined number of HTTP
 	 * requests sent.
 	 */
-	if (desc->nb_requests == DEWB_REUSE_LIMIT) {
-		DEWB_LOG_DEBUG(dbg->level, "Limit of %u requests reached reconnecting socket", DEWB_REUSE_LIMIT);
-		dewb_cdmi_disconnect(dbg, desc);
-		ret = dewb_cdmi_connect(dbg, desc);
+	if (desc->nb_requests == SRB_REUSE_LIMIT) {
+		SRB_LOG_DEBUG(dbg->level, "Limit of %u requests reached reconnecting socket", SRB_REUSE_LIMIT);
+		srb_cdmi_disconnect(dbg, desc);
+		ret = srb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 	}
 	else
@@ -429,14 +429,14 @@ static int sock_send_sglist_receive(dewb_debug_t *dbg,
 xmit_again:
 	ret = sock_xmit(dbg, desc, 1, buff, send_size, 0);
 	if (ret == -EPIPE) {
-		DEWB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
-		dewb_cdmi_disconnect(dbg, desc);
-		ret = dewb_cdmi_connect(dbg, desc);
+		SRB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
+		srb_cdmi_disconnect(dbg, desc);
+		ret = srb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 		goto xmit_again;
 	}
 	if (ret != send_size) {
-		DEWB_LOG_ERR(dbg->level, "Incomplete transmission (%d of %d), returning", ret, send_size);
+		SRB_LOG_ERR(dbg->level, "Incomplete transmission (%d of %d), returning", ret, send_size);
 		return -EIO;
 	}
 
@@ -447,14 +447,14 @@ xmit_again:
 
 		ret = sock_xmit(dbg, desc, 1, buff, length, 0);
 		if (ret == -EPIPE) {
-			DEWB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
-			dewb_cdmi_disconnect(dbg, desc);
-			ret = dewb_cdmi_connect(dbg, desc);
+			SRB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
+			srb_cdmi_disconnect(dbg, desc);
+			ret = srb_cdmi_connect(dbg, desc);
 			if (ret) return ret;
 			goto xmit_again;
 		}
 		if (ret != length) {
-			DEWB_LOG_ERR(dbg->level, "Incomplete transmission (%d of %d), returning",
+			SRB_LOG_ERR(dbg->level, "Incomplete transmission (%d of %d), returning",
 				ret, length);
 			return -EIO;
 		}
@@ -462,31 +462,31 @@ xmit_again:
 	
 	ret = sock_xmit(dbg, desc, 1, "\r\n", 2, 0);
 	if (ret == -EPIPE) {
-		DEWB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
-		dewb_cdmi_disconnect(dbg, desc);
-		ret = dewb_cdmi_connect(dbg, desc);
+		SRB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
+		srb_cdmi_disconnect(dbg, desc);
+		ret = srb_cdmi_connect(dbg, desc);
 		if (ret) return ret;
 		goto xmit_again;
 	}
 	if (ret != 2) {
-		DEWB_LOG_ERR(dbg->level, "Incomplete transmission %d of %d), returning", ret, 2);
+		SRB_LOG_ERR(dbg->level, "Incomplete transmission %d of %d), returning", ret, 2);
 		return -EIO;
 	}
 
 	/* Receive response */
 	rcvd = 0;
-	while (!dewb_http_check_response_complete(buff, rcvd))
+	while (!srb_http_check_response_complete(buff, rcvd))
 	{
 		if (rcvd)
-			DEWB_LOG_WARN(dbg->level, "Response not read fully in one go: "
+			SRB_LOG_WARN(dbg->level, "Response not read fully in one go: "
 						  "read %i bytes until now", rcvd);
 
 		ret = sock_xmit(dbg, desc, 0, buff+rcvd, rcv_size-rcvd, strict_rcv);
 		/* Is the connection to be reopened ? */
 		if (ret < 0) {
 			if (ret == -EPIPE) {
-				dewb_cdmi_disconnect(dbg, desc);
-				ret = dewb_cdmi_connect(dbg, desc);
+				srb_cdmi_disconnect(dbg, desc);
+				ret = srb_cdmi_connect(dbg, desc);
 				if (ret) return ret;
 				goto xmit_again;
 			}
@@ -500,8 +500,8 @@ xmit_again:
 }
 
 
-int dewb_cdmi_list(dewb_debug_t *dbg,
-		   struct dewb_cdmi_desc_s *desc,
+int srb_cdmi_list(srb_debug_t *dbg,
+		   struct srb_cdmi_desc_s *desc,
 		   int (*volume_cb)(void * data, const char *),
 		   void *cb_data)
 {
@@ -510,10 +510,10 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 	unsigned int	n_tokens = 0;
 	jsmnerr_t	json_err = JSMN_ERROR_NOMEM;
 
-	char filename[DEWB_URL_SIZE+1];
+	char filename[SRB_URL_SIZE+1];
 	char *buff = desc->xmit_buff;
 
-	enum dewb_http_statuscode code;
+	enum srb_http_statuscode code;
 	char *content = NULL;
 	uint64_t contentlen;
 
@@ -526,7 +526,7 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 		return 0;
 
 	// Construct HTTTP GET (for listing container)
-	len = dewb_http_mklist(buff, DEWB_XMIT_BUFFER_SIZE,
+	len = srb_http_mklist(buff, SRB_XMIT_BUFFER_SIZE,
 			       desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 
@@ -534,27 +534,27 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 	if (len < 0) return len;
 
 	// Check response status
-	ret = dewb_http_get_status(buff, len, &code);
+	ret = srb_http_get_status(buff, len, &code);
 	if (ret == -1)
 	{
-		DEWB_LOG_ERR(dbg->level, "[list] Cannot retrieve response status");
+		SRB_LOG_ERR(dbg->level, "[list] Cannot retrieve response status");
 		ret = -EIO;
 		goto err;
 	}
-	if (code != DEWB_HTTP_STATUS_OK)
+	if (code != SRB_HTTP_STATUS_OK)
 	{
-		DEWB_LOG_ERR(dbg->level, "[list] Mirror listing yielded "
+		SRB_LOG_ERR(dbg->level, "[list] Mirror listing yielded "
 			   "response status %i", code);
 		ret = -EIO;
 		goto err;
 	}
 
 	// Get content length
-	ret = dewb_http_header_get_uint64(buff, len,
+	ret = srb_http_header_get_uint64(buff, len,
 					  "Content-Length", &contentlen);
 	if (ret)
 	{
-		DEWB_LOG_ERR(dbg->level, "[list] Could not find content length in "
+		SRB_LOG_ERR(dbg->level, "[list] Could not find content length in "
 			   "response headers.");
 		ret = -EIO;
 		goto err;
@@ -563,7 +563,7 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 	content = kmalloc(contentlen, GFP_KERNEL);
 	if (content == NULL)
 	{
-		DEWB_LOG_ERR(dbg->level, "[list] Cannot allocate enough memory to"
+		SRB_LOG_ERR(dbg->level, "[list] Cannot allocate enough memory to"
 			   " read volume repository.");
 		ret = -ENOMEM;
 		goto err;
@@ -571,15 +571,15 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 	memset(content, 0, contentlen);
 
 	// Skip header
-	ret = dewb_http_skipheader(&buff, &len);
+	ret = srb_http_skipheader(&buff, &len);
 	if (ret) {
-		DEWB_LOG_ERR(dbg->level, "getrange: skipheader failed: %d", ret);
+		SRB_LOG_ERR(dbg->level, "getrange: skipheader failed: %d", ret);
 		ret = -EIO;
 		goto err;
 	}
 	if (len > contentlen)
 	{
-		DEWB_LOG_ERR(dbg->level, "[list] More data left than expected:"
+		SRB_LOG_ERR(dbg->level, "[list] More data left than expected:"
 			   " len=%i > contentlen=%llu", len, contentlen);
 		ret = -EIO;
 		goto err;
@@ -589,15 +589,15 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 	// First, copy leftovers from buff
 	memcpy(content, buff, len);
 	if (len != contentlen) {
-		DEWB_LOG_ERR(dbg->level, "getrange error: len: %d contentlen:%llu", len, contentlen);
+		SRB_LOG_ERR(dbg->level, "getrange error: len: %d contentlen:%llu", len, contentlen);
 		ret = -EIO;
 		goto err;
 	}
 
 	// Now retrieve the list of objects...
-#define DEWB_N_JSON_TOKENS	128
+#define SRB_N_JSON_TOKENS	128
 	jsmn_init(&json_parser);
-	n_tokens = DEWB_N_JSON_TOKENS;
+	n_tokens = SRB_N_JSON_TOKENS;
 	do
 	{
 		n_tokens *= 2;
@@ -616,13 +616,13 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 	{
 		if (json_tokens == NULL)
 		{
-			DEWB_LOG_ERR(dbg->level, "Could not allocate enough memory to "
+			SRB_LOG_ERR(dbg->level, "Could not allocate enough memory to "
 				   "parse JSON volume list.");
 			ret = -ENOMEM;
 		}
 		else
 		{
-			DEWB_LOG_ERR(dbg->level, "Could not parse Json: error %i", json_err);
+			SRB_LOG_ERR(dbg->level, "Could not parse Json: error %i", json_err);
 			ret = -EIO;
 		}
 		goto err;
@@ -650,7 +650,7 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 				    && json_tokens[obj+ret+1].type == JSMN_ARRAY)
 				{
 					array = obj + ret + 1;
-					DEWB_LOG_DEBUG(dbg->level, "Found children list:");
+					SRB_LOG_DEBUG(dbg->level, "Found children list:");
 					// List children of the array we found.
 					for (ret = 1;
 					     array + ret < json_err
@@ -660,12 +660,12 @@ int dewb_cdmi_list(dewb_debug_t *dbg,
 					{
 						len = json_tokens[array+ret].end
 							- json_tokens[array+ret].start;
-						DEWB_LOG_DEBUG(dbg->level, "Volume %i: %.*s", ret, len,
+						SRB_LOG_DEBUG(dbg->level, "Volume %i: %.*s", ret, len,
 							   &content[json_tokens[array+ret].start]);
 						strncpy(filename,
 							&content[json_tokens[array+ret].start],
-							DEWB_MIN(DEWB_URL_SIZE, len));
-						filename[DEWB_MIN(DEWB_URL_SIZE, len)] = 0;
+							SRB_MIN(SRB_URL_SIZE, len));
+						filename[SRB_MIN(SRB_URL_SIZE, len)] = 0;
 
 						if (volume_cb(cb_data, filename) != 0) {
 							cb_errcount += 1;
@@ -693,8 +693,8 @@ err:
 	return ret;
 }
 
-int dewb_cdmi_flush(dewb_debug_t *dbg,
-		struct dewb_cdmi_desc_s *desc, 
+int srb_cdmi_flush(srb_debug_t *dbg,
+		struct srb_cdmi_desc_s *desc, 
 		unsigned long flush_size)
 {
 	char *buff = desc->xmit_buff;
@@ -706,7 +706,7 @@ int dewb_cdmi_flush(dewb_debug_t *dbg,
 		return 0;
 
 	/* Construct HTTP truncate */
-	len = dewb_http_mktruncate(buff, DEWB_XMIT_BUFFER_SIZE, 
+	len = srb_http_mktruncate(buff, SRB_XMIT_BUFFER_SIZE, 
 				desc->ip_addr, desc->filename, flush_size);
 	if (len <= 0) return len;
 	
@@ -714,139 +714,139 @@ int dewb_cdmi_flush(dewb_debug_t *dbg,
 	if (len < 0) return len;
 
 	buff[len] = 0;
-	ret = dewb_http_header_get_uint64(buff, len, "Content-Length", &size);
+	ret = srb_http_header_get_uint64(buff, len, "Content-Length", &size);
 	if (ret)
 		return -EIO;
 
 	return 0;
 }
 
-int dewb_cdmi_extend(dewb_debug_t *dbg,
-		struct dewb_cdmi_desc_s *desc,
+int srb_cdmi_extend(srb_debug_t *dbg,
+		struct srb_cdmi_desc_s *desc,
 		unsigned long long trunc_size)
 {
 	char *buff = desc->xmit_buff;
 	unsigned long long cur_size = 0;
 	int len;
 	int ret;
-	enum dewb_http_statuscode code;
+	enum srb_http_statuscode code;
 
 	if (!desc || !desc->socket)
 		return -EINVAL;
 
-	ret = dewb_cdmi_getsize(dbg, desc, &cur_size);
+	ret = srb_cdmi_getsize(dbg, desc, &cur_size);
 	if (ret != 0) {
-		DEWB_LOG_ERR(dbg->level, "[extend] Could not get size of existing volume.");
+		SRB_LOG_ERR(dbg->level, "[extend] Could not get size of existing volume.");
 		return ret;
 	}
 
 	if (cur_size >= trunc_size) {
-		DEWB_LOG_ERR(dbg->level, "[extend] Cannot shrink a volume.");
+		SRB_LOG_ERR(dbg->level, "[extend] Cannot shrink a volume.");
 		return -EINVAL;
 	}
 
 	/* Construct/send HTTP truncate */
-	len = dewb_http_mktruncate(buff, DEWB_XMIT_BUFFER_SIZE,
+	len = srb_http_mktruncate(buff, SRB_XMIT_BUFFER_SIZE,
 				   desc->ip_addr, desc->filename, trunc_size);
 	if (len <= 0) return len;
 
 	len = sock_send_receive(dbg, desc, len, 0);
 	if (len < 0) return len;
 
-	ret = dewb_http_get_status(buff, len, &code);
+	ret = srb_http_get_status(buff, len, &code);
 	if (ret == -1) {
-		DEWB_LOG_ERR(dbg->level, "[extend] Cannot retrieve response status");
+		SRB_LOG_ERR(dbg->level, "[extend] Cannot retrieve response status");
 		return -EIO;
 	}
 
-	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS) {
-		DEWB_LOG_ERR(dbg->level, "[extend] Status of extend operation = %i.", code);
+	if (srb_http_get_status_range(code) != SRB_HTTP_STATUSRANGE_SUCCESS) {
+		SRB_LOG_ERR(dbg->level, "[extend] Status of extend operation = %i.", code);
 		return -EIO;
 	}
 
 	return 0;
 }
 
-int dewb_cdmi_create(dewb_debug_t *dbg,
-		struct dewb_cdmi_desc_s *desc,
+int srb_cdmi_create(srb_debug_t *dbg,
+		struct srb_cdmi_desc_s *desc,
 		unsigned long long trunc_size)
 {
 	char *buff = desc->xmit_buff;
 	int len;
 	int ret;
-	enum dewb_http_statuscode code;
+	enum srb_http_statuscode code;
 
 	if (!desc || !desc->socket)
 		return -EINVAL;
 
 	/* Construct/send HTTP create */
-	len = dewb_http_mkcreate(buff, DEWB_XMIT_BUFFER_SIZE,
+	len = srb_http_mkcreate(buff, SRB_XMIT_BUFFER_SIZE,
 				 desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 
 	len = sock_send_receive(dbg, desc, len, 0);
 	if (len < 0) return len;
 
-	ret = dewb_http_get_status(buff, len, &code);
+	ret = srb_http_get_status(buff, len, &code);
 	if (ret == -1) {
-		DEWB_LOG_ERR(dbg->level, "[create] Cannot retrieve response status from %.*s", 32, buff);
+		SRB_LOG_ERR(dbg->level, "[create] Cannot retrieve response status from %.*s", 32, buff);
 		return -EIO;
 	}
 
-	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS) {
-		DEWB_LOG_ERR(dbg->level, "[create] Status of create operation = %i.", code);
+	if (srb_http_get_status_range(code) != SRB_HTTP_STATUSRANGE_SUCCESS) {
+		SRB_LOG_ERR(dbg->level, "[create] Status of create operation = %i.", code);
 		return -EIO;
 	}
 
 	/* Construct/send HTTP truncate */
-	len = dewb_http_mktruncate(buff, DEWB_XMIT_BUFFER_SIZE,
+	len = srb_http_mktruncate(buff, SRB_XMIT_BUFFER_SIZE,
 				   desc->ip_addr, desc->filename, trunc_size);
 	if (len <= 0) return len;
 
 	len = sock_send_receive(dbg, desc, len, 0);
 	if (len < 0) return len;
 
-	ret = dewb_http_get_status(buff, len, &code);
+	ret = srb_http_get_status(buff, len, &code);
 	if (ret == -1) {
-		DEWB_LOG_ERR(dbg->level, "[create-trunc] Cannot retrieve response status");
+		SRB_LOG_ERR(dbg->level, "[create-trunc] Cannot retrieve response status");
 		return -EIO;
 	}
 
-	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS) {
-		DEWB_LOG_ERR(dbg->level, "[create-trunc] Status of create operation = %i.", code);
+	if (srb_http_get_status_range(code) != SRB_HTTP_STATUSRANGE_SUCCESS) {
+		SRB_LOG_ERR(dbg->level, "[create-trunc] Status of create operation = %i.", code);
 		return -EIO;
 	}
 
 	return 0;
 }
 
-int dewb_cdmi_delete(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc)
+int srb_cdmi_delete(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc)
 {
 	char *buff = desc->xmit_buff;
 	int len;
 	int ret;
-	enum dewb_http_statuscode code;
+	enum srb_http_statuscode code;
 
 	if (!desc || !desc->socket)
 		return -EINVAL;
 
 	/* Construct HTTP delete */
-	len = dewb_http_mkdelete(buff, DEWB_XMIT_BUFFER_SIZE,
+	len = srb_http_mkdelete(buff, SRB_XMIT_BUFFER_SIZE,
 				desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 	
 	len = sock_send_receive(dbg, desc, len, 0);
 	if (len < 0) return len;
 
-	ret = dewb_http_get_status(buff, len, &code);
+	ret = srb_http_get_status(buff, len, &code);
 	if (ret == -1) {
-		DEWB_LOG_ERR(dbg->level, "[destroy] Cannot retrieve response status");
+		SRB_LOG_ERR(dbg->level, "[destroy] Cannot retrieve response status");
 		return -EIO;
 	}
 
-	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS) {
-		DEWB_LOG_ERR(dbg->level, "[destroy] Status of delete operation = %i.", code);
-		if (code == DEWB_HTTP_STATUS_NOT_FOUND)
+	if (srb_http_get_status_range(code) != SRB_HTTP_STATUSRANGE_SUCCESS) {
+		SRB_LOG_ERR(dbg->level, "[destroy] Status of delete operation = %i.", code);
+		if (code == SRB_HTTP_STATUS_NOT_FOUND)
 			return -ENOENT;
 		return -EIO;
 	}
@@ -856,7 +856,7 @@ int dewb_cdmi_delete(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc)
 
 /* HACK: due to a bug in HTTP HEAD from scality,using metadata instead */
 #if 0
-int dewb_cdmi_getsize(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
+int srb_cdmi_getsize(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
 		uint64_t *size)
 {
 	char *buff = desc->xmit_buff;
@@ -864,7 +864,7 @@ int dewb_cdmi_getsize(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 	int ret, len;
 
 	/* Construct a HEAD command */
-	len = dewb_http_mkhead(buff, DEWB_XMIT_BUFFER_SIZE, 
+	len = srb_http_mkhead(buff, SRB_XMIT_BUFFER_SIZE, 
 			desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 
@@ -872,7 +872,7 @@ int dewb_cdmi_getsize(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 	if (len < 0) return len;
 	
 	buff[len] = 0;
-	ret = dewb_http_header_get_uint64(buff, len, "Content-Length", size);
+	ret = srb_http_header_get_uint64(buff, len, "Content-Length", size);
 	if (ret)
 		return -EIO;
 
@@ -880,51 +880,51 @@ int dewb_cdmi_getsize(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
 }
 #endif
 
-int dewb_cdmi_getsize(dewb_debug_t *dbg, struct dewb_cdmi_desc_s *desc,
+int srb_cdmi_getsize(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
 		uint64_t *size)
 {
 	char *buff = desc->xmit_buff;
 
-	enum dewb_http_statuscode code;
+	enum srb_http_statuscode code;
 	int ret, len;
 
 	/* Construct a GET (?metadata) command */
-	len = dewb_http_mkmetadata(buff, DEWB_XMIT_BUFFER_SIZE, 
+	len = srb_http_mkmetadata(buff, SRB_XMIT_BUFFER_SIZE, 
 			desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 
 	len = sock_send_receive(dbg, desc, len, 0);
 	if (len < 0) return len;
 	
-	ret = dewb_http_get_status(buff, len, &code);
+	ret = srb_http_get_status(buff, len, &code);
 	if (ret != 0)
 	{
-		DEWB_LOG_ERR(dbg->level, "Cannot get http response status.");
+		SRB_LOG_ERR(dbg->level, "Cannot get http response status.");
 		return -EIO;
 	}
-	if (dewb_http_get_status_range(code) != DEWB_HTTP_STATUSRANGE_SUCCESS)
+	if (srb_http_get_status_range(code) != SRB_HTTP_STATUSRANGE_SUCCESS)
 	{
-		DEWB_LOG_ERR(dbg->level, "Http server responded with bad status: %i", code);
-		if (code == DEWB_HTTP_STATUS_NOT_FOUND)
+		SRB_LOG_ERR(dbg->level, "Http server responded with bad status: %i", code);
+		if (code == SRB_HTTP_STATUS_NOT_FOUND)
 			return -ENODEV;
 		return -EIO;
 	}
 
 	buff[len] = 0;
-	ret = dewb_http_header_get_uint64(buff, len, "\"cdmi_size\"", size);
+	ret = srb_http_header_get_uint64(buff, len, "\"cdmi_size\"", size);
 	if (ret)
 		return -EIO;
 
 	return 0;
 }
 
-/* dewb_cdmi_putrange(desc, buff, offset, size)
+/* srb_cdmi_putrange(desc, buff, offset, size)
  *
  * sends a buffer to CDMI server through a CDMI put range at primitive
  * at specified "offset" reading "size" bytes from "buff".
  */
-int dewb_cdmi_putrange(dewb_debug_t *dbg,
-		struct dewb_cdmi_desc_s *desc,
+int srb_cdmi_putrange(srb_debug_t *dbg,
+		struct srb_cdmi_desc_s *desc,
 		uint64_t offset, int size)
 {
 	char *xmit_buff = desc->xmit_buff;
@@ -938,7 +938,7 @@ int dewb_cdmi_putrange(dewb_debug_t *dbg,
 	end   = offset + size - 1;
 
 	/* Construct a PUT request with range info */
-	ret = dewb_http_mkrange("PUT", xmit_buff, DEWB_XMIT_BUFFER_SIZE, 
+	ret = srb_http_mkrange("PUT", xmit_buff, SRB_XMIT_BUFFER_SIZE, 
 				desc->ip_addr, desc->filename, 
 				start, end);
 	if (ret <= 0) return ret;
@@ -948,19 +948,19 @@ int dewb_cdmi_putrange(dewb_debug_t *dbg,
 
 	len = sock_send_sglist_receive(dbg, desc, header_size, 0);
 	if (len < 0) {
-		DEWB_LOG_ERR(dbg->level, "ERROR sending sglist: %d", len);
+		SRB_LOG_ERR(dbg->level, "ERROR sending sglist: %d", len);
 		return len;
 	}
 
 	if (len > 512) {/* Shall not get more than that */
-		DEWB_LOG_ERR(dbg->level, "Incorrect response size: %d", len);
+		SRB_LOG_ERR(dbg->level, "Incorrect response size: %d", len);
 		ret = -EIO;
 		goto out;
 	}
 
 	if (strncmp(desc->xmit_buff, "HTTP/1.1 204 No Content",
 			strlen("HTTP/1.1 204 No Content"))) {
-			DEWB_LOG_ERR(dbg->level, "Unable to get back HTTP confirmation buffer");
+			SRB_LOG_ERR(dbg->level, "Unable to get back HTTP confirmation buffer");
 		ret = -EIO;
 		goto out;
 	}
@@ -970,13 +970,13 @@ out:
 	return ret;
 }
 
-/* dewb_cdmi_getrange(desc, start, end, buff) */
+/* srb_cdmi_getrange(desc, start, end, buff) */
 /*
  * get a buffer from th CDMI server through a CDMI get range primitive
  *
  */
-int dewb_cdmi_getrange(dewb_debug_t *dbg,
-		struct dewb_cdmi_desc_s *desc,
+int srb_cdmi_getrange(srb_debug_t *dbg,
+		struct srb_cdmi_desc_s *desc,
 		uint64_t offset, int size)
 {
 	char *xmit_buff = desc->xmit_buff;
@@ -990,7 +990,7 @@ int dewb_cdmi_getrange(dewb_debug_t *dbg,
 	end   = offset + size - 1;
 
 	/* Construct a PUT request with range info */
-	len = dewb_http_mkrange("GET", xmit_buff, DEWB_XMIT_BUFFER_SIZE, 
+	len = srb_http_mkrange("GET", xmit_buff, SRB_XMIT_BUFFER_SIZE, 
 				desc->ip_addr, desc->filename, 
 				start, end);
 	if (len <= 0) 
@@ -1000,9 +1000,9 @@ int dewb_cdmi_getrange(dewb_debug_t *dbg,
 	if (len < 0) return len;	
 
 	/* Skip header */
-	ret = dewb_http_skipheader(&xmit_buff, &len);
+	ret = srb_http_skipheader(&xmit_buff, &len);
 	if (ret) {
-		DEWB_LOG_DEBUG(dbg->level, "getrange: skipheader failed: %d", ret);
+		SRB_LOG_DEBUG(dbg->level, "getrange: skipheader failed: %d", ret);
 		ret = -EIO;
 		goto out;
 	}
@@ -1010,7 +1010,7 @@ int dewb_cdmi_getrange(dewb_debug_t *dbg,
 	// sock_send_receive makes sure to read the whole response,
 	// so we shall have the whole data.
 	if (len != size) {
-		DEWB_LOG_DEBUG(dbg->level, "getrange error: len: %d size:%d", len, size);
+		SRB_LOG_DEBUG(dbg->level, "getrange error: len: %d size:%d", len, size);
 		ret = -EIO;
 		goto out;
 	}
@@ -1027,7 +1027,7 @@ out:
 
 	return ret;
 }
-/* dewb_cdmi_sync(desc, start, end) */
+/* srb_cdmi_sync(desc, start, end) */
 /*
  * asks the CDMI server to sync from start offset to end offset
  */

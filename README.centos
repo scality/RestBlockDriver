@@ -20,10 +20,10 @@ script in order to configure and use the driver to access your CDMI Rest API.
 
 In order to install the system script, please use the following command:
 
-	# cp systemd/restbd.service /etc/systemd/system/
-	# cp systemd/restbd.conf /etc/
+	# cp systemd/srb.service /etc/systemd/system/
+	# cp systemd/srb.conf /etc/
 
-NB: Update your restbd.conf according to your CDMI condiguration:
+NB: Update your srb.conf according to your CDMI condiguration:
 ---   - set KMOD_PATH with the path where you have built the driver
       - set MIRRORS with your mirrors URL
 
@@ -35,18 +35,18 @@ service.
 
 In order to start / stop the service use the following command:
 
-	# systemctl start restbd.service
-	# systemctl stop restbd.service
+	# systemctl start srb.service
+	# systemctl stop srb.service
 
 In order to enable / disable the service at boot time, use the following command:
 
-	# systemctl enable restbd.service
-	# systemctl disable restbd.service
+	# systemctl enable srb.service
+	# systemctl disable srb.service
 
 
-Listing device used by RestBlockDriver service:
-	# systemctl list-units | grep -E '(rest|dew)'
+Listing device used by ScalityRestBlock service:
+	# systemctl list-units | grep -E '(rest|srb)'
 	UNIT                                           LOAD   ACTIVE SUB       DESCRIPTION
-	sys-devices-virtual-block-dewba-dewba1.device  loaded active plugged   /sys/devices/virtual/block/dewba/dewba1
-	sys-devices-virtual-block-dewba.device         loaded active plugged   /sys/devices/virtual/block/dewba
-	restbd.service                                 loaded active exited    Scality RestBlockDriver
+	sys-devices-virtual-block-srba-srba1.device    loaded active plugged   /sys/devices/virtual/block/srba/srba1
+	sys-devices-virtual-block-srba.device          loaded active plugged   /sys/devices/virtual/block/srba
+	srb.service                                    loaded active exited    Scality RestBlock driver

@@ -31,7 +31,7 @@ loading the module into the linux kernel.
 
 Here is how it's done:
 
-    # insmod dewblock.ko
+    # insmod srb.ko
 
 Now, the Rest Block Driver is set for use, and you only need to know how to
 control the driver to do the management tasks. To learn that, please continue
@@ -40,7 +40,7 @@ reading.
 In order to set the driver's parameters, you can add those to the loading
 command line of the driver as follows:
 
-    # insmod dewblock.ko thread_pool_size=16
+    # insmod srb.ko thread_pool_size=16
 
 The following parameters are available:
   * debug: log level for the LKM (integer number, 0 to 7: emergency,
@@ -82,7 +82,7 @@ Listing the mirrors
 To list the mirrors currently configured within the driver, you can simply
 display the contents of the mirrors file:
 
-    # cat /sys/class/dewb/mirrors
+    # cat /sys/class/srb/mirrors
 
 This file displays the list of mirrors separated by a coma, using the same
 format you would to add or remove one or more mirrors.
@@ -104,7 +104,7 @@ like in the example:
 
     # export REST_REPO1=http://127.0.0.1:443/volumes
     # export REST_REPO2=http://192.168.0.3/repository/
-    # echo "$REST_REPO1,$REST_REPO2" > /sys/class/dewb/add_mirrors
+    # echo "$REST_REPO1,$REST_REPO2" > /sys/class/srb/add_mirrors
 
 The driver will properly separate all repositories from the string you gave it,
 and add them one by one. In case of error, only the error-yielding mirror will
@@ -127,7 +127,7 @@ mirrors. Also, since the listing of mirrors outputs them this way, you could
 copy and paste part of the mirrors listing if you wished to. In the end,
 removing mirrors can be done as follows:
 
-    # echo "http://127.0.0.1:443/volumes" > /sys/class/dewb/remove_mirrors
+    # echo "http://127.0.0.1:443/volumes" > /sys/class/srb/remove_mirrors
 
 Please note that if a device is attached, you will not be able to remove the
 last mirror. You need to detach manually every device attached by the module
@@ -143,7 +143,7 @@ Creating a new volume
 To create a volume, just give the name of the file to create to the driver,
 accompanied by a byte size, such as in the following example:
 
-    # echo "filename human\_readable\_size" > /sys/class/dewb/create
+    # echo "filename human\_readable\_size" > /sys/class/srb/create
 
 The volume will be created on the storage with the requested size.
 But beware:
@@ -166,7 +166,7 @@ need. For this reason, you can actually extend it through the extend /sys
 control file. This command follows the same usage as the create command, thus
 using it is simple:
 
-    # echo "volumename human\_readable\_size" > /sys/class/dewb/extend
+    # echo "volumename human\_readable\_size" > /sys/class/srb/extend
 
 Be aware that this command can only extend a volume, meaning the size you give
 must be higher than the current size. Also, this is a supported operation
@@ -190,12 +190,12 @@ Destroying a volume means that it volume will no longer be accessible after
 a successful operation. To destroy a volume, give the driver the name of the
 file to remove from the storage as the following example shows:
 
-    # echo filename > /sys/class/dewb/destroy
+    # echo filename > /sys/class/srb/destroy
 
 The volume is then removed from storage and is no longer accessible.
 But beware:
   * The destroyed volume must exist beforehand
-  * Destroying a volume used by other drivers on other machines dewblock
+  * Destroying a volume used by other drivers on other machines srb
 can lead to errors and unexpected behaviors; this is untested.
 
 
@@ -224,7 +224,7 @@ Since you might not know from memory which volumes exist on your mirrors,
 you might want a way to list those, to attach them easily. One of the ways
 provided is to read the content of the volumes /sys file:
 
- # cat /sys/class/dewb/volumes
+ # cat /sys/class/srb/volumes
  Volume1
  Foo
  Bar
@@ -242,7 +242,7 @@ In order to attach an existing Volume file in the system, you simply need to
 write the name of the Volume to the attach control file, followed by the name
 of the device you want to appear, as the example states:
 
-    # echo VolumeName DeviceName > /sys/class/dewb/attach
+    # echo VolumeName DeviceName > /sys/class/srb/attach
 
 Then, a device named "DeviceName" is created in /dev. You can now use your
 device as you wish, be it by writing and reading data directly to it,
@@ -254,7 +254,7 @@ Detaching a device
 A device attached may be detached by writing the device's name into the detach
 control file as the example shows:
 
-    # echo DeviceName > /sys/class/dewb/detach
+    # echo DeviceName > /sys/class/srb/detach
 
 The DeviceName is the same Device Name used as the one used for Attach
 operations.
@@ -279,7 +279,7 @@ sysfs interface
 
 For each device, an entry is created in /sys/block
   * /sys/block/MySmallDevice for the volume attached as 'MySmallDevice'
-  * /sys/block/dewba for ithe volume attached as 'dewba'
+  * /sys/block/srba for ithe volume attached as 'srba'
 And so on...
 
 
@@ -289,16 +289,16 @@ Log & Debug
 Logs are enable in the Linux Kernel Module and default is set to INFO. In order
 to change the log level of the driver you can do it while loading it as follow:
 
-    # insmod dewblock.ko dewb_log=3
+    # insmod srb.ko srb_log=3
 
 The log level can also be changed using sysfs as follow:
 
-    # echo 3 > /sys/module/dewblock/parameters/debug
+    # echo 3 > /sys/module/srb/parameters/debug
 
 Each device inherit the Linux Kernel Module log level. The log level of a device
 can be changed as follow:
 
-    # echo 6 > /sys/block/dewb?/dewb\_debug
+    # echo 6 > /sys/block/srb?/srb\_debug
 
 The log level can be set from debug(7), info(6) ... to emergency (0).
 
@@ -307,15 +307,15 @@ Get information on the device
 
 The URL associated on CDMI (one mirror only):
 
-    # cat /sys/block/dewb?/dewb\_urls
+    # cat /sys/block/srb?/srb\_urls
 
 disk size:
 
-    # cat /sys/block/dewb?/dewb\_size
+    # cat /sys/block/srb?/srb\_size
 
 volume name:
 
-    # cat /sys/block/dewb?/dewb\_name
+    # cat /sys/block/srb?/srb\_name
 
 
 Tools

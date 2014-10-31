@@ -5,14 +5,14 @@
  * Copyright 1997-2000, 2008 Pavel Machek <pavel@ucw.cz>
  * Parts copyright 2001 Steven Whitehouse <steve@chygwyn.com>
  *
- * This file is part of RestBlockDriver.
+ * This file is part of ScalityRestBlock.
  *
- * RestBlockDriver is free software: you can redistribute it and/or modify
+ * ScalityRestBlock is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * RestBlockDriver is distributed in the hope that it will be useful,
+ * ScalityRestBlock is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
@@ -28,7 +28,7 @@
 #include <linux/blkdev.h>
 #include <linux/string.h>
 
-#include "dewb.h"
+#include "srb.h"
 
 
 /* Function for parsing params and reading humand readable size format
@@ -88,7 +88,7 @@ int human_to_bytes(char *size_str, unsigned long long *size)
 	/* calculate size */
 	ret = kstrtoull(size_str, 10, size);
 	if (ret != 0) {
-		DEWB_LOG_ERR(dewb_log, "Invalid volume size %s (%llu) (ret: %d)", size_str, *size, ret);
+		SRB_LOG_ERR(srb_log, "Invalid volume size %s (%llu) (ret: %d)", size_str, *size, ret);
 		return -EINVAL;
 	}
 	*size = *size * coef;
@@ -97,18 +97,18 @@ int human_to_bytes(char *size_str, unsigned long long *size)
 }
 
 /********************************************************************
- * /sys/block/dewb?/
- *                   dewb_debug	 Sets verbosity
- *                   dewb_urls	 Gets device CDMI url
- *                   dewb_name   Gets device's on-storage filename
- *		     dewb_size   Gets device size
+ * /sys/block/srb?/
+ *                   srb_debug	 Sets verbosity
+ *                   srb_urls	 Gets device CDMI url
+ *                   srb_name   Gets device's on-storage filename
+ *		     srb_size   Gets device size
  *******************************************************************/
 static ssize_t attr_debug_store(struct device *dv, 
 				struct device_attribute *attr, 
 				const char *buff, size_t count)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
-	struct dewb_device_s *dev = disk->private_data;
+	struct srb_device_s *dev = disk->private_data;
         char *end;
         long new;
 	int val;
@@ -119,17 +119,17 @@ static ssize_t attr_debug_store(struct device *dv,
 	 */
 	new = simple_strtol(buff, &end, 0);
 	if (end == buff || new > INT_MAX || new < INT_MIN) {
-		DEWB_LOG_WARN(dev->debug.level, "attr_debug_store: Invalid debug value");
+		SRB_LOG_WARN(dev->debug.level, "attr_debug_store: Invalid debug value");
 		return -EINVAL;
 	}
 	val = (int) new;
 	if (val >= 0 && val <= 7) {
 		dev->debug.level = val;
-		DEWB_LOG_DEBUG(dev->debug.level, "attr_debug_store: Setting Log level to %d for device %s", 
+		SRB_LOG_DEBUG(dev->debug.level, "attr_debug_store: Setting Log level to %d for device %s", 
 			val, dev->name);
 	}
 	else
-		DEWB_LOG_WARN(dev->debug.level, "attr_debug_store: Invalid debug value (%d) for device %s in sysfs", 
+		SRB_LOG_WARN(dev->debug.level, "attr_debug_store: Invalid debug value (%d) for device %s in sysfs", 
 			val, dev->name);
 
 	return count;
@@ -139,7 +139,7 @@ static ssize_t attr_debug_show(struct device *dv,
 			struct device_attribute *attr, char *buff)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
-	struct dewb_device_s *dev = disk->private_data;
+	struct srb_device_s *dev = disk->private_data;
 	
 	snprintf(buff, PAGE_SIZE, "%d\n", dev->debug.level);
 
@@ -151,7 +151,7 @@ static ssize_t attr_urls_show(struct device *dv,
 			struct device_attribute *attr, char *buff)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
-	struct dewb_device_s *dev = disk->private_data;
+	struct srb_device_s *dev = disk->private_data;
 	
 	//snprintf(buff, PAGE_SIZE, "%s\n", dev->thread_cdmi_desc[0].url);
 	snprintf(buff, PAGE_SIZE, "%s\n", dev->thread_cdmi_desc[0]->url);
@@ -163,7 +163,7 @@ static ssize_t attr_disk_name_show(struct device *dv,
 				   struct device_attribute *attr, char *buff)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
-	struct dewb_device_s *dev = disk->private_data;
+	struct srb_device_s *dev = disk->private_data;
 
 	//snprintf(buff, PAGE_SIZE, "%s\n", kbasename(dev->thread_cdmi_desc[0].url));
 	snprintf(buff, PAGE_SIZE, "%s\n", kbasename(dev->thread_cdmi_desc[0]->url));
@@ -175,38 +175,38 @@ static ssize_t attr_disk_size_show(struct device *dv,
 				struct device_attribute *attr, char *buff)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
-	struct dewb_device_s *dev = disk->private_data;
+	struct srb_device_s *dev = disk->private_data;
 	
 	snprintf(buff, PAGE_SIZE, "%llu\n", dev->disk_size);
 
 	return strlen(buff);
 }
 
-static DEVICE_ATTR(dewb_debug, S_IWUSR | S_IRUGO, &attr_debug_show, &attr_debug_store);
-static DEVICE_ATTR(dewb_urls, S_IRUGO, &attr_urls_show, NULL);
-static DEVICE_ATTR(dewb_name, S_IRUGO, &attr_disk_name_show, NULL);
-static DEVICE_ATTR(dewb_size, S_IRUGO, &attr_disk_size_show, NULL);
+static DEVICE_ATTR(srb_debug, S_IWUSR | S_IRUGO, &attr_debug_show, &attr_debug_store);
+static DEVICE_ATTR(srb_urls, S_IRUGO, &attr_urls_show, NULL);
+static DEVICE_ATTR(srb_name, S_IRUGO, &attr_disk_name_show, NULL);
+static DEVICE_ATTR(srb_size, S_IRUGO, &attr_disk_size_show, NULL);
 
 
 /************************************************************************
- * /sys/class/dewp/
+ * /sys/class/srb/
  *                   create     Create the volume's file on the storage
  *                   destroy    Removes the volume's file on the storage
- *                   attach	Attach a volume as a new dewp device
+ *                   attach	Attach a volume as a new srb device
  *                   detach	Detaches (remove from the system)
  *				the requested volume (or device)
  ***********************************************************************/
 
-static struct class *class_dewb;		/* /sys/class/dewp */
+static struct class *class_srb;		/* /sys/class/srb */
 
 
-static void class_dewb_release(struct class *cls)
+static void class_srb_release(struct class *cls)
 {
 	if (cls != NULL)
 		kfree(cls);
 }
 
-static ssize_t class_dewb_create_show(struct class *c, struct class_attribute *attr,
+static ssize_t class_srb_create_show(struct class *c, struct class_attribute *attr,
 				      char *buf)
 {
 	(void)c;
@@ -217,12 +217,12 @@ static ssize_t class_dewb_create_show(struct class *c, struct class_attribute *a
 	return strlen(buf);
 }
 
-static ssize_t class_dewb_create_store(struct class *c,
+static ssize_t class_srb_create_store(struct class *c,
 				struct class_attribute *attr,
 				const char *buf, size_t count)
 {
 	ssize_t ret = 0;
-	//char filename[DEWB_URL_SIZE + 1];
+	//char filename[SRB_URL_SIZE + 1];
 	//const char *tmp = buf;
 	unsigned long long size = 0;
 	size_t len = 0;
@@ -233,7 +233,7 @@ static ssize_t class_dewb_create_store(struct class *c,
 	(void)c;
 	(void)attr;
 
-	DEWB_LOG_INFO(dewb_log, "Creating volume with params: %s (%lu)", buf, count);
+	SRB_LOG_INFO(srb_log, "Creating volume with params: %s (%lu)", buf, count);
 
 	/* TODO: split the buff into two string array with a thread-safe function strtok_r
 	 *       - use a temporary buffer
@@ -241,21 +241,21 @@ static ssize_t class_dewb_create_store(struct class *c,
 	 */
 	tmp_buf = NULL;
 	if (count >= 256) {
-		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
+		SRB_LOG_ERR(srb_log, "Invalid parameter (too long: %lu)", count);
 		ret = -EINVAL;
 		goto out;
 	}
 	
 	tmp_buf = kmalloc(count + 1, GFP_KERNEL);
 	if (NULL == tmp_buf) {
-		DEWB_LOG_ERR(dewb_log, "Unable to allocate memory for parameters");
+		SRB_LOG_ERR(srb_log, "Unable to allocate memory for parameters");
 		ret = -ENOMEM;
 		goto out;
 	}
 	memset(tmp_buf, 0, count + 1);
 	memcpy(tmp_buf, buf, count);
 
-	//printk(KERN_DEBUG "DEBUG: class_dewb_create_store: buff (%lu:%lu): '%c':%x", count, sizeof(buf), buf[count - 1], buf[count - 1]);
+	//printk(KERN_DEBUG "DEBUG: class_srb_create_store: buff (%lu:%lu): '%c':%x", count, sizeof(buf), buf[count - 1], buf[count - 1]);
 
 	/* remove CR or LF if any and end string */
 	if (tmp_buf[count - 1] == '\n' || tmp_buf[count - 1] == '\r')
@@ -266,22 +266,22 @@ static ssize_t class_dewb_create_store(struct class *c,
 	parse_params(tmp_buf, delim, params, 2, count);
 	/* sanity check */
 	len = strlen(params[0]);
-	if (len >= DEWB_URL_SIZE) {
-		DEWB_LOG_ERR(dewb_log, "Invalid volume name (too long: %lu)", len);
+	if (len >= SRB_URL_SIZE) {
+		SRB_LOG_ERR(srb_log, "Invalid volume name (too long: %lu)", len);
 		ret = -EINVAL;
 		goto out;
 	}
 	ret = human_to_bytes(params[1], &size);
 	if (ret != 0) {
-		DEWB_LOG_ERR(dewb_log, "Invalid volume size: %s", params[1]);
+		SRB_LOG_ERR(srb_log, "Invalid volume size: %s", params[1]);
 		goto out;
 	}
 
-	DEWB_LOG_INFO(dewb_log, "Creating volume %s of size %llu (bytes)", params[0], size);
+	SRB_LOG_INFO(srb_log, "Creating volume %s of size %llu (bytes)", params[0], size);
 
-	ret = dewb_device_create(params[0], size);
+	ret = srb_device_create(params[0], size);
 	if (ret != 0) {
-		DEWB_LOG_ERR(dewb_log, "Failed to create device: %lu", ret);
+		SRB_LOG_ERR(srb_log, "Failed to create device: %lu", ret);
 		goto out;
 	}
 
@@ -296,7 +296,7 @@ out:
 	return ret;
 }
 
-static ssize_t class_dewb_extend_show(struct class *c, struct class_attribute *attr,
+static ssize_t class_srb_extend_show(struct class *c, struct class_attribute *attr,
 				      char *buf)
 {
 	(void)c;
@@ -309,12 +309,12 @@ static ssize_t class_dewb_extend_show(struct class *c, struct class_attribute *a
 	return strlen(buf);
 }
 
-static ssize_t class_dewb_extend_store(struct class *c,
+static ssize_t class_srb_extend_store(struct class *c,
 				       struct class_attribute *attr,
 				       const char *buf, size_t count)
 {
 	ssize_t ret = 0;
-	//char filename[DEWB_URL_SIZE + 1];
+	//char filename[SRB_URL_SIZE + 1];
 	//const char *tmp = buf;
 	unsigned long long size = 0;
 	size_t len = 0;
@@ -325,18 +325,18 @@ static ssize_t class_dewb_extend_store(struct class *c,
 	(void)c;
 	(void)attr;
 
-	DEWB_LOG_INFO(dewb_log, "Extending volume with params: %s (%lu)", buf, count);
+	SRB_LOG_INFO(srb_log, "Extending volume with params: %s (%lu)", buf, count);
 
 	tmp_buf = NULL;
 	if (count >= 256) {
-		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
+		SRB_LOG_ERR(srb_log, "Invalid parameter (too long: %lu)", count);
 		ret = -EINVAL;
 		goto out;
 	}
 	
 	tmp_buf = kmalloc(count, GFP_KERNEL);
 	if (NULL == tmp_buf) {
-		DEWB_LOG_ERR(dewb_log, "Unable to allocate memory for parameters");
+		SRB_LOG_ERR(srb_log, "Unable to allocate memory for parameters");
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -352,20 +352,20 @@ static ssize_t class_dewb_extend_store(struct class *c,
 	parse_params(tmp_buf, delim, params, 2, count);
 	/* sanity check */
 	len = strlen(params[0]);
-	if (len >= DEWB_URL_SIZE) {
-		DEWB_LOG_ERR(dewb_log, "Invalid volume name (too long: %lu)", len);
+	if (len >= SRB_URL_SIZE) {
+		SRB_LOG_ERR(srb_log, "Invalid volume name (too long: %lu)", len);
 		ret = -EINVAL;
 		goto out;
 	}
 	ret = human_to_bytes(params[1], &size);
 	if (ret != 0) {
-		DEWB_LOG_ERR(dewb_log, "Invalid volume size: %s", params[1]);
+		SRB_LOG_ERR(srb_log, "Invalid volume size: %s", params[1]);
 		goto out;
 	}
 
-	DEWB_LOG_INFO(dewb_log, "Extending volume %s of size %llu (bytes)", params[0], size);
+	SRB_LOG_INFO(srb_log, "Extending volume %s of size %llu (bytes)", params[0], size);
 
-	ret = dewb_device_extend(params[0], size);
+	ret = srb_device_extend(params[0], size);
 	if (ret != 0) {
 		goto out;
 	}
@@ -381,7 +381,7 @@ out:
 	return ret;
 }
 
-static ssize_t class_dewb_destroy_show(struct class *c, struct class_attribute *attr,
+static ssize_t class_srb_destroy_show(struct class *c, struct class_attribute *attr,
 				       char *buf)
 {
 	(void)c;
@@ -392,19 +392,19 @@ static ssize_t class_dewb_destroy_show(struct class *c, struct class_attribute *
 	return strlen(buf);
 }
 
-static ssize_t class_dewb_destroy_store(struct class *c,
+static ssize_t class_srb_destroy_store(struct class *c,
 					struct class_attribute *attr,
 					const char *buf, size_t count)
 {
 	ssize_t ret = 0;
-	char filename[DEWB_URL_SIZE + 1];
+	char filename[SRB_URL_SIZE + 1];
 
 	(void)c;
 	(void)attr;
 
 	/* Sanity check URL size */
-	if ((count == 0) || (count >= DEWB_URL_SIZE)) {
-		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
+	if ((count == 0) || (count >= SRB_URL_SIZE)) {
+		SRB_LOG_ERR(srb_log, "Invalid parameter (too long: %lu)", count);
 		ret = -EINVAL;
 		goto out;
 	}
@@ -416,8 +416,8 @@ static ssize_t class_dewb_destroy_store(struct class *c,
 	else
 		filename[count] = 0;
 
-	DEWB_LOG_INFO(dewb_log, "Destroying volume '%s'", filename);
-	ret = dewb_device_destroy(filename);
+	SRB_LOG_INFO(srb_log, "Destroying volume '%s'", filename);
+	ret = srb_device_destroy(filename);
 	if (ret != 0) {
 		goto out;
 	}
@@ -428,7 +428,7 @@ out:
 	return ret;
 }
 
-static ssize_t class_dewb_attach_show(struct class *c, struct class_attribute *attr,
+static ssize_t class_srb_attach_show(struct class *c, struct class_attribute *attr,
 				      char *buf)
 {
 	(void)c;
@@ -439,7 +439,7 @@ static ssize_t class_dewb_attach_show(struct class *c, struct class_attribute *a
 	return strlen(buf);
 }
 
-static ssize_t class_dewb_attach_store(struct class *c,
+static ssize_t class_srb_attach_store(struct class *c,
 			struct class_attribute *attr,
 			const char *buf, size_t count)
 {
@@ -454,7 +454,7 @@ static ssize_t class_dewb_attach_store(struct class *c,
 
 	tmp_buf = kmalloc(count + 1, GFP_KERNEL);
 	if (NULL == tmp_buf) {
-		DEWB_LOG_ERR(dewb_log, "Unable to allocate memory for parameters");
+		SRB_LOG_ERR(srb_log, "Unable to allocate memory for parameters");
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -468,15 +468,15 @@ static ssize_t class_dewb_attach_store(struct class *c,
 
 	ret = parse_params(tmp_buf, delim, params, 2, count);
 	if (ret != 2) {
-		DEWB_LOG_ERR(dewb_log, "Invalid parameters: %i instead of 2",
+		SRB_LOG_ERR(srb_log, "Invalid parameters: %i instead of 2",
 			     ret);
 		ret = -EINVAL;
 		goto out;
 	}
 
 	/* Sanity check params sizes */
-	if (NULL == *filename || strlen(*filename) > DEWB_URL_SIZE) {
-		DEWB_LOG_ERR(dewb_log, "Invalid parameter #1: "
+	if (NULL == *filename || strlen(*filename) > SRB_URL_SIZE) {
+		SRB_LOG_ERR(srb_log, "Invalid parameter #1: "
 			     "'%s'(%lu characters)", *filename,
 			     strlen(*filename));
 		ret = -EINVAL;
@@ -484,16 +484,16 @@ static ssize_t class_dewb_attach_store(struct class *c,
 	}
 
 	if (NULL == *devname || strlen(*devname) > DISK_NAME_LEN) {
-		DEWB_LOG_ERR(dewb_log, "Invalid parameter #2: "
+		SRB_LOG_ERR(srb_log, "Invalid parameter #2: "
 			     "'%s'(%lu characters)", *devname,
 			     strlen(*devname));
 		ret = -EINVAL;
 		goto out;
 	}
 
-	DEWB_LOG_INFO(dewb_log, "Attaching volume '%s' as device '%s'",
+	SRB_LOG_INFO(srb_log, "Attaching volume '%s' as device '%s'",
 		      *filename, *devname);
-	ret = dewb_device_attach(*filename, *devname);
+	ret = srb_device_attach(*filename, *devname);
 	if (ret != 0)
 		goto out;
 
@@ -505,7 +505,7 @@ out:
 	return ret;
 }
 
-static ssize_t class_dewb_detach_show(struct class *c, struct class_attribute *attr,
+static ssize_t class_srb_detach_show(struct class *c, struct class_attribute *attr,
 				      char *buf)
 {
 	(void)c;
@@ -516,7 +516,7 @@ static ssize_t class_dewb_detach_show(struct class *c, struct class_attribute *a
 	return strlen(buf);
 }
 
-static ssize_t class_dewb_detach_store(struct class *c,
+static ssize_t class_srb_detach_store(struct class *c,
 				struct class_attribute *attr,
 				const char *buf,
 				size_t count)
@@ -526,7 +526,7 @@ static ssize_t class_dewb_detach_store(struct class *c,
 
 	/* Sanity check device name size */
 	if ((count == 0) || (count >= sizeof(devname))) {
-		DEWB_LOG_ERR(dewb_log, "Invalid parameter (too long: %lu)", count);
+		SRB_LOG_ERR(srb_log, "Invalid parameter (too long: %lu)", count);
 		return -EINVAL;
 	}
 
@@ -536,15 +536,15 @@ static ssize_t class_dewb_detach_store(struct class *c,
 	else
 		devname[count] = 0;
 
-	DEWB_LOG_INFO(dewb_log, "Detaching device %s", devname);
-	ret = dewb_device_detach(devname);
+	SRB_LOG_INFO(srb_log, "Detaching device %s", devname);
+	ret = srb_device_detach(devname);
 	if (ret == 0)
 		return count;
 
 	return ret;
 }
 
-static ssize_t class_dewb_addmirror_show(struct class *c, struct class_attribute *attr,
+static ssize_t class_srb_addmirror_show(struct class *c, struct class_attribute *attr,
 					 char *buf)
 {
 	(void)c;
@@ -555,13 +555,13 @@ static ssize_t class_dewb_addmirror_show(struct class *c, struct class_attribute
 	return strlen(buf);
 }
 
-static ssize_t class_dewb_addmirror_store(struct class *c,
+static ssize_t class_srb_addmirror_store(struct class *c,
 					  struct class_attribute *attr,
 					  const char *buf,
 					  size_t count)
 {
 	ssize_t		ret = 0;
-	char		url[DEWB_URL_SIZE+1];
+	char		url[SRB_URL_SIZE+1];
 	const char	*tmp = buf;
 	const char	*tmpend = tmp;
 	int		errcount = 0;
@@ -581,8 +581,8 @@ static ssize_t class_dewb_addmirror_store(struct class *c,
 			while (*tmpend && *tmpend != '\n')
 				tmpend++;
 
-			if ((tmpend - tmp) > DEWB_URL_SIZE) {
-				DEWB_LOG_ERR(dewb_log, "Url too big: '%s'", tmp);
+			if ((tmpend - tmp) > SRB_URL_SIZE) {
+				SRB_LOG_ERR(srb_log, "Url too big: '%s'", tmp);
 				ret = -EINVAL;
 				goto end;
 			}
@@ -590,9 +590,9 @@ static ssize_t class_dewb_addmirror_store(struct class *c,
 			url[(tmpend - tmp)] = 0;
 			tmpend = NULL;
 		}
-		url[DEWB_URL_SIZE] = 0;
+		url[SRB_URL_SIZE] = 0;
 
-		ret = dewb_mirror_add(url);
+		ret = srb_mirror_add(url);
 		if (ret < 0)
 			errcount += 1;
 
@@ -601,7 +601,7 @@ static ssize_t class_dewb_addmirror_store(struct class *c,
 
 	ret = count;
 	if (errcount > 0) {
-		DEWB_LOG_ERR(dewb_log, "Could not add every mirror to driver.");
+		SRB_LOG_ERR(srb_log, "Could not add every mirror to driver.");
 		ret = -EINVAL;
 	}
 
@@ -609,7 +609,7 @@ end:
 	return ret;
 }
 
-static ssize_t class_dewb_removemirror_show(struct class *c, struct class_attribute *attr,
+static ssize_t class_srb_removemirror_show(struct class *c, struct class_attribute *attr,
 					    char *buf)
 {
 	(void)c;
@@ -620,13 +620,13 @@ static ssize_t class_dewb_removemirror_show(struct class *c, struct class_attrib
 	return strlen(buf);
 }
 
-static ssize_t class_dewb_removemirror_store(struct class *c,
+static ssize_t class_srb_removemirror_store(struct class *c,
 					     struct class_attribute *attr,
 					     const char *buf,
 					     size_t count)
 {
 	ssize_t		ret = 0;
-	char		url[DEWB_URL_SIZE];
+	char		url[SRB_URL_SIZE];
 	const char	*tmp = buf;
 	const char	*tmpend = tmp;
 
@@ -648,9 +648,9 @@ static ssize_t class_dewb_removemirror_store(struct class *c,
 			while (*tmpend && *tmpend != '\n')
 				tmpend++;
 
-			if ((tmpend - tmp) > DEWB_URL_SIZE)
+			if ((tmpend - tmp) > SRB_URL_SIZE)
 			{
-				DEWB_LOG_ERR(dewb_log, "Url too big: '%s'", tmp);
+				SRB_LOG_ERR(srb_log, "Url too big: '%s'", tmp);
 				ret = -EINVAL;
 				goto end;
 			}
@@ -659,7 +659,7 @@ static ssize_t class_dewb_removemirror_store(struct class *c,
 			tmpend = NULL;
 		}
 
-		ret = dewb_mirror_remove(url);
+		ret = srb_mirror_remove(url);
 		if (ret < 0)
 		{
 			goto end;
@@ -675,7 +675,7 @@ end:
 	return ret;
 }
 
-static ssize_t class_dewb_mirrors_show(struct class *c, struct class_attribute *attr,
+static ssize_t class_srb_mirrors_show(struct class *c, struct class_attribute *attr,
 				       char *buf)
 {
 	ssize_t	ret = 0;
@@ -683,12 +683,12 @@ static ssize_t class_dewb_mirrors_show(struct class *c, struct class_attribute *
 	(void)c;
 	(void)attr;
 
-	ret = dewb_mirrors_dump(buf, PAGE_SIZE);
+	ret = srb_mirrors_dump(buf, PAGE_SIZE);
 
 	return ret;
 }
 
-static ssize_t class_dewb_volumes_show(struct class *c, struct class_attribute *attr,
+static ssize_t class_srb_volumes_show(struct class *c, struct class_attribute *attr,
 				       char *buf)
 {
 	ssize_t	ret = 0;
@@ -696,70 +696,70 @@ static ssize_t class_dewb_volumes_show(struct class *c, struct class_attribute *
 	(void)c;
 	(void)attr;
 
-	ret = dewb_volumes_dump(buf, PAGE_SIZE);
+	ret = srb_volumes_dump(buf, PAGE_SIZE);
 
 	return ret;
 }
 
 
-void dewb_sysfs_device_init(dewb_device_t *dev)
+void srb_sysfs_device_init(srb_device_t *dev)
 {
-	device_create_file(disk_to_dev(dev->disk), &dev_attr_dewb_debug);
-	device_create_file(disk_to_dev(dev->disk), &dev_attr_dewb_urls);
-	device_create_file(disk_to_dev(dev->disk), &dev_attr_dewb_name);
-	device_create_file(disk_to_dev(dev->disk), &dev_attr_dewb_size);
+	device_create_file(disk_to_dev(dev->disk), &dev_attr_srb_debug);
+	device_create_file(disk_to_dev(dev->disk), &dev_attr_srb_urls);
+	device_create_file(disk_to_dev(dev->disk), &dev_attr_srb_name);
+	device_create_file(disk_to_dev(dev->disk), &dev_attr_srb_size);
 }
 
-static struct class_attribute class_dewb_attrs[] = {
-	__ATTR(attach,		0600, class_dewb_attach_show, class_dewb_attach_store),
-	__ATTR(detach,		0600, class_dewb_detach_show, class_dewb_detach_store),
-	__ATTR(create,		0600, class_dewb_create_show, class_dewb_create_store),
-	__ATTR(extend,		0600, class_dewb_extend_show, class_dewb_extend_store),
-	__ATTR(destroy,		0600, class_dewb_destroy_show, class_dewb_destroy_store),
-	__ATTR(add_mirrors,	0600, class_dewb_addmirror_show, class_dewb_addmirror_store),
-	__ATTR(remove_mirrors,	0600, class_dewb_removemirror_show, class_dewb_removemirror_store),
-	__ATTR(mirrors,		0400, class_dewb_mirrors_show, NULL),
-	__ATTR(volumes,		0400, class_dewb_volumes_show, NULL),
+static struct class_attribute class_srb_attrs[] = {
+	__ATTR(attach,		0600, class_srb_attach_show, class_srb_attach_store),
+	__ATTR(detach,		0600, class_srb_detach_show, class_srb_detach_store),
+	__ATTR(create,		0600, class_srb_create_show, class_srb_create_store),
+	__ATTR(extend,		0600, class_srb_extend_show, class_srb_extend_store),
+	__ATTR(destroy,		0600, class_srb_destroy_show, class_srb_destroy_store),
+	__ATTR(add_mirrors,	0600, class_srb_addmirror_show, class_srb_addmirror_store),
+	__ATTR(remove_mirrors,	0600, class_srb_removemirror_show, class_srb_removemirror_store),
+	__ATTR(mirrors,		0400, class_srb_mirrors_show, NULL),
+	__ATTR(volumes,		0400, class_srb_volumes_show, NULL),
 	__ATTR_NULL
 };
 
-int dewb_sysfs_init(void)
+int srb_sysfs_init(void)
 {
 	int ret = 0;
 
 	/*
 	 * create control files in sysfs
-	 * /sys/class/dewb/...
+	 * /sys/class/srb/...
 	 */
 	/* TODO: check for class_create() from device.h
 	 */
-	class_dewb = kzalloc(sizeof(*class_dewb), GFP_KERNEL);
-	if (!class_dewb) {
-		DEWB_LOG_CRIT(dewb_log, "Failed to allocate memory for sysfs class registration");
+	class_srb = kzalloc(sizeof(*class_srb), GFP_KERNEL);
+	if (!class_srb) {
+		SRB_LOG_CRIT(srb_log, "Failed to allocate memory for sysfs class registration");
 		return -ENOMEM;
 	}
-	class_dewb->name	  = DEV_NAME;
-	class_dewb->owner	  = THIS_MODULE;
-	class_dewb->class_release = class_dewb_release;
-	class_dewb->class_attrs   = class_dewb_attrs;
+	class_srb->name	  = DEV_NAME;
+	class_srb->owner	  = THIS_MODULE;
+	class_srb->class_release = class_srb_release;
+	class_srb->class_attrs   = class_srb_attrs;
 
-	ret = class_register(class_dewb);
+	ret = class_register(class_srb);
 	if (ret) {
-		if (class_dewb != NULL)
-			kfree(class_dewb);
-		class_dewb = NULL;
-		DEWB_LOG_CRIT(dewb_log, "Failed to create class dewb");
+		if (class_srb != NULL)
+			kfree(class_srb);
+		class_srb = NULL;
+		SRB_LOG_CRIT(srb_log, "Failed to create class srb");
 		return ret;
 	}
 
 	return 0;
 }
 
-void dewb_sysfs_cleanup(void)
+void srb_sysfs_cleanup(void)
 {
 	/* TODO: check for class_unregister from device.h
 	 */
-	if (class_dewb)
-		class_destroy(class_dewb);
-	class_dewb = NULL;
+	if (class_srb)
+		class_destroy(class_srb);
+	class_srb = NULL;
 }

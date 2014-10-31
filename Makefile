@@ -1,11 +1,10 @@
-TARGET := dewblock
+TARGET := srb
 
-dewblock-objs := dewb.o dewb_sysfs.o dewb_cdmi.o dewb_http.o jsmn/jsmn.o
+srb-objs := srb_driver.o srb_sysfs.o srb_cdmi.o srb_http.o jsmn/jsmn.o
 obj-m := $(TARGET).o
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 
-#ccflags-y += -DJSMN_PARENT_LINKS
 ccflags-y += -g3 -Wunused -Wuninitialized -O2 -Wall -Werror -Warray-bounds -D_REENTRANT -DJSMN_PARENT_LINKS
 
 all:
