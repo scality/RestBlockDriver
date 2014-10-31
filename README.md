@@ -15,12 +15,13 @@ github's issue tracker; as well as providing patches through pull requests.
 INSTRUCTIONS
 =============
 
-Prerequisites
+Supported OS
 ---------
 
-Ubuntu 12.04.4 LTS or CentOS 7 system supported
+Ubuntu 12.04.4 LTS
+CentOS 7 system
 
-Minimal Linux kernel version: v3.10
+Minimum Linux kernel version: v3.10
 
 Installing the driver
 ---------------------
@@ -50,14 +51,14 @@ The following parameters are available:
   * mirror_conn_timeout: timeout for connecting to a mirror
   * thread_pool_size: size of the thread pool of each device
 
-Volume provisionning
+Volume Provisioning
 ====================
 
 Currently, the driver does not yet support failover between multiple mirrors
 providing the same repository of volumes, but it is nonetheless a feature that
 we are aiming for. For this reason, we chose to provide a facility to manage
 the mirrors the driver is associated to, and then the usual operations will
-operate one one of those mirrors.
+operate on one of those mirrors.
 
 For this reason we provide you with three /sys files controlling the mirrors:
  * mirrors: allows listing the mirrors currently available/configured
@@ -98,8 +99,8 @@ In essence, a volume repository URL would look like this:
 
     http://<ip>[:<port>]/<path>
 
-Thus, to concatenate the multiples mirror urls, you can add them all at once like in
-the example:
+Thus, to concatenate the multiples mirror urls, you can add them all at once
+like in the example:
 
     # export REST_REPO1=http://127.0.0.1:443/volumes
     # export REST_REPO2=http://192.168.0.3/repository/
@@ -114,8 +115,8 @@ listing the mirrors if you cannot add all your mirrors.
 Be careful, though:
  * Every mirror must point to the same volume repository. Doing otherwise is
 an unsupported use, and behavior is undefined and untested
- * /!\ Currently, the failover not being supported, not all mirrors might
-be actually used.
+ * /!\ Currently, the failover not being supported, not all of the mirrors may
+actually be used.
 
 
 Removing mirrors
@@ -168,7 +169,7 @@ using it is simple:
     # echo "volumename human\_readable\_size" > /sys/class/dewb/extend
 
 Be aware that this command can only extend a volume, meaning the size you give
-there must be higher than the current size. Also, this is a supported operation
+must be higher than the current size. Also, this is a supported operation
 on an attached volume, though any file-system formatted onto the volume should
 be extended to the new volume's size manually since most of the filesystems
 don't support flexible partition or volume extension (unless you are using LVM
@@ -179,7 +180,7 @@ system without any additional administrative task. For instance, displaying the
 contents of the file /proc/partitions will show you the updated size of the
 volume.
 
-Note that the humand readable size format of the extend command follows the
+Note that the human readable size format of the extend command follows the
 same rules as that of the create command.
 
 Destruction of an existing volume
@@ -204,13 +205,13 @@ Attaching and Detaching devices
 For multiple reasons, the driver does not attach automatically the devices when
 adding a mirror or creating a new volume. Those reasons include:
   * automatization does not always gain from having generated device names
-  * it's sometimes more a pain to synchronize with a generated name than define
-it yourself
+  * it's sometimes difficult to synchronize with a generated name than defining
+a name yourself
 
 For those reason, you need to attach the volumes manually to the system, using
 the three following management files are available:
  * volumes: Reading the file lists the volumes available on the mirrors
- * attach: Attaches an already provisionned volume as a device
+ * attach: Attaches an already provisioned volume as a device
  * detach: Detaches an attached device from the system
 (does not delete the volume)
 
@@ -327,7 +328,7 @@ In the playground directory, you will find a minimalistic REST server written
 in python that will allow you to try out the features of the Scality Rest Block
 Driver. It was written to support Scality's REST protocol's mandatory semantics.
 
-The Playground Server uses the filesystem to store its data, so using it too
+The Playground Server uses the filesystem to store its data; using it
 extensively might fill your disk up. By default, the server stores the volumes
 in the 'playground\_data' directory, within the directory you started the
 server from; and listens on the port 80 (meaning that you might have to start
@@ -335,10 +336,10 @@ it as root). By using the options '--port' and '--datapath', you can change
 either the port it listens on, or the directory where the volumes are stored.
 
 Please keep in mind that as it is a minimal server script, it is not designed
-for performance, but for functional testing mostly.
+for performance, but for functional testing.
 
 
-Remains to be done :
+Remaining Tasks :
 --------------------
 
   * Fault tolerance when more server (reset or timeout).
