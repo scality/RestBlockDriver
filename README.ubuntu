@@ -4,8 +4,8 @@
 INTRODUCTION
 ============
 
-This Linux Kernel Driver can be installed under Ubuntu 14 LTS and upper release 
-with Linux Kernel greater than v3.8.
+This Linux Kernel Driver can be installed on Ubuntu 14 LTS and greater releases
+with Linux Kernel v3.10 and greater.
 
 
 Installing the driver with a service

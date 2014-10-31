@@ -18,7 +18,7 @@ INSTRUCTIONS
 Supported OS
 ---------
 
-Ubuntu 12.04.4 LTS
+Ubuntu 14.04.4 LTS
 CentOS 7 system
 
 Minimum Linux kernel version: v3.10
@@ -342,8 +342,8 @@ for performance, but for functional testing.
 Remaining Tasks :
 --------------------
 
-  * Fault tolerance when more server (reset or timeout).
-  * Optimize sector sizes.
-  * Put the device in non-rotational
+  * Fault tolerance when more servers are available (reset or timeout).
+  * Optimize sector sizes
+  * Flag the device as non-rotational
   * Support DKMS
   * Rollback if connection lost

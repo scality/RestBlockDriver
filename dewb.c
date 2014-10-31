@@ -568,13 +568,8 @@ static int dewb_open(struct block_device *bdev, fmode_t mode)
 
 /*
  * After linux kernel v3.10, this function stops returning anything
- * (becomes void). To avoid supporting too many things, just keep it int
- * and ignore th associated warning.
+ * (becomes void). For simplicity, we currently don't support earlier kernels.
  */
-/* XXX: No return value expected
- *      Fix compilation warning: initialization from incompatible pointer type
- */
-//static int dewb_release(struct gendisk *disk, fmode_t mode)
 static void dewb_release(struct gendisk *disk, fmode_t mode)
 {
 	dewb_device_t *dev;
@@ -586,8 +581,6 @@ static void dewb_release(struct gendisk *disk, fmode_t mode)
 	spin_lock(&devtab_lock);
 	dev->users--;
 	spin_unlock(&devtab_lock);
-
-	//return 0;
 }
 
 static const struct block_device_operations dewb_fops =
