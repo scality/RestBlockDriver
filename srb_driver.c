@@ -1,9 +1,5 @@
 /*
- * Copyright (C) 2014 SCALITY SA. All rights reserved.
- * http://www.scality.com
- * Copyright (c) 2010 Serge A. Zaitsev
- * Copyright 1997-2000, 2008 Pavel Machek <pavel@ucw.cz>
- * Parts copyright 2001 Steven Whitehouse <steve@chygwyn.com>
+ * Copyright (C) 2014 SCALITY SA - http://www.scality.com
  *
  * This file is part of ScalityRestBlock.
  *
@@ -18,7 +14,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ * along with ScalityRestBlock.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
