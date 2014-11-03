@@ -37,7 +37,7 @@
 
 /* Unix device constants */
 #define DEV_NAME		"srb"
-#define DEV_REL_VERSION		"0.6.0"		// Set version of srb LKM
+#define DEV_REL_VERSION		"0.6.1"		// Set version of srb LKM
 #define DEV_MINORS		256
 #define DEV_DEFAULT_DISKSIZE	(50 * MB)
 #define DEV_MAX			64
