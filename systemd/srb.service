@@ -15,18 +15,18 @@ EnvironmentFile=/etc/srb.conf
 # Start
 #
 ExecStart=/usr/sbin/insmod ${KMOD_PATH}/${KMOD_NAME}.ko
-ExecStart=/usr/bin/cp /sys/class/srb/add_mirrors /tmp/add_mirrors
-ExecStart=/usr/bin/sed -r -e "s,.*,${MIRRORS}," -i /tmp/add_mirrors
-ExecStart=/usr/bin/cp /tmp/add_mirrors /sys/class/srb/add_mirrors
-ExecStart=/usr/bin/rm -f /tmp/add_mirrors
+ExecStart=/usr/bin/cp /sys/class/srb/add_urls /tmp/add_urls
+ExecStart=/usr/bin/sed -r -e "s,.*,${URLS}," -i /tmp/add_urls
+ExecStart=/usr/bin/cp /tmp/add_urls /sys/class/srb/add_urls
+ExecStart=/usr/bin/rm -f /tmp/add_urls
 
 #
 # Stop
 #
-ExecStop=/usr/bin/touch /tmp/add_mirrors
-ExecStop=/usr/bin/cp /tmp/add_mirrors /sys/class/srb/add_mirrors
+ExecStop=/usr/bin/touch /tmp/add_urls
+ExecStop=/usr/bin/cp /tmp/add_urls /sys/class/srb/add_urls
 ExecStop=/usr/sbin/rmmod $KMOD_NAME
-ExecStop=/usr/bin/rm -f /tmp/add_mirrors
+ExecStop=/usr/bin/rm -f /tmp/add_urls
 
 
 [Install]

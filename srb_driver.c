@@ -60,7 +60,7 @@ MODULE_LICENSE("GPL");
 MODULE_VERSION(DEV_REL_VERSION);
 
 static srb_device_t	devtab[DEV_MAX];
-static srb_mirror_t	*mirrors = NULL;
+static srb_server_t	*servers = NULL;
 static DEFINE_SPINLOCK(devtab_lock);
 
 /* Module parameters (LKM parameters)
@@ -68,7 +68,7 @@ static DEFINE_SPINLOCK(devtab_lock);
 unsigned short srb_log = SRB_LOG_LEVEL_DFLT;
 unsigned short req_timeout = SRB_REQ_TIMEOUT_DFLT;
 unsigned short nb_req_retries = SRB_NB_REQ_RETRIES_DFLT;
-unsigned short mirror_conn_timeout = SRB_CONN_TIMEOUT_DFLT;
+unsigned short server_conn_timeout = SRB_CONN_TIMEOUT_DFLT;
 unsigned int thread_pool_size = SRB_THREAD_POOL_SIZE_DFLT;
 MODULE_PARM_DESC(debug, "Global log level for ScalityRestBlock LKM");
 module_param_named(debug, srb_log, ushort, 0644);
@@ -79,8 +79,8 @@ module_param(req_timeout, ushort, 0644);
 MODULE_PARM_DESC(nb_req_retries, "Global number of retries for request");
 module_param(nb_req_retries, ushort, 0644);
 
-MODULE_PARM_DESC(mirror_conn_timeout, "Global timeout for connection to mirror(s)");
-module_param(mirror_conn_timeout, ushort, 0644);
+MODULE_PARM_DESC(server_conn_timeout, "Global timeout for connection to server(s)");
+module_param(server_conn_timeout, ushort, 0644);
 
 MODULE_PARM_DESC(thread_pool_size, "Size of the thread pool");
 module_param(thread_pool_size, uint, 0444);
@@ -923,90 +923,90 @@ static int _srb_detach_devices(void)
 	return errcount;
 }
 
-static void _srb_mirror_free(srb_mirror_t *mirror)
+static void _srb_server_free(srb_server_t *server)
 {
-	SRB_LOG_DEBUG(srb_log, "_srb_mirror_free: deleting mirror url %s (%p)", mirror->cdmi_desc.url, mirror);
+	SRB_LOG_DEBUG(srb_log, "_srb_server_free: deleting server url %s (%p)", server->cdmi_desc.url, server);
 
-	if (mirror) {
-		mirror->next = NULL;
-		kfree(mirror);
-		mirror = NULL;
+	if (server) {
+		server->next = NULL;
+		kfree(server);
+		server = NULL;
 	}
 }
 
-static int _srb_mirror_new(srb_debug_t *dbg, const char *url, srb_mirror_t **mirror)
+static int _srb_server_new(srb_debug_t *dbg, const char *url, srb_server_t **server)
 {
-	srb_mirror_t	*new = NULL;
+	srb_server_t	*new = NULL;
 	int		ret = 0;
 
-	SRB_LOG_DEBUG(dbg->level, "_srb_mirror_new: creating mirror with url: %s, mirrors: %p", url, *mirror);
+	SRB_LOG_DEBUG(dbg->level, "_srb_server_new: creating server with url: %s, servers: %p", url, *server);
 
-	new = kcalloc(1, sizeof(struct srb_mirror_s), GFP_KERNEL);
+	new = kcalloc(1, sizeof(struct srb_server_s), GFP_KERNEL);
 	if (new == NULL) {
-		SRB_LOG_ERR(dbg->level, "Cannot allocate memory to add a new mirror.");
+		SRB_LOG_ERR(dbg->level, "Cannot allocate memory to add a new server.");
 		ret = -ENOMEM;
 		goto end;
 	}
 
 	ret = srb_cdmi_init(dbg, &new->cdmi_desc, url);
 	if (ret != 0) {
-		SRB_LOG_ERR(dbg->level, "Could not initialize mirror descriptor (parse URL).");
+		SRB_LOG_ERR(dbg->level, "Could not initialize server descriptor (parse URL).");
 		goto end;
 	}
 
-	if (mirror) {
+	if (server) {
 		new->next = NULL;
-		*mirror = new;
+		*server = new;
 	}
 
 	return 0;
 end:
-	_srb_mirror_free(new);
+	_srb_server_free(new);
 
 	return ret;
 }
 
 
 /*
- * XXX NOTE XXX: #13 This function picks only one mirror that has enough free
+ * XXX NOTE XXX: #13 This function picks only one server that has enough free
  * space in the URL buffer to append the filename.
  */
-static int _srb_mirror_pick(const char *filename, struct srb_cdmi_desc_s *pick)
+static int _srb_server_pick(const char *filename, struct srb_cdmi_desc_s *pick)
 {
 	char url[SRB_URL_SIZE];
 	char name[SRB_URL_SIZE];
 	int ret;
 	int found = 0;
-	srb_mirror_t *mirror = NULL;
+	srb_server_t *server = NULL;
 
-	SRB_LOG_DEBUG(srb_log, "_srb_mirror_pick: picking mirror with filename: %s, with CDMI pick %p", filename, pick);
+	SRB_LOG_DEBUG(srb_log, "_srb_server_pick: picking server with filename: %s, with CDMI pick %p", filename, pick);
 
 	spin_lock(&devtab_lock);
-	mirror = mirrors;
-	while (mirror != NULL) {
-		SRB_LOG_INFO(srb_log, "Browsing mirror: %s", mirror->cdmi_desc.url);
+	server = servers;
+	while (server != NULL) {
+		SRB_LOG_INFO(srb_log, "Browsing server: %s", server->cdmi_desc.url);
 		ret = _srb_reconstruct_url(url, name,
-					    mirror->cdmi_desc.url,
-					    mirror->cdmi_desc.filename,
+					    server->cdmi_desc.url,
+					    server->cdmi_desc.filename,
 					    filename);
 		SRB_LOG_INFO(srb_log, "Dewb reconstruct url yielded %s, %i", url, ret);
 		if (ret == 0) {
-			memcpy(pick, &mirror->cdmi_desc, sizeof(struct srb_cdmi_desc_s));
+			memcpy(pick, &server->cdmi_desc, sizeof(struct srb_cdmi_desc_s));
 			strncpy(pick->url, url, SRB_URL_SIZE);
 			strncpy(pick->filename, name, SRB_URL_SIZE);
 			SRB_LOG_INFO(srb_log, "Copied into pick: url=%s, name=%s", pick->url, pick->filename);
 			found = 1;
 			break ;
 		}
-		mirror = mirror->next;
+		server = server->next;
 	}
 	spin_unlock(&devtab_lock);
 
-	SRB_LOG_INFO(srb_log, "Browsed all mirrors");
+	SRB_LOG_INFO(srb_log, "Browsed all servers");
 
 	if (!found) {
-		SRB_LOG_ERR(srb_log, "Could not match any mirror for filename %s", filename);
-		// No such device or adress seems to match 'missing mirror'
+		SRB_LOG_ERR(srb_log, "Could not match any server for filename %s", filename);
+		// No such device or adress seems to match 'missing server'
 		ret = -ENXIO;
 		goto end;
 	}
@@ -1018,20 +1018,20 @@ end:
 
 /* XXX: Respect ISO C90
  *      Fix compilation warning: ISO C90 forbids mixed declarations and code
- *      Fix design: only create new mirror if not found in the list
+ *      Fix design: only create new server if not found in the list
  */
-int srb_mirror_add(const char *url)
+int srb_server_add(const char *url)
 {
 	int		ret = 0;
 	int		found = 0;
-	srb_mirror_t	*cur = NULL;
-	srb_mirror_t	*last = NULL;
-	srb_mirror_t	*new = NULL;
+	srb_server_t	*cur = NULL;
+	srb_server_t	*last = NULL;
+	srb_server_t	*new = NULL;
 	srb_debug_t	debug;
 
-	SRB_LOG_INFO(srb_log, "srb_mirror_add: adding mirror %s", url);
+	SRB_LOG_INFO(srb_log, "srb_server_add: adding server %s", url);
 
-	debug.name = "<Mirror-Adder>";
+	debug.name = "<Server-Url-Adder>";
 	debug.level = srb_log;
 
 	if (strlen(url) >= SRB_URL_SIZE) {
@@ -1040,12 +1040,12 @@ int srb_mirror_add(const char *url)
 		goto err_out_dev;
 	}
 
-	ret = _srb_mirror_new(&debug, url, &new);
+	ret = _srb_server_new(&debug, url, &new);
 	if (ret != 0)
 		goto err_out_dev;
 
 	spin_lock(&devtab_lock);
-	cur = mirrors;
+	cur = servers;
 	while (cur != NULL) {
 		if (strcmp(url, cur->cdmi_desc.url) == 0) {
 			found = 1;
@@ -1058,13 +1058,13 @@ int srb_mirror_add(const char *url)
 		if (last != NULL)
 			last->next = new;
 		else
-			mirrors = new;
+			servers = new;
 		new = NULL;
 	}
 	spin_unlock(&devtab_lock);
 
 	if (found)
-		_srb_mirror_free(new);
+		_srb_server_free(new);
 
 	return 0;
 
@@ -1073,15 +1073,15 @@ err_out_dev:
 	return ret;
 }
 
-static int _locked_mirror_remove(const char *url)
+static int _locked_server_remove(const char *url)
 {
 	int		ret = 0;
 	int		i;
 	int		found = 0;
-	srb_mirror_t	*cur = NULL;
-	srb_mirror_t	*prev = NULL;
+	srb_server_t	*cur = NULL;
+	srb_server_t	*prev = NULL;
 
-	cur = mirrors;
+	cur = servers;
 	while (cur != NULL) {
 		if (strcmp(url, cur->cdmi_desc.url) == 0) {
 			found = 1;
@@ -1092,20 +1092,20 @@ static int _locked_mirror_remove(const char *url)
 	}
 
 	if (found == 0) {
-		SRB_LOG_ERR(srb_log, "Cannot remove mirror: "
-			     "Url is not part of mirrors");
+		SRB_LOG_ERR(srb_log, "Cannot remove server: "
+			     "Url is not part of servers");
 		ret = -ENOENT;
 		goto end;
 	}
 
-	/* Only one mirror == Last mirror, make sure there are no devices
+	/* Only one server == Last server, make sure there are no devices
 	 * attached anymore before removing */
-	if (mirrors != NULL && mirrors->next == NULL) {
+	if (servers != NULL && servers->next == NULL) {
 		for (i = 0; i < DEV_MAX; ++i) {
 			if (!device_free_slot(&devtab[i])) {
 				SRB_LOG_ERR(srb_log,
 					     "Could not remove all devices; "
-					     "not removing mirror.");
+					     "not removing server.");
 				ret = -EBUSY;
 				goto end;
 			}
@@ -1116,9 +1116,9 @@ static int _locked_mirror_remove(const char *url)
 	if (prev)
 		prev->next = cur->next;
 	else
-		mirrors = cur->next;
+		servers = cur->next;
 
-	_srb_mirror_free(cur);
+	_srb_server_free(cur);
 
 	ret = 0;
 
@@ -1126,11 +1126,11 @@ end:
 	return ret;
 }
 
-int srb_mirror_remove(const char *url)
+int srb_server_remove(const char *url)
 {
 	int		ret = 0;
 
-	SRB_LOG_INFO(srb_log, "srb_mirror_remove: removing mirror %s", url);
+	SRB_LOG_INFO(srb_log, "srb_server_remove: removing server %s", url);
 
 	if (strlen(url) >= SRB_URL_SIZE) {
 		SRB_LOG_ERR(srb_log, "Url too big: '%s'", url);
@@ -1139,29 +1139,29 @@ int srb_mirror_remove(const char *url)
 	}
 
 	spin_lock(&devtab_lock);
-	ret = _locked_mirror_remove(url);
+	ret = _locked_server_remove(url);
 	spin_unlock(&devtab_lock);
 
 end:
 	return ret;
 }
 
-ssize_t srb_mirrors_dump(char *buf, ssize_t max_size)
+ssize_t srb_servers_dump(char *buf, ssize_t max_size)
 {
-	srb_mirror_t	*cur = NULL;
+	srb_server_t	*cur = NULL;
 	ssize_t		printed = 0;
 	ssize_t		len = 0;
 	ssize_t		ret = 0;
 
-	SRB_LOG_INFO(srb_log, "srb_mirrors_dump: dumping mirrors: buf: %p, max_size: %ld", buf, max_size);
+	SRB_LOG_INFO(srb_log, "srb_servers_dump: dumping servers: buf: %p, max_size: %ld", buf, max_size);
 
 	spin_lock(&devtab_lock);
-	cur = mirrors;
+	cur = servers;
 	while (cur) {
 		if (printed != 0) {
 			len = snprintf(buf + printed, max_size - printed, ",");
 			if (len == -1 || len != 1) {
-				SRB_LOG_ERR(srb_log, "Not enough space to print mirrors list in buffer.");
+				SRB_LOG_ERR(srb_log, "Not enough space to print servers list in buffer.");
 				ret = -ENOMEM;
 				break;
 			}
@@ -1170,7 +1170,7 @@ ssize_t srb_mirrors_dump(char *buf, ssize_t max_size)
 
 		len = snprintf(buf + printed, max_size - printed, "%s", cur->cdmi_desc.url);
 		if (len == -1 || len > (max_size - printed)) {
-			SRB_LOG_ERR(srb_log, "Not enough space to print mirrors list in buffer.");
+			SRB_LOG_ERR(srb_log, "Not enough space to print servers list in buffer.");
 			ret = -ENOMEM;
 			break;
 		}
@@ -1182,7 +1182,7 @@ ssize_t srb_mirrors_dump(char *buf, ssize_t max_size)
 
 	len = snprintf(buf + printed, max_size - printed, "\n");
 	if (len == -1 || len != 1) {
-		SRB_LOG_ERR(srb_log, "Not enough space to print mirrors list in buffer.");
+		SRB_LOG_ERR(srb_log, "Not enough space to print servers list in buffer.");
 		ret = -ENOMEM;
 	}
 	printed += len;
@@ -1238,13 +1238,13 @@ int srb_volumes_dump(char *buf, size_t max_size)
 		goto cleanup;
 	}
 
-	/* Find mirror for directory (filename must be empty, not NULL) */
-	ret = _srb_mirror_pick("", cdmi_desc);
+	/* Find server for directory (filename must be empty, not NULL) */
+	ret = _srb_server_pick("", cdmi_desc);
 	if (ret != 0) {
-		SRB_LOG_ERR(srb_log, "Unable to get mirror: %i", ret);
+		SRB_LOG_ERR(srb_log, "Unable to get server: %i", ret);
 		goto cleanup;
 	}
-	SRB_LOG_INFO(srb_log, "Dumping volumes: Picked mirror "
+	SRB_LOG_INFO(srb_log, "Dumping volumes: Picked server "
 		      "[ip=%s port=%d fullpath=%s]",
 		      cdmi_desc->ip_addr, cdmi_desc->port,
 		      cdmi_desc->filename);
@@ -1398,16 +1398,16 @@ int srb_device_attach(const char *filename, const char *devname)
 	INIT_LIST_HEAD(&dev->waiting_queue);
 	spin_lock_init(&dev->waiting_lock);
 
-	/* Pick a convenient mirror to get srb_cdmi_desc
-	 * TODO: #13 We need to manage failover by using every mirror
-	 * NB: _srb_mirror_pick fills the cdmi_desc sruct
+	/* Pick a convenient server to get srb_cdmi_desc
+	 * TODO: #13 We need to manage failover by using every server
+	 * NB: _srb_server_pick fills the cdmi_desc sruct
 	 */
-	rc = _srb_mirror_pick(filename, cdmi_desc);
+	rc = _srb_server_pick(filename, cdmi_desc);
 	if (rc != 0) {
-		SRB_LOG_ERR(srb_log, "Unable to get mirror: %i", rc);
+		SRB_LOG_ERR(srb_log, "Unable to get server: %i", rc);
 		goto cleanup;
 	}
-	SRB_LOG_INFO(srb_log, "Adding Device: Picked mirror "
+	SRB_LOG_INFO(srb_log, "Adding Device: Picked server "
 		      "[ip=%s port=%d fullpath=%s]",
 		      cdmi_desc->ip_addr, cdmi_desc->port,
 		      cdmi_desc->filename);
@@ -1436,7 +1436,7 @@ int srb_device_attach(const char *filename, const char *devname)
 
 	srb_sysfs_device_init(dev);
 
-	SRB_LOG_INFO(srb_log, "Added device %s (id: %d, major:%d) for mirror "
+	SRB_LOG_INFO(srb_log, "Added device %s (id: %d, major:%d) for server "
 		      "[ip=%s port=%d fullpath=%s]",
 		      dev->name, dev->id, dev->major, cdmi_desc->ip_addr,
 		      cdmi_desc->port, cdmi_desc->filename);
@@ -1489,7 +1489,7 @@ int srb_device_create(const char *filename, unsigned long long size)
 	}
 
 	/* Now, setup a cdmi connection then Truncate(create) the file. */
-	rc = _srb_mirror_pick(filename, cdmi_desc);
+	rc = _srb_server_pick(filename, cdmi_desc);
 	if (rc != 0)
 		goto err_out_alloc;
 
@@ -1564,7 +1564,7 @@ int srb_device_extend(const char *filename, unsigned long long size)
 	memset(cdmi_desc, 0, sizeof(struct srb_cdmi_desc_s));
 
 	/* Now, setup a cdmi connection then Truncate(create) the file. */
-	rc = _srb_mirror_pick(filename, cdmi_desc);
+	rc = _srb_server_pick(filename, cdmi_desc);
 	if (rc != 0)
 		goto err_out_alloc;
 
@@ -1649,7 +1649,7 @@ int srb_device_destroy(const char *filename)
 	}
 
 	/* First, setup a cdmi connection then Delete the file. */
-	rc = _srb_mirror_pick(filename, cdmi_desc);
+	rc = _srb_server_pick(filename, cdmi_desc);
 	if (rc != 0)
 		goto err_out_alloc;
 

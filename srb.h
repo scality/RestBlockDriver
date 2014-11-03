@@ -62,7 +62,7 @@
 extern unsigned short srb_log;
 extern unsigned short req_timeout;
 extern unsigned short nb_req_retries;
-extern unsigned short mirror_conn_timeout;
+extern unsigned short server_conn_timeout;
 extern unsigned int thread_pool_size;
 
 /* TODO: LKM logging (Issue #28 and Issue #3)
@@ -259,10 +259,10 @@ typedef struct srb_device_s {
 	srb_debug_t		debug;
 } srb_device_t;
 
-typedef struct srb_mirror_s {
-	struct srb_mirror_s   	*next;
+typedef struct srb_server_s {
+	struct srb_server_s   	*next;
 	struct srb_cdmi_desc_s	cdmi_desc;
-} srb_mirror_t;
+} srb_server_t;
 
 /* srb.c */
 int srb_device_create(const char *filename, unsigned long long size);
@@ -272,9 +272,9 @@ int srb_device_destroy(const char *filename);
 int srb_device_attach(const char *filename, const char *devname);
 int srb_device_detach(const char *devname);
 
-int srb_mirror_add(const char *url);
-int srb_mirror_remove(const char *url);
-ssize_t srb_mirrors_dump(char *buf, ssize_t max_size);
+int srb_server_add(const char *url);
+int srb_server_remove(const char *url);
+ssize_t srb_servers_dump(char *buf, ssize_t max_size);
 int srb_volumes_dump(char *buf, size_t max_size);
 
 /* srb_sysfs.c*/
@@ -331,8 +331,5 @@ int srb_http_mkmetadata(char *buff, int len, char *host, char *page);
 
 int srb_http_get_status(char *buf, int len, enum srb_http_statuscode *code);
 enum srb_http_statusrange srb_http_get_status_range(enum srb_http_statuscode status);
-
-/**/
-//int _srb_mirror_pick(const char *filename, struct srb_cdmi_desc_s *pick);
 
 #endif

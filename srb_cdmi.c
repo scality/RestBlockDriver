@@ -541,7 +541,7 @@ int srb_cdmi_list(srb_debug_t *dbg,
 	}
 	if (code != SRB_HTTP_STATUS_OK)
 	{
-		SRB_LOG_ERR(dbg->level, "[list] Mirror listing yielded "
+		SRB_LOG_ERR(dbg->level, "[list] Server listing yielded "
 			   "response status %i", code);
 		ret = -EIO;
 		goto err;

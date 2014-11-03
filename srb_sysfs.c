@@ -540,18 +540,18 @@ static ssize_t class_srb_detach_store(struct class *c,
 	return ret;
 }
 
-static ssize_t class_srb_addmirror_show(struct class *c, struct class_attribute *attr,
+static ssize_t class_srb_addurl_show(struct class *c, struct class_attribute *attr,
 					 char *buf)
 {
 	(void)c;
 	(void)attr;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo mirror_url1,...,mirror_urlN > add_mirrors\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo server_url1,...,server_urlN > add_urls\n");
 
 	return strlen(buf);
 }
 
-static ssize_t class_srb_addmirror_store(struct class *c,
+static ssize_t class_srb_addurl_store(struct class *c,
 					  struct class_attribute *attr,
 					  const char *buf,
 					  size_t count)
@@ -588,7 +588,7 @@ static ssize_t class_srb_addmirror_store(struct class *c,
 		}
 		url[SRB_URL_SIZE] = 0;
 
-		ret = srb_mirror_add(url);
+		ret = srb_server_add(url);
 		if (ret < 0)
 			errcount += 1;
 
@@ -597,7 +597,7 @@ static ssize_t class_srb_addmirror_store(struct class *c,
 
 	ret = count;
 	if (errcount > 0) {
-		SRB_LOG_ERR(srb_log, "Could not add every mirror to driver.");
+		SRB_LOG_ERR(srb_log, "Could not add every url to driver.");
 		ret = -EINVAL;
 	}
 
@@ -605,18 +605,18 @@ end:
 	return ret;
 }
 
-static ssize_t class_srb_removemirror_show(struct class *c, struct class_attribute *attr,
+static ssize_t class_srb_removeurl_show(struct class *c, struct class_attribute *attr,
 					    char *buf)
 {
 	(void)c;
 	(void)attr;
 
-	snprintf(buf, PAGE_SIZE, "# Usage: echo mirror_url1,...,mirror_urlN > remove_mirrors\n");
+	snprintf(buf, PAGE_SIZE, "# Usage: echo server_url1,...,server_urlN > remove_urls\n");
 
 	return strlen(buf);
 }
 
-static ssize_t class_srb_removemirror_store(struct class *c,
+static ssize_t class_srb_removeurl_store(struct class *c,
 					     struct class_attribute *attr,
 					     const char *buf,
 					     size_t count)
@@ -655,7 +655,7 @@ static ssize_t class_srb_removemirror_store(struct class *c,
 			tmpend = NULL;
 		}
 
-		ret = srb_mirror_remove(url);
+		ret = srb_server_remove(url);
 		if (ret < 0)
 		{
 			goto end;
@@ -671,7 +671,7 @@ end:
 	return ret;
 }
 
-static ssize_t class_srb_mirrors_show(struct class *c, struct class_attribute *attr,
+static ssize_t class_srb_urls_show(struct class *c, struct class_attribute *attr,
 				       char *buf)
 {
 	ssize_t	ret = 0;
@@ -679,7 +679,7 @@ static ssize_t class_srb_mirrors_show(struct class *c, struct class_attribute *a
 	(void)c;
 	(void)attr;
 
-	ret = srb_mirrors_dump(buf, PAGE_SIZE);
+	ret = srb_servers_dump(buf, PAGE_SIZE);
 
 	return ret;
 }
@@ -712,9 +712,9 @@ static struct class_attribute class_srb_attrs[] = {
 	__ATTR(create,		0600, class_srb_create_show, class_srb_create_store),
 	__ATTR(extend,		0600, class_srb_extend_show, class_srb_extend_store),
 	__ATTR(destroy,		0600, class_srb_destroy_show, class_srb_destroy_store),
-	__ATTR(add_mirrors,	0600, class_srb_addmirror_show, class_srb_addmirror_store),
-	__ATTR(remove_mirrors,	0600, class_srb_removemirror_show, class_srb_removemirror_store),
-	__ATTR(mirrors,		0400, class_srb_mirrors_show, NULL),
+	__ATTR(add_urls,	0600, class_srb_addurl_show, class_srb_addurl_store),
+	__ATTR(remove_urls,	0600, class_srb_removeurl_show, class_srb_removeurl_store),
+	__ATTR(urls,		0400, class_srb_urls_show, NULL),
 	__ATTR(volumes,		0400, class_srb_volumes_show, NULL),
 	__ATTR_NULL
 };

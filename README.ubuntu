@@ -23,7 +23,7 @@ In order to install the system script, please use the following command:
 
 NB: Update your srb.conf according to your CDMI condiguration:
 ---   - set KMOD_PATH with the path where you have built the driver
-      - set MIRRORS with your mirrors URL
+      - set URLS with your server URL(S)
 
 
 Using the driver as a service

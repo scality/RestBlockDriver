@@ -48,22 +48,23 @@ The following parameters are available:
                                   notice, info, debug)
   * req_timeout: timeout for requests
   * nb_req_retries: number of retries before aborting a Request
-  * mirror_conn_timeout: timeout for connecting to a mirror
+  * server_conn_timeout: timeout for connecting to a server
   * thread_pool_size: size of the thread pool of each device
 
 Volume Provisioning
 ====================
 
-Currently, the driver does not yet support failover between multiple mirrors
+Currently, the driver does not yet support failover between multiple servers
 providing the same repository of volumes, but it is nonetheless a feature that
 we are aiming for. For this reason, we chose to provide a facility to manage
-the mirrors the driver is associated to, and then the usual operations will
-operate on one of those mirrors.
+the server urls the driver is associated to, and then the usual operations will
+operate on one of those.
 
-For this reason we provide you with three /sys files controlling the mirrors:
- * mirrors: allows listing the mirrors currently available/configured
- * add\_mirrors: allows adding one or more mirrors to the driver
- * remove\_mirrors: allows removing one or more mirrors from the driver
+For this reason we provide you with three /sys files controlling the URLs to
+the servers:
+ * urls: allows listing the server urls currently available/configured
+ * add\_urls: allows adding one or more server urls to the driver
+ * remove\_urls: allows removing one or more server urls from the driver
 
 Then, the following management files are available:
  * create: allows creating a volume file on the storage
@@ -76,62 +77,62 @@ to one management (/sys) file. Please mind that each one of theses files can be
 displayed (using cat on them) to show a simple usage text.
 
 
-Listing the mirrors
--------------------
+Listing the server urls
+-----------------------
 
-To list the mirrors currently configured within the driver, you can simply
-display the contents of the mirrors file:
+To list the server urls currently configured within the driver, you can simply
+display the contents of the urls file:
 
-    # cat /sys/class/srb/mirrors
+    # cat /sys/class/srb/urls
 
-This file displays the list of mirrors separated by a coma, using the same
-format you would to add or remove one or more mirrors.
+This file displays the list of server urls separated by a coma, using the same
+format you would to add or remove one or more server urls.
 
 
-Adding mirrors
---------------
+Adding server urls
+------------------
 
-To add one (or more) new mirror(s) to the driver, you need to write the list of
-mirrors separated by commas into the associated file. The format includes
+To add one (or more) new server urls to the driver, you need to write the list of
+urls separated by commas into the associated file. The format includes
 protocol, host (IP only: DNS is not supported yet), optional port, and the
 path to the volume repository ("path") which does no require an ending '/'.
 In essence, a volume repository URL would look like this:
 
     http://<ip>[:<port>]/<path>
 
-Thus, to concatenate the multiples mirror urls, you can add them all at once
+Thus, to concatenate the multiple urls, you can add them all at once
 like in the example:
 
     # export REST_REPO1=http://127.0.0.1:443/volumes
     # export REST_REPO2=http://192.168.0.3/repository/
-    # echo "$REST_REPO1,$REST_REPO2" > /sys/class/srb/add_mirrors
+    # echo "$REST_REPO1,$REST_REPO2" > /sys/class/srb/add_urls
 
 The driver will properly separate all repositories from the string you gave it,
-and add them one by one. In case of error, only the error-yielding mirror will
-not be added to the mirror list. All valid mirrors that did not yield any error
+and add them one by one. In case of error, only the error-yielding server will
+not be added to the list. All valid server urls that did not yield any error
 will be properly added. You might want to check which ones could be added by
-listing the mirrors if you cannot add all your mirrors.
+listing the urls if you cannot add all your server urls.
 
 Be careful, though:
- * Every mirror must point to the same volume repository. Doing otherwise is
-an unsupported use, and behavior is undefined and untested
- * /!\ Currently, the failover not being supported, not all of the mirrors may
+ * Every server url must point to the same volume repository. Doing otherwise
+is an unsupported use, and behavior is undefined and untested
+ * /!\ Currently, the failover not being supported, not all of the servers may
 actually be used.
 
 
-Removing mirrors
-----------------
+Removing server urls
+--------------------
 
-In order to remove one or more mirrors, the same format is used as for adding
-mirrors. Also, since the listing of mirrors outputs them this way, you could
-copy and paste part of the mirrors listing if you wished to. In the end,
-removing mirrors can be done as follows:
+In order to remove one or more server urls, the same format is used as for
+adding some. Also, since the listing of urls outputs them this way, you could
+copy and paste part of the urls listing if you wished to. In the end,
+removing server urls can be done as follows:
 
-    # echo "http://127.0.0.1:443/volumes" > /sys/class/srb/remove_mirrors
+    # echo "http://127.0.0.1:443/volumes" > /sys/class/srb/remove_url
 
 Please note that if a device is attached, you will not be able to remove the
-last mirror. You need to detach manually every device attached by the module
-before manually removing the last mirror.
+last server url. You need to detach manually every device attached by the module
+before manually removing the last server url.
 
 Note also that when unloading the module, the devices are detached
 automatically before the module can actually be unloaded.
@@ -152,7 +153,8 @@ But beware:
     * [integer number]k: size in Kilobytes
     * [integer number]M: size in Megabytes
     * [integer number]G: size in Gigabytes
-  * At least one mirror must exist and be valid for the volume to be created
+  * At least one server url must exist and be valid for the volume to be
+created
   * Created volume are not automatically attached as a device on the system.
 
 Before you can use the volume, you have to attach it through the attach /sys
@@ -203,14 +205,14 @@ Attaching and Detaching devices
 ===============================
 
 For multiple reasons, the driver does not attach automatically the devices when
-adding a mirror or creating a new volume. Those reasons include:
+adding a server url or creating a new volume. Those reasons include:
   * automatization does not always gain from having generated device names
-  * it's sometimes difficult to synchronize with a generated name than defining
-a name yourself
+  * it's sometimes more difficult to synchronize with a generated name than
+defining a name yourself
 
 For those reason, you need to attach the volumes manually to the system, using
 the three following management files are available:
- * volumes: Reading the file lists the volumes available on the mirrors
+ * volumes: Reading the file lists the volumes available on the server
  * attach: Attaches an already provisioned volume as a device
  * detach: Detaches an attached device from the system
 (does not delete the volume)
@@ -220,7 +222,7 @@ They are described in detail in the following sections.
 Listing the volumes
 -------------------
 
-Since you might not know from memory which volumes exist on your mirrors,
+Since you might not know from memory which volumes exist on your servers,
 you might want a way to list those, to attach them easily. One of the ways
 provided is to read the content of the volumes /sys file:
 
@@ -231,7 +233,7 @@ provided is to read the content of the volumes /sys file:
  Baz
  Qux
 
-This way, you can know that you have five volumes available on your mirror,
+This way, you can know that you have five volumes available on your servers,
 and know their names, which will allow you to either attach, extend or destroy
 them.
 
@@ -305,7 +307,7 @@ The log level can be set from debug(7), info(6) ... to emergency (0).
 Get information on the device
 ----------------------------------
 
-The URL associated on CDMI (one mirror only):
+The URL associated on CDMI (one server only):
 
     # cat /sys/block/srb?/srb\_urls
 
