@@ -170,9 +170,12 @@ class RestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.end_headers()
 
     def _write_file(self, path, offset, data, creat):
-        if creat and os.path.exists(path):
-            self._error(412, "Cannot Exclusively create file: already exists")
-            return
+        flags = 'w+b'
+        if os.path.exists(path):
+            if creat:
+                self._error(412, "Cannot Exclusively create file: already exists")
+                return
+            flags = 'r+b'
 
         failure = True
         error_sent = False
