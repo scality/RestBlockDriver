@@ -571,7 +571,7 @@ int srb_cdmi_list(srb_debug_t *dbg,
 	// Skip header
 	ret = srb_http_skipheader(&buff, &len);
 	if (ret) {
-		SRB_LOG_ERR(dbg->level, "getrange: skipheader failed: %d", ret);
+		SRB_LOG_ERR(dbg->level, "[list] skipheader failed: %d", ret);
 		ret = -EIO;
 		goto err;
 	}
@@ -587,7 +587,8 @@ int srb_cdmi_list(srb_debug_t *dbg,
 	// First, copy leftovers from buff
 	memcpy(content, buff, len);
 	if (len != contentlen) {
-		SRB_LOG_ERR(dbg->level, "getrange error: len: %d contentlen:%llu", len, contentlen);
+		SRB_LOG_ERR(dbg->level, "[list] Cannot read whole listing: "
+                            "len: %d contentlen:%llu", len, contentlen);
 		ret = -EIO;
 		goto err;
 	}
@@ -699,6 +700,7 @@ int srb_cdmi_flush(srb_debug_t *dbg,
 	uint64_t size;
 	int len;
 	int ret;
+	enum srb_http_statuscode code;
 
 	if (!desc->socket)
 		return 0;
@@ -710,6 +712,20 @@ int srb_cdmi_flush(srb_debug_t *dbg,
 	
 	len = sock_send_receive(dbg, desc, len, 0);
 	if (len < 0) return len;
+
+	ret = srb_http_get_status(buff, len, &code);
+	if (ret != 0)
+	{
+		SRB_LOG_ERR(dbg->level, "Cannot get http response status.");
+		return -EIO;
+	}
+	if (srb_http_get_status_range(code) != SRB_HTTP_STATUSRANGE_SUCCESS)
+	{
+		SRB_LOG_ERR(dbg->level, "Http server responded with bad status: %i", code);
+		if (code == SRB_HTTP_STATUS_NOT_FOUND)
+			return -ENODEV;
+		return -EIO;
+	}
 
 	buff[len] = 0;
 	ret = srb_http_header_get_uint64(buff, len, "Content-Length", &size);

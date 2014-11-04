@@ -138,13 +138,6 @@ static int finish_buffer(char **buff, int *len)
 }
 #endif
 
-static int frame_status_ok(char *buff, int len)
-{
-	if (!strncmp(buff, HTTP_OK, strlen(HTTP_OK)))
-		return 1;
-	return 0;
-}
-
 int srb_http_check_response_complete(char *buff, int len)
 {
 	int hdr_end = 0;
@@ -554,9 +547,6 @@ int srb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
 {
 	int ret;
 	char *pos;
-
-	if (!frame_status_ok(buff, len))
-		return -EIO;
 
 	pos = strstr(buff, key);
 	if (!pos)
