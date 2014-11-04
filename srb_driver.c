@@ -474,8 +474,10 @@ static int srb_thread(void *data)
 		list_del_init(&req->queuelist);
 		spin_unlock_irqrestore(&dev->waiting_lock, flags);
 		
-		if (blk_rq_sectors(req) == 0)
+		if (blk_rq_sectors(req) == 0) {
+			blk_end_request_all(req, 0);
 			continue;
+		}
 
 		req_flags_to_str(req->cmd_flags, buff);
 		SRB_LOG_DEBUG(dev->debug.level, "srb_thread: thread %d: New REQ of type %s (%d) flags: %s (%llu)",
