@@ -312,7 +312,7 @@ class RestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_DELETE(self):
         fpath = self._get_fpath()
         try:
-            os.rm(fpath)
+            os.remove(fpath)
         except OSError as e:
             if e.errno == errno.ENOENT:
                 self._error(404, "File not found")
