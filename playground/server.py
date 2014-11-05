@@ -181,7 +181,7 @@ class RestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         error_sent = False
         try:
             # Ensure both files are created at the same time.
-            with open(path, 'r+b') as f:
+            with open(path, flags) as f:
                 f.seek(offset)
                 if data is not None and len(data) != 0:
                     f.write(data)
