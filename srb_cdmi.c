@@ -339,43 +339,62 @@ static int sock_send_receive(srb_debug_t *dbg,
 			int send_size, int rcv_size)
 {
 	char *buff = desc->xmit_buff;
-	int strict_rcv = (rcv_size) ? 1 : 0;
-	int ret;
-	int rcvd;
+	int strict_rcv = 1;
+	int ret = 0;
+	int rcvd = 0;
 	char *rcvbuf = NULL;
+	int has_epiped = 0;
 
-	if (rcv_size == 0)
+	if (rcv_size == 0) {
+		strict_rcv = 0;
 		rcv_size = SRB_XMIT_BUFFER_SIZE;
+	}
 	rcvbuf = kmalloc(rcv_size, GFP_KERNEL);
 	if (rcvbuf == NULL) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
 
-	/* Check if the connection needs to be restarted */
-	/* Reconnect the socket after a predefined number of HTTP
+	/*
+	 * Check if the connection needs to be restarted:
+	 * Reconnect the socket after a predefined number of HTTP
 	 * requests sent.
 	 */
 	if (desc->nb_requests == SRB_REUSE_LIMIT) {
 		SRB_LOG_DEBUG(dbg->level, "Limit of %u requests reached reconnecting socket", SRB_REUSE_LIMIT);
 		srb_cdmi_disconnect(dbg, desc);
-		ret = srb_cdmi_connect(dbg, desc);
-		if (ret) goto cleanup;
 	}
 	else
 		desc->nb_requests++;
 
+	/*
+	 * Reconnect whether it's been resetted manually (SRB_REUSE_LIMIT) or
+	 * it was left disconnected
+	 */
+	if (desc->state == CDMI_DISCONNECTED) {
+		ret = srb_cdmi_connect(dbg, desc);
+		if (ret)
+			goto cleanup;
+	}
+
 	/* Send buffer */
-xmit_again:
+retry_once:
 	ret = sock_xmit(dbg, desc, 1, buff, send_size, 0);
 	if (ret == -EPIPE) {
+		SRB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
 		srb_cdmi_disconnect(dbg, desc);
-		if (ret) goto cleanup;
-		goto xmit_again;
+		if (has_epiped == 0) {
+			has_epiped = 1;
+			ret = srb_cdmi_connect(dbg, desc);
+			if (ret)
+				goto cleanup;
+			goto retry_once;
+		}
+		goto cleanup;
 	}
-       if (ret != send_size) {
-               ret = -EIO;
-               goto cleanup;
+	if (ret != send_size) {
+		ret = -EIO;
+		goto cleanup;
 	}
 	
 	/* Receive response - We want to make sure we received a full response */
@@ -391,9 +410,13 @@ xmit_again:
 		if (ret < 0) {
 			if (ret == -EPIPE) {
 				srb_cdmi_disconnect(dbg, desc);
-				ret = srb_cdmi_connect(dbg, desc);
-				if (ret) goto cleanup;
-				goto xmit_again;
+				if (has_epiped == 0) {
+					has_epiped = 1;
+					ret = srb_cdmi_connect(dbg, desc);
+					if (ret)
+						goto cleanup;
+					goto retry_once;
+				}
 			}
 			goto cleanup;
 		}
@@ -414,42 +437,59 @@ static int sock_send_sglist_receive(srb_debug_t *dbg,
 				int send_size, int rcv_size)
 {
 	char *buff = desc->xmit_buff;
-	int strict_rcv = (rcv_size) ? 1 : 0;
+	int strict_rcv = 1;
 	int i;
 	int ret;
 	int rcvd;
 	char *rcvbuf = NULL;
+	int has_epiped = 0;
 
-	if (rcv_size == 0)
+	if (rcv_size == 0) {
+		strict_rcv = 0;
 		rcv_size = SRB_XMIT_BUFFER_SIZE;
+	}
 	rcvbuf = kmalloc(rcv_size, GFP_KERNEL);
 	if (rcvbuf == NULL) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
 
-	/* Check if the connection needs to be restarted */
-	/* Reconnect the socket after a predefined number of HTTP
+	/*
+	 * Check if the connection needs to be restarted:
+	 * Reconnect the socket after a predefined number of HTTP
 	 * requests sent.
 	 */
 	if (desc->nb_requests == SRB_REUSE_LIMIT) {
 		SRB_LOG_DEBUG(dbg->level, "Limit of %u requests reached reconnecting socket", SRB_REUSE_LIMIT);
 		srb_cdmi_disconnect(dbg, desc);
-		ret = srb_cdmi_connect(dbg, desc);
-		if (ret) goto cleanup;
 	}
 	else
 		desc->nb_requests++;
 
+	/*
+	 * Reconnect whether it's been resetted manually (SRB_REUSE_LIMIT) or
+	 * it was left disconnected
+	 */
+	if (desc->state == CDMI_DISCONNECTED) {
+		ret = srb_cdmi_connect(dbg, desc);
+		if (ret)
+			goto cleanup;
+	}
+
 	/* Send buffer */
-xmit_again:
+retry_once:
 	ret = sock_xmit(dbg, desc, 1, buff, send_size, 0);
 	if (ret == -EPIPE) {
 		SRB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
 		srb_cdmi_disconnect(dbg, desc);
-		ret = srb_cdmi_connect(dbg, desc);
-		if (ret) return ret;
-		goto xmit_again;
+		if (has_epiped == 0) {
+			has_epiped = 1;
+			ret = srb_cdmi_connect(dbg, desc);
+			if (ret)
+				goto cleanup;
+			goto retry_once;
+		}
+		goto cleanup;
 	}
 	if (ret != send_size) {
 		SRB_LOG_ERR(dbg->level, "Incomplete transmission (%d of %d), returning", ret, send_size);
@@ -466,9 +506,14 @@ xmit_again:
 		if (ret == -EPIPE) {
 			SRB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
 			srb_cdmi_disconnect(dbg, desc);
-			ret = srb_cdmi_connect(dbg, desc);
-			if (ret) goto cleanup;
-			goto xmit_again;
+			if (has_epiped == 0) {
+				has_epiped = 1;
+				ret = srb_cdmi_connect(dbg, desc);
+				if (ret)
+					goto cleanup;
+				goto retry_once;
+			}
+			goto cleanup;
 		}
 		if (ret != length) {
 			SRB_LOG_ERR(dbg->level, "Incomplete transmission (%d of %d), returning",
@@ -482,9 +527,14 @@ xmit_again:
 	if (ret == -EPIPE) {
 		SRB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
 		srb_cdmi_disconnect(dbg, desc);
-		ret = srb_cdmi_connect(dbg, desc);
-		if (ret) goto cleanup;
-		goto xmit_again;
+		if (has_epiped == 0) {
+			has_epiped = 1;
+			ret = srb_cdmi_connect(dbg, desc);
+			if (ret)
+				goto cleanup;
+			goto retry_once;
+		}
+		goto cleanup;
 	}
 	if (ret != 2) {
 		SRB_LOG_ERR(dbg->level, "Incomplete transmission %d of %d), returning", ret, 2);
@@ -505,9 +555,13 @@ xmit_again:
 		if (ret < 0) {
 			if (ret == -EPIPE) {
 				srb_cdmi_disconnect(dbg, desc);
-				ret = srb_cdmi_connect(dbg, desc);
-				if (ret) goto cleanup;
-				goto xmit_again;
+				if (has_epiped == 0) {
+					has_epiped = 1;
+					ret = srb_cdmi_connect(dbg, desc);
+					if (ret)
+						goto cleanup;
+					goto retry_once;
+				}
 			}
 			goto cleanup;
 		}
