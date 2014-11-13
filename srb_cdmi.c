@@ -577,6 +577,40 @@ cleanup:
 	return ret;
 }
 
+static int retried_send_receive(srb_debug_t *dbg,
+				struct srb_cdmi_desc_s *desc,
+				int send_size, int rcv_size,
+				int do_sglist, int attempts)
+{
+	int ret = -1;
+	int i;
+
+        if (attempts < 1)
+            return -EINVAL;
+
+	/*
+         * TODO: Handle CDMI request retry (Failover: Issue #22)
+	 *
+	 * This meanss that in case of EPIPE (only?),
+	 * we must switch to another server url.
+	 */
+	for (i = 0; i < attempts; i++) {
+		if (do_sglist) {
+			ret = sock_send_sglist_receive(dbg, desc, send_size, rcv_size);
+		}
+		else {
+			ret = sock_send_receive(dbg, desc, send_size, rcv_size);
+		}
+
+		/* If some data is returned, then the response is whole */
+		if (ret >= 0)
+			break;
+		else if (i < attempts - 1)
+			SRB_LOG_NOTICE(dbg->level, "Retrying CDMI request... %d", (i + 1));
+	}
+
+	return ret;
+}
 
 int srb_cdmi_list(srb_debug_t *dbg,
 		   struct srb_cdmi_desc_s *desc,
@@ -1012,10 +1046,9 @@ int srb_cdmi_getsize(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
 	return 0;
 }
 
-/* srb_cdmi_putrange(desc, buff, offset, size)
- *
+/*
  * sends a buffer to CDMI server through a CDMI put range at primitive
- * at specified "offset" reading "size" bytes from "buff".
+ * at specified "offset" writing "size" bytes from "buff".
  */
 int srb_cdmi_putrange(srb_debug_t *dbg,
 		struct srb_cdmi_desc_s *desc,
@@ -1040,7 +1073,7 @@ int srb_cdmi_putrange(srb_debug_t *dbg,
 	xmit_buff += ret;
 	header_size = ret;
 
-	len = sock_send_sglist_receive(dbg, desc, header_size, 0);
+	len = retried_send_receive(dbg, desc, header_size, 0, 1/*sglist*/, nb_req_retries);
 	if (len < 0) {
 		SRB_LOG_ERR(dbg->level, "ERROR sending sglist: %d", len);
 		return len;
@@ -1064,10 +1097,9 @@ out:
 	return ret;
 }
 
-/* srb_cdmi_getrange(desc, start, end, buff) */
 /*
  * get a buffer from th CDMI server through a CDMI get range primitive
- *
+ * at specified "offset" reading "size" bytes from "buff".
  */
 int srb_cdmi_getrange(srb_debug_t *dbg,
 		struct srb_cdmi_desc_s *desc,
@@ -1090,7 +1122,7 @@ int srb_cdmi_getrange(srb_debug_t *dbg,
 	if (len <= 0) 
 		goto out;
 	
-	rcv = len = sock_send_receive(dbg, desc, len, 0);
+	rcv = len = retried_send_receive(dbg, desc, len, 0, 1/*sglist*/, nb_req_retries);
 	if (len < 0) return len;	
 
 	/* Skip header */
@@ -1121,6 +1153,7 @@ out:
 
 	return ret;
 }
+
 /* srb_cdmi_sync(desc, start, end) */
 /*
  * asks the CDMI server to sync from start offset to end offset

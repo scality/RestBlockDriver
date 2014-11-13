@@ -341,46 +341,33 @@ static int srb_xfer_bio(struct srb_device_s *dev,
 }
 #endif	/* _SRB_BIO_ENABLED_ */
 
-
-/* TODO: Handle CDMI request timeout and retry (Issue #22)
- * For error handling use a returned code
- */
-//void srb_xfer_scl(struct srb_device_s *dev,
 int srb_xfer_scl(struct srb_device_s *dev,
 		struct srb_cdmi_desc_s *desc,
 		struct request *req)
 {
-	int ret;
-	int i;
+	int ret = 0;
 	struct timeval tv_start;
 	struct timeval tv_end;
 
 	SRB_LOG_DEBUG(dev->debug.level, "srb_xfer_scl: CDMI request %p (%s) for device %p with cdmi %p",
 		req, req_code_to_str(rq_data_dir(req)), dev, desc);
 
-	ret = 0;
-	/* TODO: Handle CDMI request retry (Issue #22)
-	 */
 	if (SRB_DEBUG <= dev->debug.level)
 		do_gettimeofday(&tv_start);
-	for (i = 0; i < nb_req_retries; i++) {
-		if (rq_data_dir(req) == WRITE) {
-			ret = srb_cdmi_putrange(&dev->debug,
-						desc,
-						blk_rq_pos(req) * 512ULL,
-						blk_rq_sectors(req) * 512ULL);
-		}
-		else {
-			ret = srb_cdmi_getrange(&dev->debug,
-						desc,
-						blk_rq_pos(req) * 512ULL,
-						blk_rq_sectors(req) * 512ULL);
-		}
-		if (0 == ret)
-			break;
-		else if (i < nb_req_retries - 1)
-			SRB_LOG_NOTICE(dev->debug.level, "Retrying CDMI request... %d", (i + 1));
-	}
+
+        if (rq_data_dir(req) == WRITE) {
+                ret = srb_cdmi_putrange(&dev->debug,
+                                        desc,
+                                        blk_rq_pos(req) * 512ULL,
+                                        blk_rq_sectors(req) * 512ULL);
+        }
+        else {
+                ret = srb_cdmi_getrange(&dev->debug,
+                                        desc,
+                                        blk_rq_pos(req) * 512ULL,
+                                        blk_rq_sectors(req) * 512ULL);
+        }
+
 	if (SRB_DEBUG <= dev->debug.level) {
 		do_gettimeofday(&tv_end);
 		SRB_LOG_DEBUG(dev->debug.level, "cdmi request time: %ldms",
@@ -499,8 +486,6 @@ static int srb_thread(void *data)
 		}
 #else
 		/* Create scatterlist */
-		/* sg_init_table(dev->thread_cdmi_desc[th_id].sgl, DEV_NB_PHYS_SEGS);
-		dev->thread_cdmi_desc[th_id].sgl_size = blk_rq_map_sg(dev->q, req, dev->thread_cdmi_desc[th_id].sgl); */
 		cdmi_desc = dev->thread_cdmi_desc[th_id];
 		sg_init_table(dev->thread_cdmi_desc[th_id]->sgl, DEV_NB_PHYS_SEGS);
 		dev->thread_cdmi_desc[th_id]->sgl_size = blk_rq_map_sg(dev->q, req, dev->thread_cdmi_desc[th_id]->sgl);
@@ -509,7 +494,6 @@ static int srb_thread(void *data)
 			DEV_NB_PHYS_SEGS, dev->thread_cdmi_desc[th_id]->sgl_size, blk_rq_pos(req), blk_rq_sectors(req), rq_data_dir(req) == WRITE);
 
 		/* Call scatter function */
-		//th_ret = srb_xfer_scl(dev, &dev->thread_cdmi_desc[th_id], req);
 		th_ret = srb_xfer_scl(dev, dev->thread_cdmi_desc[th_id], req);
 #endif	/* _SRB_BIO_ENABLED_ */
 
