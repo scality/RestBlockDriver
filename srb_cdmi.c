@@ -342,9 +342,15 @@ static int sock_send_receive(srb_debug_t *dbg,
 	int strict_rcv = (rcv_size) ? 1 : 0;
 	int ret;
 	int rcvd;
+	char *rcvbuf = NULL;
 
 	if (rcv_size == 0)
 		rcv_size = SRB_XMIT_BUFFER_SIZE;
+	rcvbuf = kmalloc(rcv_size, GFP_KERNEL);
+	if (rcvbuf == NULL) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
 
 	/* Check if the connection needs to be restarted */
 	/* Reconnect the socket after a predefined number of HTTP
@@ -354,7 +360,7 @@ static int sock_send_receive(srb_debug_t *dbg,
 		SRB_LOG_DEBUG(dbg->level, "Limit of %u requests reached reconnecting socket", SRB_REUSE_LIMIT);
 		srb_cdmi_disconnect(dbg, desc);
 		ret = srb_cdmi_connect(dbg, desc);
-		if (ret) return ret;
+		if (ret) goto cleanup;
 	}
 	else
 		desc->nb_requests++;
@@ -364,36 +370,42 @@ xmit_again:
 	ret = sock_xmit(dbg, desc, 1, buff, send_size, 0);
 	if (ret == -EPIPE) {
 		srb_cdmi_disconnect(dbg, desc);
-		ret = srb_cdmi_connect(dbg, desc);
-		if (ret) return ret;
+		if (ret) goto cleanup;
 		goto xmit_again;
 	}
-	if (ret != send_size)
-		return -EIO;
+       if (ret != send_size) {
+               ret = -EIO;
+               goto cleanup;
+	}
 	
 	/* Receive response - We want to make sure we received a full response */
 	rcvd = 0;
-	while (!srb_http_check_response_complete(buff, rcvd))
+	while (!srb_http_check_response_complete(rcvbuf, rcvd))
 	{
 		if (rcvd)
 			SRB_LOG_WARN(dbg->level, "Response not read fully in one go: "
 			              "read %i bytes until now", rcvd);
 
-		ret = sock_xmit(dbg, desc, 0, buff+rcvd, rcv_size-rcvd, strict_rcv);
+		ret = sock_xmit(dbg, desc, 0, rcvbuf+rcvd, rcv_size-rcvd, strict_rcv);
 		/* Is the connection to be reopened ? */
 		if (ret < 0) {
 			if (ret == -EPIPE) {
 				srb_cdmi_disconnect(dbg, desc);
 				ret = srb_cdmi_connect(dbg, desc);
-				if (ret) return ret;
+				if (ret) goto cleanup;
 				goto xmit_again;
 			}
-			break ;
+			goto cleanup;
 		}
 		rcvd += ret;
 		ret = rcvd;
 	}
 
+	memcpy(buff, rcvbuf, rcvd);
+
+cleanup:
+	if (rcvbuf)
+		kfree(rcvbuf);
 	return ret;
 }
 
@@ -406,9 +418,15 @@ static int sock_send_sglist_receive(srb_debug_t *dbg,
 	int i;
 	int ret;
 	int rcvd;
+	char *rcvbuf = NULL;
 
 	if (rcv_size == 0)
 		rcv_size = SRB_XMIT_BUFFER_SIZE;
+	rcvbuf = kmalloc(rcv_size, GFP_KERNEL);
+	if (rcvbuf == NULL) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
 
 	/* Check if the connection needs to be restarted */
 	/* Reconnect the socket after a predefined number of HTTP
@@ -418,7 +436,7 @@ static int sock_send_sglist_receive(srb_debug_t *dbg,
 		SRB_LOG_DEBUG(dbg->level, "Limit of %u requests reached reconnecting socket", SRB_REUSE_LIMIT);
 		srb_cdmi_disconnect(dbg, desc);
 		ret = srb_cdmi_connect(dbg, desc);
-		if (ret) return ret;
+		if (ret) goto cleanup;
 	}
 	else
 		desc->nb_requests++;
@@ -435,7 +453,8 @@ xmit_again:
 	}
 	if (ret != send_size) {
 		SRB_LOG_ERR(dbg->level, "Incomplete transmission (%d of %d), returning", ret, send_size);
-		return -EIO;
+		ret = -EIO;
+		goto cleanup;
 	}
 
 	/* Now iterate through the sglist */
@@ -448,13 +467,14 @@ xmit_again:
 			SRB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
 			srb_cdmi_disconnect(dbg, desc);
 			ret = srb_cdmi_connect(dbg, desc);
-			if (ret) return ret;
+			if (ret) goto cleanup;
 			goto xmit_again;
 		}
 		if (ret != length) {
 			SRB_LOG_ERR(dbg->level, "Incomplete transmission (%d of %d), returning",
 				ret, length);
-			return -EIO;
+			ret = -EIO;
+			goto cleanup;
 		}
 	}
 	
@@ -463,37 +483,43 @@ xmit_again:
 		SRB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
 		srb_cdmi_disconnect(dbg, desc);
 		ret = srb_cdmi_connect(dbg, desc);
-		if (ret) return ret;
+		if (ret) goto cleanup;
 		goto xmit_again;
 	}
 	if (ret != 2) {
 		SRB_LOG_ERR(dbg->level, "Incomplete transmission %d of %d), returning", ret, 2);
-		return -EIO;
+		ret = -EIO;
+		goto cleanup;
 	}
 
 	/* Receive response */
 	rcvd = 0;
-	while (!srb_http_check_response_complete(buff, rcvd))
+	while (!srb_http_check_response_complete(rcvbuf, rcvd))
 	{
 		if (rcvd)
 			SRB_LOG_WARN(dbg->level, "Response not read fully in one go: "
 						  "read %i bytes until now", rcvd);
 
-		ret = sock_xmit(dbg, desc, 0, buff+rcvd, rcv_size-rcvd, strict_rcv);
+		ret = sock_xmit(dbg, desc, 0, rcvbuf+rcvd, rcv_size-rcvd, strict_rcv);
 		/* Is the connection to be reopened ? */
 		if (ret < 0) {
 			if (ret == -EPIPE) {
 				srb_cdmi_disconnect(dbg, desc);
 				ret = srb_cdmi_connect(dbg, desc);
-				if (ret) return ret;
+				if (ret) goto cleanup;
 				goto xmit_again;
 			}
-			break ;
+			goto cleanup;
 		}
 		rcvd += ret;
 		ret = rcvd;
 	}
 
+	memcpy(buff, rcvbuf, rcvd);
+
+cleanup:
+	if (rcvbuf)
+		kfree(rcvbuf);
 	return ret;
 }
 
