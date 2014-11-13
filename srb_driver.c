@@ -47,11 +47,6 @@
 #include "srb.h"
 
 
-/* TODO: Testing REQ_FLUSH with old version (Issue #21)
- */
-//#define SRB_BIO_ENABLED	1
-
-
 // LKM information
 MODULE_AUTHOR("Laurent Meyer <laurent.meyer@digitam.net>");
 MODULE_AUTHOR("David Pineau <david.pineau@scality.com>");
@@ -266,81 +261,6 @@ int req_flags_to_str(int flags, char *buff)
 /*
  * Handle an I/O request.
  */
-#ifdef SRB_BIO_ENABLED
-static void srb_xmit_range(struct srb_device_s *dev,
-			struct srb_cdmi_desc_s *desc,
-			char *buf,
-			unsigned long range_start, unsigned long size, int write)
-{
-	if ((range_start + size) > dev->disk_size) {
-		SRB_INFO("Beyond-end write (%lu %lu)", range_start, size);
-		return;
-	}
-
-	if (size != 4096)
-		SRB_DEV_DEBUG("Wrote size of %lu", size);
-
-	if (write) {
-		srb_cdmi_putrange(&dev->debug,
-				desc,
-				range_start,
-				size);
-	}
-	else {
-		srb_cdmi_getrange(&dev->debug,
-				desc,
-				//buf,
-				range_start,
-				size);
-	}
-}
-
-static int srb_xfer_bio(struct srb_device_s *dev,
-			struct srb_cdmi_desc_s *desc,
-			struct bio *bio)
-{
-	int i;
-	struct bio_vec *bvec;
-	sector_t sector = bio->bi_sector;
-
-	/*
-	** Takes care of REQ_FLUSH flag, if set we have to flush
-	** before sending actual bio to device
-	*/
-	if (bio->bi_rw & REQ_FLUSH) {
-		SRB_DEV_DEBUG("[Flush(REG_FLUSH)]");
-		srb_cdmi_flush(&dev->debug, desc, dev->disk_size);
-	}
-
-	bio_for_each_segment(bvec, bio, i) {
-		char *buffer = kmap(bvec->bv_page);
-		unsigned int nbsect = bvec->bv_len / 512UL;
-		
-		SRB_DEV_DEBUG("[Transfering sect=%lu, nb=%d w=%d]",
-			(unsigned long) sector, nbsect,
-			bio_data_dir(bio) == WRITE);
-		
-		srb_xmit_range(dev, desc, buffer + bvec->bv_offset,
-				sector * 512UL, nbsect * 512UL,
-				bio_data_dir(bio) == WRITE);
-
-		sector += nbsect;
-		kunmap(bvec->bv_page);
-	}
-
-	/*
-	** Takes care care of REQ_FUA flag, need to flush here
-	** after the bio have been sent
-	*/
-	if (bio->bi_rw & REQ_FUA) {
-		SRB_DEV_DEBUG("[Flush(REG_FUA)]");
-		srb_cdmi_flush(&dev->debug, desc, dev->disk_size);
-	}
-
-	return 0;
-}
-#endif	/* _SRB_BIO_ENABLED_ */
-
 int srb_xfer_scl(struct srb_device_s *dev,
 		struct srb_cdmi_desc_s *desc,
 		struct request *req)
@@ -419,9 +339,6 @@ static int srb_thread(void *data)
 	int th_id;
 	int th_ret = 0;
 	char buff[256];
-#ifdef SRB_BIO_ENABLED
-	struct bio *bio;
-#endif
 	struct req_iterator iter;
 	struct bio_vec *bvec;
 	struct srb_cdmi_desc_s *cdmi_desc;
@@ -479,12 +396,6 @@ static int srb_thread(void *data)
 			}
 		}
 
-#ifdef SRB_BIO_ENABLED
-		__rq_for_each_bio(bio, req) {
-			//srb_xfer_bio(dev, &dev->thread_cdmi_desc[th_id], bio);
-			srb_xfer_bio(dev, dev->thread_cdmi_desc[th_id], bio);
-		}
-#else
 		/* Create scatterlist */
 		cdmi_desc = dev->thread_cdmi_desc[th_id];
 		sg_init_table(dev->thread_cdmi_desc[th_id]->sgl, DEV_NB_PHYS_SEGS);
@@ -495,7 +406,6 @@ static int srb_thread(void *data)
 
 		/* Call scatter function */
 		th_ret = srb_xfer_scl(dev, dev->thread_cdmi_desc[th_id], req);
-#endif	/* _SRB_BIO_ENABLED_ */
 
 		//SRB_DEV_DEBUG("END REQUEST [tid:%d]", th_id);
 		SRB_LOG_DEBUG(dev->debug.level, "srb_thread: thread %d: REQ done with returned code %d",
