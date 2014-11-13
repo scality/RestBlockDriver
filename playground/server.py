@@ -323,6 +323,7 @@ class RestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self._error(500, "Could not delete volume: %s" % (str(e)))
             return
         self.send_response(204)
+        self.end_headers()
  
 
 class ThreadedHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
