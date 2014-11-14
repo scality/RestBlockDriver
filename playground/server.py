@@ -15,14 +15,31 @@
 # You should have received a copy of the GNU General Public License
 # along with ScalityRestBlock.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
+
+try:
+    import chaussette.util
+except ImportError:
+    chaussette = None
+
 import falcon
+
+# Create & configure root logger
+LOGGER = logging.getLogger(__name__)
+if chaussette:
+    chaussette.util.configure_logger(LOGGER, level='DEBUG')
 
 # Current handlers are for demo purpose only
 
 class Root(object):
+    def __init__(self):
+        self._logger = LOGGER.getChild('root')
+
     def on_get(self, request, response):
         response.content_type = 'text/plain'
         response.status = falcon.HTTP_200
+
+        self._logger.info('Hello, world!')
 
         data = ['abc']
         data_len = sum(len(s) for s in data)
@@ -31,6 +48,7 @@ class Root(object):
 
 CatchallHandler = Root
 
+LOGGER.info('Starting app')
 app = falcon.API()
 app.add_route('/', Root())
 app.set_default_route(CatchallHandler())
