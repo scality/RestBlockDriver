@@ -523,25 +523,6 @@ retry_once:
 		}
 	}
 	
-	ret = sock_xmit(dbg, desc, 1, "\r\n", 2, 0);
-	if (ret == -EPIPE) {
-		SRB_LOG_ERR(dbg->level, "Transmission error (%d), reconnecting...", ret);
-		srb_cdmi_disconnect(dbg, desc);
-		if (has_epiped == 0) {
-			has_epiped = 1;
-			ret = srb_cdmi_connect(dbg, desc);
-			if (ret)
-				goto cleanup;
-			goto retry_once;
-		}
-		goto cleanup;
-	}
-	if (ret != 2) {
-		SRB_LOG_ERR(dbg->level, "Incomplete transmission %d of %d), returning", ret, 2);
-		ret = -EIO;
-		goto cleanup;
-	}
-
 	/* Receive response */
 	rcvd = 0;
 	while (!srb_http_check_response_complete(rcvbuf, rcvd))
