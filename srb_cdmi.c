@@ -1122,7 +1122,7 @@ int srb_cdmi_getrange(srb_debug_t *dbg,
 	if (len <= 0) 
 		goto out;
 	
-	rcv = len = retried_send_receive(dbg, desc, len, 0, 1/*sglist*/, nb_req_retries);
+	rcv = len = retried_send_receive(dbg, desc, len, 0, 0/*no sglist*/, nb_req_retries);
 	if (len < 0) return len;	
 
 	/* Skip header */
