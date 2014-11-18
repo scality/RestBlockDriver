@@ -546,17 +546,34 @@ int srb_http_mklist(char *buff, int len, char *host, char *page)
 int srb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
 {
 	int ret;
-	char *pos;
+	int ipos=0;
+	int keylen;
+	int span;
 
-	pos = strstr(buff, key);
-	if (!pos)
-		return -EIO;
+	keylen = strlen(key);
+	while (ipos < len && strncasecmp(&buff[ipos], key, keylen) != 0) {
+	    ++ipos;
+	}
+	if (ipos == len)
+	    return -EIO;
 
-	/* Skip the key and the ' :' */
-	pos += strlen(key) + 2;
-	ret = sscanf(pos, "%lu", (unsigned long *)value);
+	/* Skip the key and the ': ' */
+	span = 0;
+	while (ipos+keylen+span < len && buff[ipos+keylen+span] != ':')
+	    ++span;
+	if (ipos+keylen+span == len)
+	    return -EIO;
+	++span;
+	while (ipos+keylen+span < len && buff[ipos+keylen+span] == ' ')
+	    ++span;
+	if (ipos+keylen+span == len)
+	    return -EIO;
+
+	/* Now, retrieve the value */
+	ret = sscanf(&buff[ipos+keylen+span], "%lu", (unsigned long *)value);
 	if (ret != 1)
 		return -EIO;
+
 	return 0;
 }
 
