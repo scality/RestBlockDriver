@@ -30,7 +30,7 @@
 #define HTTP_KEEPALIVE	"Connection: keep-alive" CRLF \
 	                "Keep-Alive: timeout=3600 "
 #define HTTP_TRUNCATE	"X-Scal-Truncate"
-#define HTTP_USER_AGENT	"User-Agent: srb/0.2.0"
+#define HTTP_USER_AGENT	"User-Agent: srb/" DEV_REL_VERSION
 #define HTTP_CDMI_VERS	"X-CDMI-Specification-Version: 1.0.1"
 
 #define CR '\r'
