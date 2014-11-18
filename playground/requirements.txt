@@ -1,0 +1,5 @@
+falcon >= 0.1
+chaussette >= 1.2
+gevent >= 1.0
+circus >= 0.11
+circus-web >= 0.5
