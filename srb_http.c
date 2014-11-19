@@ -352,10 +352,6 @@ int srb_http_mkdelete(char *buff, int len, char *host, char *page)
 	if (ret)
 		return -ENOMEM;
 
-	ret = add_buffer(&bufp, &mylen, CRLF);
-	if (ret)
-		return -ENOMEM;
-
 	ret = add_buffer(&bufp, &mylen, CRLF CRLF);
 	if (ret)
 		return -ENOMEM;
@@ -405,7 +401,7 @@ int srb_http_mkmetadata(char *buff, int len, char *host, char *page)
 	return (len - mylen);
 }
 
-int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page, 
+int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 		uint64_t start, uint64_t end)
 {
 	char *bufp = buff;
@@ -455,7 +451,7 @@ int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 		return -ENOMEM;
 
 	/* Construct range info */
-	sprintf(range_str, "%lu-%lu" CRLF, 
+	sprintf(range_str, "%lu-%lu",
 		(unsigned long) start, (unsigned long) end);
 
 	ret = add_buffer(&bufp, &mylen, range_str);
@@ -463,21 +459,17 @@ int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 		return -ENOMEM;
 
 	if (!strncmp("PUT", cmd, 3)) {
-		ret = add_buffer(&bufp, &mylen, "Content-Length: ");
-		if (ret)
-			return -ENOMEM;
-
-		sprintf(range_str, "%lu" CRLF CRLF, 
+		sprintf(range_str, CRLF "Content-Length: %lu",
 			(unsigned long)(end - start + 1UL));
 
 		ret = add_buffer(&bufp, &mylen, range_str);
 		if (ret)
 			return -ENOMEM;
-	} else {
-		ret = add_buffer(&bufp, &mylen, CRLF);
-		if (ret)
-			return -ENOMEM;
 	}
+
+        ret = add_buffer(&bufp, &mylen, CRLF CRLF);
+        if (ret)
+                return -ENOMEM;
 
 	return (len - mylen);
 }
@@ -541,7 +533,7 @@ int srb_http_mklist(char *buff, int len, char *host, char *page)
 		return -ENOMEM;
 
 	return (len - mylen);
-} 
+}
 
 int srb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
 {
