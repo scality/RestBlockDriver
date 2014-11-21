@@ -1087,7 +1087,7 @@ int srb_cdmi_getrange(srb_debug_t *dbg,
 		uint64_t offset, int size)
 {
 	char *xmit_buff = desc->xmit_buff;
-	int len, rcv;
+	int len;
 	int ret = -EIO;
 	uint64_t start, end;
 	int i;
@@ -1103,7 +1103,7 @@ int srb_cdmi_getrange(srb_debug_t *dbg,
 	if (len <= 0) 
 		goto out;
 	
-	rcv = len = retried_send_receive(dbg, desc, len, 0, 0/*no sglist*/, nb_req_retries);
+	len = retried_send_receive(dbg, desc, len, 0, 0/*no sglist*/, nb_req_retries);
 	if (len < 0) return len;	
 
 	/* Skip header */
