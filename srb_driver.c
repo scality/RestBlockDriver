@@ -18,15 +18,6 @@
  *
  */
 
-// Defining __KERNEL__ and MODULE allows us to access kernel-level
-// code not usually available to userspace programs.
-
-#undef __KERNEL__
-#define __KERNEL__
-
-#undef MODULE
-#define MODULE
-
 // Linux Kernel/LKM headers: module.h is needed by all modules and
 // kernel.h is needed for KERN_INFO.
 
@@ -42,7 +33,6 @@
 #include <linux/blkdev.h>
 #include <linux/slab.h>
 #include <linux/kthread.h>
-#include <linux/blkdev.h>
 
 #include "srb.h"
 
@@ -82,7 +72,7 @@ module_param(thread_pool_size, uint, 0444);
 
 /* XXX: Request mapping
  */
-char *req_code_to_str(int code)
+static char *req_code_to_str(int code)
 {
 	switch (code) {
 		case READ: return "READ"; break;
@@ -94,7 +84,7 @@ char *req_code_to_str(int code)
 	}
 }
 
-int req_flags_to_str(int flags, char *buff)
+static int req_flags_to_str(int flags, char *buff)
 {
 	//char buff[128];
 	int size = 0;
@@ -261,7 +251,7 @@ int req_flags_to_str(int flags, char *buff)
 /*
  * Handle an I/O request.
  */
-int srb_xfer_scl(struct srb_device_s *dev,
+static int srb_xfer_scl(struct srb_device_s *dev,
 		struct srb_cdmi_desc_s *desc,
 		struct request *req)
 {
@@ -623,7 +613,7 @@ static int srb_device_new(const char *devname, srb_device_t *dev)
 	 *     whereas the allocation for the cdmi connection pool is an array
 	 *     of cdmi connection structure
 	 */
-	dev->thread_cdmi_desc = kmalloc(sizeof(struct srb_cdmi_desc_s *) * thread_pool_size, GFP_KERNEL);
+	dev->thread_cdmi_desc = kmalloc_array(thread_pool_size, sizeof(struct srb_cdmi_desc_s *), GFP_KERNEL);
 	if (dev->thread_cdmi_desc == NULL) {
 		SRB_LOG_CRIT(srb_log, "srb_device_new: Unable to allocate memory for CDMI struct pointer");
 		ret = -ENOMEM;
@@ -637,7 +627,7 @@ static int srb_device_new(const char *devname, srb_device_t *dev)
 			goto err_mem;
 		}
 	}
-	dev->thread = kmalloc(sizeof(struct task_struct *) * thread_pool_size, GFP_KERNEL);
+	dev->thread = kmalloc_array(thread_pool_size, sizeof(struct task_struct *), GFP_KERNEL);
 	if (dev->thread == NULL) {
 		SRB_LOG_CRIT(srb_log, "srb_device_new: Unable to allocate memory for kernel thread struct");
 		ret = -ENOMEM;
@@ -1091,7 +1081,7 @@ struct cdmi_volume_list_data {
 	size_t	max_size;
 	size_t	printed;
 };
-int _srb_volume_dump(struct cdmi_volume_list_data *cb_data, const char *volname)
+static int _srb_volume_dump(struct cdmi_volume_list_data *cb_data, const char *volname)
 {
 	int ret;
 	int len;

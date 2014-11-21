@@ -599,7 +599,7 @@ int srb_cdmi_list(srb_debug_t *dbg,
 		   void *cb_data)
 {
 	jsmn_parser	json_parser;
-	jsmntok_t	*json_tokens = NULL;
+	jsmntok_t	*json_tokens = NULL, *json_tokens2 = NULL;
 	unsigned int	n_tokens = 0;
 	jsmnerr_t	json_err = JSMN_ERROR_NOMEM;
 
@@ -695,14 +695,19 @@ int srb_cdmi_list(srb_debug_t *dbg,
 	do
 	{
 		n_tokens *= 2;
-		json_tokens = krealloc(json_tokens,
+		json_tokens2 = json_tokens;
+		json_tokens = krealloc(json_tokens2,
 				       n_tokens * sizeof(*json_tokens),
 				       GFP_KERNEL);
 		if (json_tokens != NULL)
 		{
 			json_err = jsmn_parse(&json_parser, content, contentlen,
 					      json_tokens, n_tokens);
+		} else {
+			/* krealloc doesn't free the original */
+			kfree(json_tokens2);
 		}
+
 	} while (json_tokens != NULL
 		 && json_err < 0 && json_err == JSMN_ERROR_NOMEM);
 

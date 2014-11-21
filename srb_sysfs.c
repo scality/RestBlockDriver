@@ -31,7 +31,7 @@
  *
  * Returns number of parameters found, and fills up to param_nb parameters.
  */
-int parse_params(char *params, const char *delim, char **param_tbl, int param_nb, int max)
+static int parse_params(char *params, const char *delim, char **param_tbl, int param_nb, int max)
 {
 	int i;
 	int j;
@@ -54,7 +54,7 @@ int parse_params(char *params, const char *delim, char **param_tbl, int param_nb
 	return j;
 }
 
-int human_to_bytes(char *size_str, unsigned long long *size)
+static int human_to_bytes(char *size_str, unsigned long long *size)
 {
 	char h;
 	unsigned long long coef;
