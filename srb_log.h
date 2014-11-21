@@ -42,7 +42,7 @@
 #define SRB_LVLSTR_ALERT	"ALERT"
 #define SRB_LVLSTR_EMERG	"EMERGENCY"
 
-/* 
+/*
  * LOGGING macros.
  */
 

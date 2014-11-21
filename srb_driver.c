@@ -265,18 +265,18 @@ static int srb_xfer_scl(struct srb_device_s *dev,
 	if (SRB_DEBUG <= dev->debug.level)
 		do_gettimeofday(&tv_start);
 
-        if (rq_data_dir(req) == WRITE) {
-                ret = srb_cdmi_putrange(&dev->debug,
-                                        desc,
-                                        blk_rq_pos(req) * 512ULL,
-                                        blk_rq_sectors(req) * 512ULL);
-        }
-        else {
-                ret = srb_cdmi_getrange(&dev->debug,
-                                        desc,
-                                        blk_rq_pos(req) * 512ULL,
-                                        blk_rq_sectors(req) * 512ULL);
-        }
+	if (rq_data_dir(req) == WRITE) {
+		ret = srb_cdmi_putrange(&dev->debug,
+					desc,
+					blk_rq_pos(req) * 512ULL,
+					blk_rq_sectors(req) * 512ULL);
+	}
+	else {
+		ret = srb_cdmi_getrange(&dev->debug,
+					desc,
+					blk_rq_pos(req) * 512ULL,
+					blk_rq_sectors(req) * 512ULL);
+	}
 
 	if (SRB_DEBUG <= dev->debug.level) {
 		do_gettimeofday(&tv_end);
@@ -406,7 +406,7 @@ static int srb_thread(void *data)
 		th_ret = srb_xfer_scl(dev, dev->thread_cdmi_desc[th_id], req);
 
 		SRBDEV_LOG_DEBUG(dev, "thread %d: REQ done with returned code %d",
-                                 th_id, th_ret);;
+		                 th_id, th_ret);
 	
 		/* No IO error testing for the moment */
 		blk_end_request_all(req, 0);
@@ -559,7 +559,7 @@ static int srb_init_disk(struct srb_device_s *dev)
 	add_disk(disk);
 
 	SRBDEV_LOG_INFO(dev, "Attached volume %s of size 0x%llx",
-                        disk->disk_name, (unsigned long long)dev->disk_size);
+	                disk->disk_name, (unsigned long long)dev->disk_size);
 
 	return 0;
 
@@ -725,7 +725,7 @@ static int __srb_device_detach(srb_device_t *dev)
 		return -EINVAL;
 	}
 
-        SRBDEV_LOG_DEBUG(dev, "Detaching device (%s)", dev->name);
+	SRBDEV_LOG_DEBUG(dev, "Detaching device (%s)", dev->name);
 
 	if (dev->users > 0) {
 		SRBDEV_LOG_ERR(dev, "Unable to remove, device still opened (#users: %d)", dev->users);
@@ -792,13 +792,13 @@ static int _srb_detach_devices(void)
 			ret = __srb_device_detach(&devtab[i]);
 			if (ret != 0) {
 				SRBDEV_LOG_ERR(&devtab[i],
-                                        "Cannot remove device %s for volume %s"
-                                        " on module unload: %i",
-					devtab[i].name,
-                                        devtab[i].thread_cdmi_desc ?
-                                                devtab[i].thread_cdmi_desc[0]->filename
-                                                : "NULL",
-                                         ret);
+				        "Cannot remove device %s for volume %s"
+				        " on module unload: %i",
+				        devtab[i].name,
+				        devtab[i].thread_cdmi_desc ?
+				                devtab[i].thread_cdmi_desc[0]->filename
+				                : "NULL",
+				         ret);
 				errcount++;
 			}
 		}
@@ -1185,7 +1185,7 @@ int srb_device_detach(const char *devname)
 		if (!device_free_slot(&devtab[i])) {
 			if (strcmp(devname, devtab[i].name) == 0) {
 				found = 1;
-                                dev = &devtab[i];
+				dev = &devtab[i];
 				if (devtab[i].state == DEV_IN_USE) {
 					ret = -EBUSY;
 				} else {

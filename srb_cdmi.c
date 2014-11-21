@@ -100,7 +100,7 @@ static int get_port(const char *url, int *port)
 /* srb_cdmi_init (URL)
  *
  * Parse url and initialise cdmi structure in all threads descriptors
- * 
+ *
  */
 int srb_cdmi_init(srb_debug_t *dbg,
 		struct srb_cdmi_desc_s *desc,
@@ -133,7 +133,7 @@ int srb_cdmi_init(srb_debug_t *dbg,
 	/* Decode optional port number*/
 	if (url[0] == ':') {
 		url++;
-	        ret = get_port(url, &port);
+		ret = get_port(url, &port);
 		if (ret == 0) {
 			return -EINVAL;
 		}
@@ -151,7 +151,7 @@ int srb_cdmi_init(srb_debug_t *dbg,
 	desc->state	  = CDMI_DISCONNECTED;
 
 	SRB_LOG_DEBUG(dbg->level, "Decoded URL [ip=%s port=%d file=%s]",
-                   desc->ip_addr, desc->port, desc->filename);
+	              desc->ip_addr, desc->port, desc->filename);
 
 	return 0;	
 }
@@ -186,8 +186,8 @@ int srb_cdmi_connect(srb_debug_t *dbg,
 	desc->sockaddr.sin_family	= AF_INET;
 	desc->sockaddr.sin_addr.s_addr  = in_aton(desc->ip_addr);
 	desc->sockaddr.sin_port		= htons(desc->port);
-	ret = desc->socket->ops->connect(desc->socket, 
-				(struct sockaddr*)&desc->sockaddr, 
+	ret = desc->socket->ops->connect(desc->socket,
+				(struct sockaddr*)&desc->sockaddr,
 				sizeof(struct sockaddr_in), !O_NONBLOCK);
 	if (ret < 0) {
 		SRB_LOG_ERR(dbg->level, "Unable to connect to cdmi server: %d", ret);
@@ -206,7 +206,7 @@ int srb_cdmi_connect(srb_debug_t *dbg,
 	/* TODO: set request timeout value (Issue #22) */
 	if (desc->timeout.tv_sec > 0) {
 		SRB_LOG_DEBUG(dbg->level, "srb_cdmi_connect: set socket timeout %lu", desc->timeout.tv_sec);
-		ret = kernel_setsockopt(desc->socket, SOL_SOCKET, SO_RCVTIMEO, 
+		ret = kernel_setsockopt(desc->socket, SOL_SOCKET, SO_RCVTIMEO,
 			(char *)&desc->timeout, sizeof(struct timeval));
 		if (ret < 0) {
 			SRB_LOG_ERR(dbg->level, "Failed to set socket receive timeout value: %d", ret);
@@ -261,7 +261,7 @@ int srb_cdmi_disconnect(srb_debug_t *dbg,
  */
 static int sock_xmit(srb_debug_t *dbg,
 		struct srb_cdmi_desc_s *desc,
-		int send, 
+		int send,
 		void *buf, int size,
 		int strict_receive)
 {
@@ -403,7 +403,7 @@ retry_once:
 	{
 		if (rcvd)
 			SRB_LOG_WARN(dbg->level, "Response not read fully in one go: "
-			              "read %i bytes until now", rcvd);
+			             "read %i bytes until now", rcvd);
 
 		ret = sock_xmit(dbg, desc, 0, rcvbuf+rcvd, rcv_size-rcvd, strict_rcv);
 		/* Is the connection to be reopened ? */
@@ -566,8 +566,8 @@ static int retried_send_receive(srb_debug_t *dbg,
 	int ret = -1;
 	int i;
 
-        if (attempts < 1)
-            return -EINVAL;
+	if (attempts < 1)
+		return -EINVAL;
 
 	/*
          * TODO: Handle CDMI request retry (Failover: Issue #22)
@@ -683,7 +683,7 @@ int srb_cdmi_list(srb_debug_t *dbg,
 	memcpy(content, buff, len);
 	if (len != contentlen) {
 		SRB_LOG_ERR(dbg->level, "[list] Cannot read whole listing: "
-                            "len: %d contentlen:%llu", len, contentlen);
+		            "len: %d contentlen:%llu", len, contentlen);
 		ret = -EIO;
 		goto err;
 	}
@@ -793,7 +793,7 @@ err:
 }
 
 int srb_cdmi_flush(srb_debug_t *dbg,
-		struct srb_cdmi_desc_s *desc, 
+		struct srb_cdmi_desc_s *desc,
 		unsigned long flush_size)
 {
 	char *buff = desc->xmit_buff;
@@ -806,7 +806,7 @@ int srb_cdmi_flush(srb_debug_t *dbg,
 		return 0;
 
 	/* Construct HTTP truncate */
-	len = srb_http_mktruncate(buff, SRB_XMIT_BUFFER_SIZE, 
+	len = srb_http_mktruncate(buff, SRB_XMIT_BUFFER_SIZE,
 				desc->ip_addr, desc->filename, flush_size);
 	if (len <= 0) return len;
 	
@@ -978,7 +978,7 @@ int srb_cdmi_getsize(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
 	int ret, len;
 
 	/* Construct a HEAD command */
-	len = srb_http_mkhead(buff, SRB_XMIT_BUFFER_SIZE, 
+	len = srb_http_mkhead(buff, SRB_XMIT_BUFFER_SIZE,
 			desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 
@@ -1003,7 +1003,7 @@ int srb_cdmi_getsize(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
 	int ret, len;
 
 	/* Construct a GET (?metadata) command */
-	len = srb_http_mkmetadata(buff, SRB_XMIT_BUFFER_SIZE, 
+	len = srb_http_mkmetadata(buff, SRB_XMIT_BUFFER_SIZE,
 			desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 
@@ -1051,8 +1051,8 @@ int srb_cdmi_putrange(srb_debug_t *dbg,
 	end   = offset + size - 1;
 
 	/* Construct a PUT request with range info */
-	ret = srb_http_mkrange("PUT", xmit_buff, SRB_XMIT_BUFFER_SIZE, 
-				desc->ip_addr, desc->filename, 
+	ret = srb_http_mkrange("PUT", xmit_buff, SRB_XMIT_BUFFER_SIZE,
+				desc->ip_addr, desc->filename,
 				start, end);
 	if (ret <= 0) return ret;
 	
@@ -1102,10 +1102,10 @@ int srb_cdmi_getrange(srb_debug_t *dbg,
 	end   = offset + size - 1;
 
 	/* Construct a PUT request with range info */
-	len = srb_http_mkrange("GET", xmit_buff, SRB_XMIT_BUFFER_SIZE, 
-				desc->ip_addr, desc->filename, 
+	len = srb_http_mkrange("GET", xmit_buff, SRB_XMIT_BUFFER_SIZE,
+				desc->ip_addr, desc->filename,
 				start, end);
-	if (len <= 0) 
+	if (len <= 0)
 		goto out;
 	
 	rcv = len = retried_send_receive(dbg, desc, len, 0, 0/*no sglist*/, nb_req_retries);

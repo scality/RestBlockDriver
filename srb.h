@@ -65,7 +65,7 @@ extern unsigned short nb_req_retries;
 extern unsigned short server_conn_timeout;
 extern unsigned int thread_pool_size;
 
-/* 
+/*
  * Default values for ScalityRestBlock LKM parameters
  */
 #define SRB_REQ_TIMEOUT_DFLT		30
@@ -74,10 +74,8 @@ extern unsigned int thread_pool_size;
 #define SRB_LOG_LEVEL_DFLT		SRB_INFO
 #define SRB_THREAD_POOL_SIZE_DFLT	8
 
-
 #define SRB_DEBUG_LEVEL	0   /* We do not want to be polluted
-				     * by default */
-
+			     * by default */
 
 #define SRB_XMIT_BUFFER_SIZE	(SRB_HTTP_HEADER_SIZE + DEV_SECTORSIZE)
 
@@ -156,7 +154,7 @@ struct srb_cdmi_desc_s {
 	char			xmit_buff[SRB_XMIT_BUFFER_SIZE];
 	uint64_t		nb_requests; /* Number of HTTP
 					      * requests already sent
-					      * through this socket */ 
+					      * through this socket */
 	struct scatterlist	sgl[DEV_NB_PHYS_SEGS];
 	int			sgl_size;
 	struct socket		*socket;
@@ -198,7 +196,7 @@ typedef struct srb_device_s {
 	//struct srb_cdmi_desc_s	thread_cdmi_desc[SRB_THREAD_POOL_SIZE_DFLT];
 	struct srb_cdmi_desc_s	 **thread_cdmi_desc;	/* allow dynamic allocation during device creation*/
 
-	/* 
+	/*
 	** List of requests received by the drivers, but still to be
 	** processed. This due to network latency.
 	*/
@@ -271,7 +269,7 @@ int srb_cdmi_list(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
 int srb_http_check_response_complete(char *buff, int len);
 int srb_http_mklist(char *buff, int len, char *host, char *page);
 int srb_http_mkhead(char *buff, int len, char *host, char *page);
-int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page, 
+int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 		uint64_t start, uint64_t end);
 
 int srb_http_mkcreate(char *buff, int len, char *host, char *page);

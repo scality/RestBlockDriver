@@ -89,7 +89,7 @@ static int human_to_bytes(char *size_str, unsigned long long *size)
 	}
 	*size = *size * coef;
 
-	return 0; 
+	return 0;
 }
 
 /********************************************************************
@@ -97,10 +97,10 @@ static int human_to_bytes(char *size_str, unsigned long long *size)
  *                   srb_debug	 Sets verbosity
  *                   srb_urls	 Gets device CDMI url
  *                   srb_name   Gets device's on-storage filename
- *		     srb_size   Gets device size
+ *                   srb_size   Gets device size
  *******************************************************************/
-static ssize_t attr_debug_store(struct device *dv, 
-				struct device_attribute *attr, 
+static ssize_t attr_debug_store(struct device *dv,
+				struct device_attribute *attr,
 				const char *buff, size_t count)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
@@ -130,7 +130,7 @@ static ssize_t attr_debug_store(struct device *dv,
 	return count;
 }
 
-static ssize_t attr_debug_show(struct device *dv, 
+static ssize_t attr_debug_show(struct device *dv,
 			struct device_attribute *attr, char *buff)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
@@ -142,7 +142,7 @@ static ssize_t attr_debug_show(struct device *dv,
 }
 
 
-static ssize_t attr_urls_show(struct device *dv, 
+static ssize_t attr_urls_show(struct device *dv,
 			struct device_attribute *attr, char *buff)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
@@ -166,7 +166,7 @@ static ssize_t attr_disk_name_show(struct device *dv,
 	return strlen(buff);
 }
 
-static ssize_t attr_disk_size_show(struct device *dv, 
+static ssize_t attr_disk_size_show(struct device *dv,
 				struct device_attribute *attr, char *buff)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
@@ -189,7 +189,7 @@ static DEVICE_ATTR(srb_size, S_IRUGO, &attr_disk_size_show, NULL);
  *                   destroy    Removes the volume's file on the storage
  *                   attach	Attach a volume as a new srb device
  *                   detach	Detaches (remove from the system)
- *				the requested volume (or device)
+ *                              the requested volume (or device)
  ***********************************************************************/
 
 static struct class *class_srb;		/* /sys/class/srb */

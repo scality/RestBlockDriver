@@ -467,9 +467,9 @@ int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 			return -ENOMEM;
 	}
 
-        ret = add_buffer(&bufp, &mylen, CRLF CRLF);
-        if (ret)
-                return -ENOMEM;
+	ret = add_buffer(&bufp, &mylen, CRLF CRLF);
+	if (ret)
+		return -ENOMEM;
 
 	return (len - mylen);
 }
