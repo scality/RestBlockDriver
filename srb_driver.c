@@ -613,7 +613,7 @@ static int srb_device_new(const char *devname, srb_device_t *dev)
 	 *     whereas the allocation for the cdmi connection pool is an array
 	 *     of cdmi connection structure
 	 */
-	dev->thread_cdmi_desc = kmalloc(sizeof(struct srb_cdmi_desc_s *) * thread_pool_size, GFP_KERNEL);
+	dev->thread_cdmi_desc = kmalloc_array(thread_pool_size, sizeof(struct srb_cdmi_desc_s *), GFP_KERNEL);
 	if (dev->thread_cdmi_desc == NULL) {
 		SRB_LOG_CRIT(srb_log, "srb_device_new: Unable to allocate memory for CDMI struct pointer");
 		ret = -ENOMEM;
@@ -627,7 +627,7 @@ static int srb_device_new(const char *devname, srb_device_t *dev)
 			goto err_mem;
 		}
 	}
-	dev->thread = kmalloc(sizeof(struct task_struct *) * thread_pool_size, GFP_KERNEL);
+	dev->thread = kmalloc_array(thread_pool_size, sizeof(struct task_struct *), GFP_KERNEL);
 	if (dev->thread == NULL) {
 		SRB_LOG_CRIT(srb_log, "srb_device_new: Unable to allocate memory for kernel thread struct");
 		ret = -ENOMEM;
