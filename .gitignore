@@ -16,3 +16,10 @@
 *.exe
 *.out
 *.app
+
+# Kernel module build files
+*.cmd
+Module.symvers
+.tmp_versions/
+modules.order
+srb.mod.c
