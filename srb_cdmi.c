@@ -1051,7 +1051,6 @@ int srb_cdmi_putrange(srb_debug_t *dbg,
 				start, end);
 	if (ret <= 0) return ret;
 	
-	xmit_buff += ret;
 	header_size = ret;
 
 	len = retried_send_receive(dbg, desc, header_size, 0, 1/*sglist*/, nb_req_retries);
