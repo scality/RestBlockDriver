@@ -105,26 +105,22 @@ static ssize_t attr_debug_store(struct device *dv,
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
 	struct srb_device_s *dev = disk->private_data;
-        char *end;
-        long new;
-	int val;
+	long int val;
+	int ret;
 
-	/* XXX: simple_strtol is an obsolete function
-	 * TODO: replace it with kstrtol wich can returns:
-	 *       0 on success, -ERANGE on overflow and -EINVAL on parsing error
-	 */
-	new = simple_strtol(buff, &end, 0);
-	if (end == buff || new > INT_MAX || new < INT_MIN) {
-		SRB_LOG_WARN(dev->debug.level, "attr_debug_store: Invalid debug value");
+	ret = kstrtol(buff, 10, &val);
+	if (ret < 0) {
+		SRBDEV_LOG_WARN(dev, "Invalid debug value");
+		return ret;
+	}
+	if ((int)val < 0 || (int)val > 7)
+	{
+		SRBDEV_LOG_WARN(dev, "Invalid debug value (%d) for device %s in sysfs",
+				(int)val, dev->name);
 		return -EINVAL;
 	}
-	val = (int) new;
-	if (val >= 0 && val <= 7) {
-		dev->debug.level = val;
-		SRBDEV_LOG_WARN(dev, "Invalid debug value (%d) for device %s in sysfs", 
-				(int)val, dev->name);
-	}
 
+	dev->debug.level = (int)val;
 	SRBDEV_LOG_DEBUG(dev, "Setting Log level to %d for device %s", (int)val, dev->name);
 
 	return count;
