@@ -480,8 +480,9 @@ static ssize_t class_srb_attach_store(struct class *c,
 
 	if (NULL == *devname || strlen(*devname) > DISK_NAME_LEN) {
 		SRB_LOG_ERR(srb_log, "Invalid parameter #2: "
-			     "'%s'(%lu characters)", *devname,
-			     strlen(*devname));
+			     "'%s'(%lu characters)",
+                             (*devname == NULL ? "NULL" : *devname),
+			     (*devname == NULL ? 0 : strlen(*devname)));
 		ret = -EINVAL;
 		goto out;
 	}
