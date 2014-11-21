@@ -18,15 +18,6 @@
  *
  */
 
-// Defining __KERNEL__ and MODULE allows us to access kernel-level
-// code not usually available to userspace programs.
-
-#undef __KERNEL__
-#define __KERNEL__
-
-#undef MODULE
-#define MODULE
-
 // Linux Kernel/LKM headers: module.h is needed by all modules and
 // kernel.h is needed for KERN_INFO.
 
