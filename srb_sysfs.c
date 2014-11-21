@@ -472,8 +472,9 @@ static ssize_t class_srb_attach_store(struct class *c,
 	/* Sanity check params sizes */
 	if (NULL == *filename || strlen(*filename) > SRB_URL_SIZE) {
 		SRB_LOG_ERR(srb_log, "Invalid parameter #1: "
-			     "'%s'(%lu characters)", *filename,
-			     strlen(*filename));
+			     "'%s'(%lu characters)",
+                             (*filename == NULL ? "NULL" : *filename),
+			     (*filename == NULL ? 0 : strlen(*filename)));
 		ret = -EINVAL;
 		goto out;
 	}
