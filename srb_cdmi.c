@@ -203,7 +203,6 @@ int srb_cdmi_connect(srb_debug_t *dbg,
 		goto out_error;
 	}
 
-	/* TODO: set request timeout value (Issue #22) */
 	if (desc->timeout.tv_sec > 0) {
 		SRB_LOG_DEBUG(dbg->level, "srb_cdmi_connect: set socket timeout %lu", desc->timeout.tv_sec);
 		ret = kernel_setsockopt(desc->socket, SOL_SOCKET, SO_RCVTIMEO,
@@ -570,10 +569,11 @@ static int retried_send_receive(srb_debug_t *dbg,
 		return -EINVAL;
 
 	/*
-         * TODO: Handle CDMI request retry (Failover: Issue #22)
+	 * TODO: Handle Failover (Issue #20)
 	 *
-	 * This meanss that in case of EPIPE (only?),
-	 * we must switch to another server url.
+	 * This means that in case of EPIPE (only? more?),
+	 * we must switch to another server url. It might require to
+	 * be done within the callees
 	 */
 	for (i = 0; i < attempts; i++) {
 		if (do_sglist) {

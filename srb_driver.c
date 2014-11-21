@@ -501,7 +501,6 @@ static int srb_init_disk(struct srb_device_s *dev)
 	if (!q) {
 		SRB_LOG_WARN(srb_log, "srb_init_disk: unable to init block queue for device: %p, disk: %p",
 			dev, disk);
-		//put_disk(disk);
 		srb_free_disk(dev);
 		return -ENOMEM;
 	}
@@ -518,38 +517,30 @@ static int srb_init_disk(struct srb_device_s *dev)
 	//TODO: Enable flush and bio (Issue #21)
 	//blk_queue_flush(q, REQ_FLUSH);
 
-	//TODO: Make thread pool variable (Issue #33)
-	//for (i = 0; i < SRB_THREAD_POOL_SIZE; i++) {
 	for (i = 0; i < thread_pool_size; i++) {
 		//if ((ret = srb_cdmi_connect(&dev->debug, &dev->thread_cdmi_desc[i]))) {
 		if ((ret = srb_cdmi_connect(&dev->debug, dev->thread_cdmi_desc[i]))) {
 			SRB_LOG_ERR(srb_log, "Unable to connect to CDMI endpoint: %d",
 				ret);
-			//put_disk(disk);
 			srb_free_disk(dev);
 			return -EIO;
 		}
 	}
 	/* Caution: be sure to call this before spawning threads */
-	//ret = srb_cdmi_getsize(&dev->debug, &dev->thread_cdmi_desc[0],
 	ret = srb_cdmi_getsize(&dev->debug, dev->thread_cdmi_desc[0], &dev->disk_size);
 	if (ret != 0) {
 		SRB_LOG_ERR(srb_log, "Could not retrieve volume size.");
-		//put_disk(disk);
 		srb_free_disk(dev);
 		return ret;
 	}
 
 	set_capacity(disk, dev->disk_size / 512ULL);
 
-	//TODO: Make thread pool variable (Issue #33)
-	//for (i = 0; i < SRB_THREAD_POOL_SIZE; i++) {
 	for (i = 0; i < thread_pool_size; i++) {
 		dev->thread[i] = kthread_create(srb_thread, dev, "%s",
 						dev->disk->disk_name);
 		if (IS_ERR(dev->thread[i])) {
 			SRB_LOG_ERR(srb_log, "Unable to create worker thread (id %d)", i);
-			//put_disk(disk);
 			dev->thread[i] = NULL;
 			srb_free_disk(dev);
 			goto err_kthread;
@@ -668,8 +659,6 @@ static void srb_device_free(srb_device_t *dev)
 
 	__srb_device_free(dev);
 
-	/* TODO: free kernel memory for CDMI struct (Issue #33)
-	 */
 	if (dev->thread_cdmi_desc) {
 		for (i = 0; i < thread_pool_size; i++) {
 			if (dev->thread_cdmi_desc[i])
@@ -737,8 +726,6 @@ static int __srb_device_detach(srb_device_t *dev)
 		return -EINVAL;
 	}
 
-	/* TODO: Make thread pool variable (Issue #33)
-	 */
 	SRBDEV_LOG_INFO(dev, "Stopping device's background processes");
 	for (i = 0; i < thread_pool_size; i++) {
 		if (dev->thread[i])
@@ -1224,7 +1211,7 @@ int srb_device_detach(const char *devname)
 	return ret;
 }
 
-/* TODO: Remove useless memory allocation
+/* TODO: Remove useless memory allocation (cdmi_desc)
  */
 int srb_device_attach(const char *filename, const char *devname)
 {
@@ -1313,7 +1300,6 @@ int srb_device_attach(const char *filename, const char *devname)
 		memcpy(dev->thread_cdmi_desc[i], cdmi_desc,
 		       sizeof(struct srb_cdmi_desc_s));
 	}
-	//rc = register_blkdev(0, dev->name);
 	rc = register_blkdev(0, DEV_NAME);
 	if (rc < 0) {
 		SRB_LOG_ERR(srb_log, "Could not register_blkdev()");

@@ -217,8 +217,6 @@ static ssize_t class_srb_create_store(struct class *c,
 				const char *buf, size_t count)
 {
 	ssize_t ret = 0;
-	//char filename[SRB_URL_SIZE + 1];
-	//const char *tmp = buf;
 	unsigned long long size = 0;
 	size_t len = 0;
 	char *size_str = NULL;
@@ -249,8 +247,6 @@ static ssize_t class_srb_create_store(struct class *c,
 	}
 	memset(tmp_buf, 0, count + 1);
 	memcpy(tmp_buf, buf, count);
-
-	//printk(KERN_DEBUG "DEBUG: class_srb_create_store: buff (%lu:%lu): '%c':%x", count, sizeof(buf), buf[count - 1], buf[count - 1]);
 
 	/* remove CR or LF if any and end string */
 	if (tmp_buf[count - 1] == '\n' || tmp_buf[count - 1] == '\r')

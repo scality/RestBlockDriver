@@ -56,7 +56,7 @@
 				     * restarting a new one.
 				     */
 
-/* TODO: Retry CDMI request (Issue #22)
+/*
  * Linux Kernel Module (LKM) parameters
  */
 extern unsigned short srb_log;
@@ -172,8 +172,8 @@ typedef struct srb_device_s {
 	/* Device subsystem related data */
 	int			id;		/* device ID */
 	int			major;		/* blkdev assigned major */
-	//char			name[32];	/* blkdev name, e.g. srba */
-	//XXX: use const from ./linux/genhd.h
+
+	/* NOTE: use const from ./linux/genhd.h */
 	char			name[DISK_NAME_LEN];	/* blkdev name, e.g. srba */
 	struct gendisk		*disk;
 	uint64_t		disk_size;	/* Size in bytes */
@@ -184,16 +184,10 @@ typedef struct srb_device_s {
 	struct request_queue	*q;
 	spinlock_t		rq_lock;	/* request queue lock */
 
-	/* TODO: Use a dynamic thread pool (Issue #33)
-         */
-	//struct task_struct	*thread[SRB_THREAD_POOL_SIZE_DFLT];
 	struct task_struct	**thread;	/* allow dynamic allocation during device creation */
 	int			nb_threads;
 
 	/* Dewpoint specific data */
-	/* TODO: Use a dynamic CDMI pool due to the 1 <-> 1 relation with thread (Issue #33)
-	 */
-	//struct srb_cdmi_desc_s	thread_cdmi_desc[SRB_THREAD_POOL_SIZE_DFLT];
 	struct srb_cdmi_desc_s	 **thread_cdmi_desc;	/* allow dynamic allocation during device creation*/
 
 	/*
