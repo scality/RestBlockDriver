@@ -562,8 +562,8 @@ int srb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
 	    return -EIO;
 
 	/* Now, retrieve the value */
-	ret = sscanf(&buff[ipos+keylen+span], "%lu", (unsigned long *)value);
-	if (ret != 1)
+	ret = kstrtou64(&buff[ipos+keylen+span], 10, value);
+	if (ret != 0)
 		return -EIO;
 
 	return 0;
