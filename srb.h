@@ -65,37 +65,6 @@ extern unsigned short nb_req_retries;
 extern unsigned short server_conn_timeout;
 extern unsigned int thread_pool_size;
 
-/* TODO: LKM logging (Issue #28 and Issue #3)
- * Standard Kernel value for log level
- */
-#define SRB_DEBUG		7
-#define SRB_INFO		6
-#define SRB_NOTICE		5
-#define SRB_WARN		4
-#define SRB_ERR		3
-#define SRB_CRIT		2
-#define SRB_ALERT		1
-#define SRB_EMERG		0
-/* 
- * ScalityRestBlock log function
- */
-#define SRB_LOG_DEBUG(level, fmt, a...) \
-	if (level >= SRB_DEBUG) printk(KERN_DEBUG "srb: " fmt "\n", ##a)
-#define SRB_LOG_INFO(level, fmt, a...) \
-	if (level >= SRB_INFO) printk(KERN_INFO "srb: " fmt "\n", ##a)
-#define SRB_LOG_NOTICE(level, fmt, a...) \
-	if (level >= SRB_NOTICE) printk(KERN_NOTICE "srb: " fmt "\n", ##a)
-#define SRB_LOG_WARN(level, fmt, a...) \
-	if (level >= SRB_WARN) printk(KERN_WARNING "srb: " fmt "\n", ##a)
-#define SRB_LOG_ERR(level, fmt, a...) \
-	if (level >= SRB_ERR) printk(KERN_ERR "srb: " fmt "\n", ##a)
-#define SRB_LOG_CRIT(level, fmt, a...) \
-	if (level >= SRB_CRIT) printk(KERN_CRIT "srb: " fmt "\n", ##a)
-#define SRB_LOG_ALERT(level, fmt, a...) \
-	if (level >= SRB_ALERT) printk(KERN_ALERT "srb: " fmt "\n", ##a)
-#define SRB_LOG_EMERG(level, fmt, a...) \
-	if (level >= SRB_EMERG) printk(KERN_EMERG "srb: " fmt "\n", ##a)
-
 /* 
  * Default values for ScalityRestBlock LKM parameters
  */
@@ -111,24 +80,6 @@ extern unsigned int thread_pool_size;
 
 
 #define SRB_XMIT_BUFFER_SIZE	(SRB_HTTP_HEADER_SIZE + DEV_SECTORSIZE)
-
-#define SRB_INTERNAL_DBG(dbg, fmt, a...) \
-	do { if ((dbg)->level)					\
-		printk(KERN_NOTICE "%s @%s:%d: " fmt "\n" ,	\
-			(dbg)->name, __func__, __LINE__, ##a);	\
-	} while (0)
-
-//#define SRB_DEBUG(fmt, a...) SRB_INTERNAL_DBG(dbg, fmt, ##a)
-
-#define SRB_DEV_DEBUG(fmt, a...) SRB_INTERNAL_DBG(&dev->debug, fmt, ##a)
-
-/*
-#define SRB_INFO(fmt, a...) \
-	printk(KERN_INFO "srb: " fmt "\n" , ##a)
-
-#define SRB_ERROR(fmt, a...) \
-	printk(KERN_ERR "srb: " fmt "\n" , ##a)
-*/
 
 #define SRB_MIN(x, y) ((x) < (y) ? (x) : (y))
 #define SRB_N_JSON_TOKENS	128
@@ -263,6 +214,9 @@ typedef struct srb_server_s {
 	struct srb_server_s   	*next;
 	struct srb_cdmi_desc_s	cdmi_desc;
 } srb_server_t;
+
+
+#include "srb_log.h"
 
 /* srb.c */
 int srb_device_create(const char *filename, unsigned long long size);
