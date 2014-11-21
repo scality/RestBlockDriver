@@ -252,7 +252,7 @@ static int req_flags_to_str(int flags, char *buff)
 /*
  * Handle an I/O request.
  */
-int srb_xfer_scl(struct srb_device_s *dev,
+static int srb_xfer_scl(struct srb_device_s *dev,
 		struct srb_cdmi_desc_s *desc,
 		struct request *req)
 {
