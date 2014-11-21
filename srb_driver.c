@@ -33,7 +33,6 @@
 #include <linux/blkdev.h>
 #include <linux/slab.h>
 #include <linux/kthread.h>
-#include <linux/blkdev.h>
 
 #include "srb.h"
 
