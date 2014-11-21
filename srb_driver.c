@@ -340,7 +340,7 @@ static int srb_thread(void *data)
 	int th_ret = 0;
 	char buff[256];
 	struct req_iterator iter;
-	struct bio_vec *bvec;
+	struct bio_vec bvec;
 	struct srb_cdmi_desc_s *cdmi_desc;
 
 	SRB_LOG_DEBUG(((struct srb_device_s *)data)->debug.level, "srb_thread: thread function with data %p", data);
