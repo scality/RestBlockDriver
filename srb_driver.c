@@ -82,7 +82,7 @@ module_param(thread_pool_size, uint, 0444);
 
 /* XXX: Request mapping
  */
-char *req_code_to_str(int code)
+static char *req_code_to_str(int code)
 {
 	switch (code) {
 		case READ: return "READ"; break;
@@ -94,7 +94,7 @@ char *req_code_to_str(int code)
 	}
 }
 
-int req_flags_to_str(int flags, char *buff)
+static int req_flags_to_str(int flags, char *buff)
 {
 	//char buff[128];
 	int size = 0;
@@ -1091,7 +1091,7 @@ struct cdmi_volume_list_data {
 	size_t	max_size;
 	size_t	printed;
 };
-int _srb_volume_dump(struct cdmi_volume_list_data *cb_data, const char *volname)
+static int _srb_volume_dump(struct cdmi_volume_list_data *cb_data, const char *volname)
 {
 	int ret;
 	int len;
