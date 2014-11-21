@@ -290,8 +290,10 @@ int srb_xfer_scl(struct srb_device_s *dev,
 
 	if (SRB_DEBUG <= dev->debug.level) {
 		do_gettimeofday(&tv_end);
+#ifndef __clang_analyzer__ /* scan-build thinks tv_start could be uninitialized */
 		SRB_LOG_DEBUG(dev->debug.level, "cdmi request time: %ldms",
 			(tv_end.tv_sec - tv_start.tv_sec)*1000 + (tv_end.tv_usec - tv_start.tv_usec)/1000);
+#endif
 	}
 
 	if (ret) {
