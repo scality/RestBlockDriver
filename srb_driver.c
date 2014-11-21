@@ -341,7 +341,6 @@ static int srb_thread(void *data)
 	char buff[256];
 	struct req_iterator iter;
 	struct bio_vec bvec;
-	struct srb_cdmi_desc_s *cdmi_desc;
 
 	SRB_LOG_DEBUG(((struct srb_device_s *)data)->debug.level, "srb_thread: thread function with data %p", data);
 
@@ -399,7 +398,6 @@ static int srb_thread(void *data)
 		}
 
 		/* Create scatterlist */
-		cdmi_desc = dev->thread_cdmi_desc[th_id];
 		sg_init_table(dev->thread_cdmi_desc[th_id]->sgl, DEV_NB_PHYS_SEGS);
 		dev->thread_cdmi_desc[th_id]->sgl_size = blk_rq_map_sg(dev->q, req, dev->thread_cdmi_desc[th_id]->sgl);
 
