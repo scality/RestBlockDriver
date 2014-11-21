@@ -62,7 +62,6 @@ int human_to_bytes(char *size_str, unsigned long long *size)
 
 	//printk(KERN_DEBUG "DEBUG: human_to_bytes: buff: %s\n", size_str);
 
-	coef = 1;
 	h = size_str[strlen(size_str) - 1];
 	/* get human format if any and set coeff */
 	switch (h) {
