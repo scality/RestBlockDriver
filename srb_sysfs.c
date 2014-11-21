@@ -558,7 +558,7 @@ static ssize_t class_srb_addurl_store(struct class *c,
 	ssize_t		ret = 0;
 	char		url[SRB_URL_SIZE+1];
 	const char	*tmp = buf;
-	const char	*tmpend = tmp;
+	const char	*tmpend = NULL;
 	int		errcount = 0;
 
 	while (tmp != NULL) {
