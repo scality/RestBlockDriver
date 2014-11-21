@@ -259,8 +259,8 @@ static int srb_xfer_scl(struct srb_device_s *dev,
 	struct timeval tv_start;
 	struct timeval tv_end;
 
-	SRB_LOG_DEBUG(dev->debug.level, "srb_xfer_scl: CDMI request %p (%s) for device %p with cdmi %p",
-		req, req_code_to_str(rq_data_dir(req)), dev, desc);
+	SRBDEV_LOG_DEBUG(dev, "CDMI request %p (%s) with cdmi_desc %p",
+			 req, req_code_to_str(rq_data_dir(req)), desc);
 
 	if (SRB_DEBUG <= dev->debug.level)
 		do_gettimeofday(&tv_start);
@@ -280,12 +280,14 @@ static int srb_xfer_scl(struct srb_device_s *dev,
 
 	if (SRB_DEBUG <= dev->debug.level) {
 		do_gettimeofday(&tv_end);
-		SRB_LOG_DEBUG(dev->debug.level, "cdmi request time: %ldms",
-			(tv_end.tv_sec - tv_start.tv_sec)*1000 + (tv_end.tv_usec - tv_start.tv_usec)/1000);
+		SRBDEV_LOG_DEBUG(dev, "Request took %ldms",
+				 (tv_end.tv_sec - tv_start.tv_sec)*1000 +
+				 (tv_end.tv_usec - tv_start.tv_usec)/1000);
 	}
 
 	if (ret) {
-		SRB_LOG_ERR(dev->debug.level, "CDMI Request using scatterlist failed with IO error: %d", ret);
+		SRBDEV_LOG_ERR(dev, "CDMI Request using scatterlist failed"
+			       " with IO error: %d", ret);
 		return -EIO;
 	}
 
@@ -301,7 +303,7 @@ static int srb_free_disk(struct srb_device_s *dev)
 
 	disk = dev->disk;
 	if (!disk) {
-		SRB_LOG_ERR(dev->debug.level, "%s: Disk is no more available", dev->name);
+		SRBDEV_LOG_ERR(dev, "Disk is not available anymore (%s)", dev->name);
 		return -EINVAL;
 	}
 	dev->disk = NULL;
@@ -333,7 +335,7 @@ static int srb_thread(void *data)
 	struct bio_vec *bvec;
 	struct srb_cdmi_desc_s *cdmi_desc;
 
-	SRB_LOG_DEBUG(((struct srb_device_s *)data)->debug.level, "srb_thread: thread function with data %p", data);
+	SRBDEV_LOG_DEBUG(((struct srb_device_s *)data), "Thread started with device %p", data);
 
 	dev = data;
 
@@ -374,17 +376,17 @@ static int srb_thread(void *data)
 		}
 
 		req_flags_to_str(req->cmd_flags, buff);
-		SRB_LOG_DEBUG(dev->debug.level, "srb_thread: thread %d: New REQ of type %s (%d) flags: %s (%llu)",
-			th_id, req_code_to_str(rq_data_dir(req)), rq_data_dir(req), buff, req->cmd_flags);
+		SRBDEV_LOG_DEBUG(dev, "thread %d: New REQ of type %s (%d) flags: %s (%llu)",
+				 th_id, req_code_to_str(rq_data_dir(req)), rq_data_dir(req), buff, req->cmd_flags);
 		if (req->cmd_flags & REQ_FLUSH) {
-			SRB_LOG_DEBUG(dev->debug.level, "DEBUG CMD REQ_FLUSH\n");
+			SRBDEV_LOG_DEBUG(dev, "DEBUG CMD REQ_FLUSH\n");
 		}
 		/* XXX: Use iterator instead of internal function (cf linux/blkdev.h)
 		 *  __rq_for_each_bio(bio, req) {
 		 */
 		rq_for_each_segment(bvec, req, iter) {
 			if (iter.bio->bi_rw & REQ_FLUSH) {
-				SRB_LOG_DEBUG(dev->debug.level, "DEBUG VR BIO REQ_FLUSH\n");
+				SRBDEV_LOG_DEBUG(dev, "DEBUG VR BIO REQ_FLUSH\n");
 			}
 		}
 
@@ -393,15 +395,18 @@ static int srb_thread(void *data)
 		sg_init_table(dev->thread_cdmi_desc[th_id]->sgl, DEV_NB_PHYS_SEGS);
 		dev->thread_cdmi_desc[th_id]->sgl_size = blk_rq_map_sg(dev->q, req, dev->thread_cdmi_desc[th_id]->sgl);
 
-		SRB_LOG_DEBUG(dev->debug.level, "srb_thread: scatter_list size %d [nb_seg = %d, sector = %lu, nr_sectors=%u w=%d]",
-			DEV_NB_PHYS_SEGS, dev->thread_cdmi_desc[th_id]->sgl_size, blk_rq_pos(req), blk_rq_sectors(req), rq_data_dir(req) == WRITE);
+		SRBDEV_LOG_DEBUG(dev, "scatter_list size %d [nb_seg = %d,"
+		                 " sector = %lu, nr_sectors=%u w=%d]",
+		                 DEV_NB_PHYS_SEGS,
+		                 dev->thread_cdmi_desc[th_id]->sgl_size,
+		                 blk_rq_pos(req), blk_rq_sectors(req),
+		                 rq_data_dir(req) == WRITE);
 
 		/* Call scatter function */
 		th_ret = srb_xfer_scl(dev, dev->thread_cdmi_desc[th_id], req);
 
-		//SRB_DEV_DEBUG("END REQUEST [tid:%d]", th_id);
-		SRB_LOG_DEBUG(dev->debug.level, "srb_thread: thread %d: REQ done with returned code %d",
-			th_id, th_ret);;
+		SRBDEV_LOG_DEBUG(dev, "thread %d: REQ done with returned code %d",
+                                 th_id, th_ret);;
 	
 		/* No IO error testing for the moment */
 		blk_end_request_all(req, 0);
@@ -419,7 +424,7 @@ static void srb_rq_fn(struct request_queue *q)
 
 	while ((req = blk_fetch_request(q)) != NULL) {
 		if (req->cmd_type != REQ_TYPE_FS) {
-			SRB_LOG_DEBUG(dev->debug.level, "srb_rq_fn: Skip non-CMD request");
+			SRBDEV_LOG_DEBUG(dev, "Skip non-CMD request");
 
 			__blk_end_request_all(req, -EIO);
 			continue;
@@ -434,12 +439,9 @@ static void srb_rq_fn(struct request_queue *q)
 
 static int srb_open(struct block_device *bdev, fmode_t mode)
 {
-	//srb_device_t *dev = bdev->bd_disk->private_data;
-	srb_device_t *dev;
+	srb_device_t *dev = (srb_device_t*)bdev->bd_disk->private_data;
 
-	SRB_LOG_INFO(srb_log, "srb_open: opening block device %s", bdev->bd_disk->disk_name);
-
-	dev = bdev->bd_disk->private_data;
+	SRBDEV_LOG_INFO(dev, "Opening device (%s)", bdev->bd_disk->disk_name);
 
 	spin_lock(&devtab_lock);
 	dev->users++;
@@ -456,10 +458,8 @@ static void srb_release(struct gendisk *disk, fmode_t mode)
 {
 	srb_device_t *dev;
 
-	SRB_LOG_INFO(srb_log, "srb_release: releasing disk %s", disk->disk_name);
-
 	dev = disk->private_data;
-
+	SRBDEV_LOG_INFO(dev, "Releasing device (%s)", disk->disk_name);
 	spin_lock(&devtab_lock);
 	dev->users--;
 	spin_unlock(&devtab_lock);
@@ -558,8 +558,8 @@ static int srb_init_disk(struct srb_device_s *dev)
 	}
 	add_disk(disk);
 
-	SRB_LOG_INFO(srb_log, "%s: Added of size 0x%llx",
-		disk->disk_name, (unsigned long long)dev->disk_size);
+	SRBDEV_LOG_INFO(dev, "Attached volume %s of size 0x%llx",
+                        disk->disk_name, (unsigned long long)dev->disk_size);
 
 	return 0;
 
@@ -718,27 +718,28 @@ static int __srb_device_detach(srb_device_t *dev)
 	int i;
 	int ret = 0;
 
-	SRB_LOG_DEBUG(srb_log, "__srb_device_detach: detaching device %s (%p)", dev->name, dev);
+	SRB_LOG_DEBUG(srb_log, "detaching device (%p)", dev);
 
 	if (!dev) {
 		SRB_LOG_WARN(srb_log, "__srb_device_detach: empty device");
 		return -EINVAL;
 	}
 
+        SRBDEV_LOG_DEBUG(dev, "Detaching device (%s)", dev->name);
+
 	if (dev->users > 0) {
-		SRB_LOG_ERR(srb_log, "%s: Unable to remove, device still opened (#users: %d)", dev->name, dev->users);
+		SRBDEV_LOG_ERR(dev, "Unable to remove, device still opened (#users: %d)", dev->users);
 		return -EBUSY;
 	}
 
 	if (!dev->disk) {
-		SRB_LOG_ERR(srb_log, "%s: Disk is no more available", dev->name);
+		SRBDEV_LOG_ERR(dev, "Device %s is not available anymore", dev->name);
 		return -EINVAL;
 	}
 
-	SRB_LOG_INFO(srb_log, "%s: Removing disk", dev->disk->disk_name);
-
 	/* TODO: Make thread pool variable (Issue #33)
 	 */
+	SRBDEV_LOG_INFO(dev, "Stopping device's background processes");
 	for (i = 0; i < thread_pool_size; i++) {
 		if (dev->thread[i])
 			kthread_stop(dev->thread[i]);
@@ -747,10 +748,10 @@ static int __srb_device_detach(srb_device_t *dev)
 	/* free disk */
 	ret = srb_free_disk(dev);
 	if (0 != ret) {
-		SRB_LOG_WARN(srb_log, "%s: Failed to remove disk: %d", dev->name, ret);
+		SRBDEV_LOG_WARN(dev, "Failed to remove device: %d", ret);
 	}
 
-	SRB_LOG_INFO(srb_log, "%s: Removing disk for major %d", dev->name, dev->major);
+	SRB_LOG_INFO(srb_log, "Unregistering device from BLOCK Subsystem");
 	/* Remove device */
 	unregister_blkdev(dev->major, DEV_NAME);
 
@@ -790,8 +791,14 @@ static int _srb_detach_devices(void)
 		if (2 == dev_in_use[i]) {
 			ret = __srb_device_detach(&devtab[i]);
 			if (ret != 0) {
-				SRB_LOG_ERR(srb_log, "Could not remove device %s for volume at unload %s",
-					devtab[i].name, devtab[i].thread_cdmi_desc ? devtab[i].thread_cdmi_desc[0]->filename : "NULL");
+				SRBDEV_LOG_ERR(&devtab[i],
+                                        "Cannot remove device %s for volume %s"
+                                        " on module unload: %i",
+					devtab[i].name,
+                                        devtab[i].thread_cdmi_desc ?
+                                                devtab[i].thread_cdmi_desc[0]->filename
+                                                : "NULL",
+                                         ret);
 				errcount++;
 			}
 		}
@@ -1178,10 +1185,10 @@ int srb_device_detach(const char *devname)
 		if (!device_free_slot(&devtab[i])) {
 			if (strcmp(devname, devtab[i].name) == 0) {
 				found = 1;
+                                dev = &devtab[i];
 				if (devtab[i].state == DEV_IN_USE) {
 					ret = -EBUSY;
 				} else {
-					dev = &devtab[i];
 					/* mark it as ongoing operation */
 					dev->state = DEV_IN_USE;
 					ret = 0;
@@ -1194,18 +1201,18 @@ int srb_device_detach(const char *devname)
 
 	/* check status */
 	if (1 == found && 0 != ret) {
-		SRB_LOG_ERR(srb_log, "Device %s in use", devname);
+		SRBDEV_LOG_ERR(dev, "Device %s is in use", devname);
 		return ret;
 	}
 
 	/* real stuff */
 	if (1 == found) {
-		ret = __srb_device_detach(&devtab[i]);
+		ret = __srb_device_detach(dev);
 		if (ret != 0) {
-			SRB_LOG_ERR(srb_log, "Cannot detach device %s", devname);
+			SRBDEV_LOG_ERR(dev, "Cannot detach device %s", devname);
 		}
 	} else {
-		SRB_LOG_ERR(srb_log, "Device %s not found as attached", devname);
+		SRBDEV_LOG_ERR(dev, "Device %s was not found as attached", devname);
 		return -EINVAL;
 	}
 
@@ -1257,11 +1264,11 @@ int srb_device_attach(const char *filename, const char *devname)
 	spin_unlock(&devtab_lock);
 
 	if (1 == found) {
-		SRB_LOG_ERR(srb_log, "Volume %s already attached as device %s", filename, dev->name);
+		SRBDEV_LOG_ERR(dev, "Volume %s already attached as device %s", filename, dev->name);
 		dev = NULL;
 		return -EEXIST;
 	} else {
-		SRB_LOG_INFO(srb_log, "Volume %s not attached as device, using device slot %d", filename, dev->id);
+		SRB_LOG_INFO(srb_log, "Volume %s not attached yet, using device slot %d", filename, dev->id);
 	}
 
 	cdmi_desc = kmalloc(sizeof(struct srb_cdmi_desc_s), GFP_KERNEL);
@@ -1293,7 +1300,7 @@ int srb_device_attach(const char *filename, const char *devname)
 		SRB_LOG_ERR(srb_log, "Unable to get server: %i", rc);
 		goto cleanup;
 	}
-	SRB_LOG_INFO(srb_log, "Adding Device: Picked server "
+	SRB_LOG_INFO(srb_log, "Attaching Device: Picked server "
 		      "[ip=%s port=%d fullpath=%s]",
 		      cdmi_desc->ip_addr, cdmi_desc->port,
 		      cdmi_desc->filename);
@@ -1322,9 +1329,9 @@ int srb_device_attach(const char *filename, const char *devname)
 
 	srb_sysfs_device_init(dev);
 
-	SRB_LOG_INFO(srb_log, "Added device %s (id: %d, major:%d) for server "
+	SRBDEV_LOG_INFO(dev, "Attached device %s (id: %d) for server "
 		      "[ip=%s port=%d fullpath=%s]",
-		      dev->name, dev->id, dev->major, cdmi_desc->ip_addr,
+		      dev->name, dev->id, cdmi_desc->ip_addr,
 		      cdmi_desc->port, cdmi_desc->filename);
 
 	/* mark device as unsued == available */
@@ -1437,7 +1444,7 @@ int srb_device_extend(const char *filename, unsigned long long size)
 	}
 	spin_unlock(&devtab_lock);
 	if (0 != rc) {
-		SRB_LOG_ERR(srb_log, "Volume %s attached on device %s and in use", filename, dev->name);
+		SRBDEV_LOG_ERR(dev, "Cannot extend volume %s: attached on device in use (%s)", filename, dev->name);
 		dev = NULL;
 		return rc;
 	}

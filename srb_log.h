@@ -85,17 +85,17 @@
  */
 #define SRBDEV_INTERNAL_DBG(lvl, dev, dbg, fmt, args...)\
 	do {\
-		if (dev == NULL && dbg == NULL && SRB_##lvl != SRB_DEBUG)\
+		if (dev == NULL && ((dbg) == NULL || (dbg)->name == NULL) && SRB_##lvl != SRB_DEBUG)\
 			printk(KERN_##lvl SRB_FMT_MINIMAL(lvl, fmt), ##args);\
-		else if (dev == NULL && dbg == NULL)\
+		else if (dev == NULL && ((dbg) == NULL || (dbg)->name == NULL))\
 			printk(KERN_##lvl SRB_FMT_DBG(lvl, fmt), SRB_ARGS_DBG, ##args);\
 		else if (dev == NULL && SRB_##lvl != SRB_DEBUG)\
 			printk(KERN_##lvl SRB_FMT_MOD(lvl, fmt), SRB_ARGS_MOD(dbg), ##args);\
-		else if (dbg == NULL && SRB_##lvl != SRB_DEBUG)\
+		else if (((dbg) == NULL || (dbg)->name == NULL) && SRB_##lvl != SRB_DEBUG)\
 			printk(KERN_##lvl SRB_FMT_DEV(lvl, fmt), SRB_ARGS_DEV(dev), ##args);\
 		else if (dev == NULL)\
 			printk(KERN_##lvl SRB_FMT_NODEV(lvl, fmt), SRB_ARGS_NODEV(dbg), ##args);\
-		else if (dbg == NULL)\
+		else if ((dbg) == NULL || (dbg)->name == NULL)\
 			printk(KERN_##lvl SRB_FMT_NOMOD(lvl, fmt), SRB_ARGS_NOMOD(dev), ##args);\
 		else if (SRB_##lvl != SRB_DEBUG)\
 			printk(KERN_##lvl SRB_FMT_NODBG(lvl, fmt), SRB_ARGS_NODBG(dev, dbg), ##args);\
@@ -107,8 +107,6 @@
 	do {\
 		srb_device_t *dev = NULL;\
 		srb_debug_t *dbg = NULL;\
-		(void)dbg;\
-		(void)dev;\
 		SRBDEV_INTERNAL_DBG(lvl, dev, dbg, fmt, ##args);\
 	} while (0)
 
@@ -129,22 +127,22 @@
 #define SRB_LOG_EMERG(level, fmt, args...) \
 	if (level >= SRB_EMERG) SRB_INTERNAL_DBG(EMERG, fmt, ##args)
 
-#define SRBDEV_LOG_DEBUG(level, fmt, a...) \
-	if (level >= SRB_DEBUG) SRBDEV_INTERNAL_DBG(DEBUG, dbg, fmt, ##a)
-#define SRBDEV_LOG_INFO(level, fmt, a...) \
-	if (level >= SRB_INFO) SRBDEV_INTERNAL_DBG(INFO, dbg, fmt, ##a)
-#define SRBDEV_LOG_NOTICE(level, fmt, a...) \
-	if (level >= SRB_NOTICE) SRBDEV_INTERNAL_DBG(NOTICE, dbg, fmt, ##a)
-#define SRBDEV_LOG_WARN(level, fmt, a...) \
-	if (level >= SRB_WARNING) SRBDEV_INTERNAL_DBG(WARNING, dbg, fmt, ##a)
-#define SRBDEV_LOG_ERR(level, fmt, a...) \
-	if (level >= SRB_ERR) SRBDEV_INTERNAL_DBG(ERR, dbg, fmt, ##a)
-#define SRBDEV_LOG_CRIT(level, fmt, a...) \
-	if (level >= SRB_CRIT) SRBDEV_INTERNAL_DBG(CRIT, dbg, fmt, ##a)
-#define SRBDEV_LOG_ALERT(level, fmt, a...) \
-	if (level >= SRB_ALERT) SRBDEV_INTERNAL_DBG(ALERT, dbg, fmt, ##a)
-#define SRBDEV_LOG_EMERG(level, fmt, a...) \
-	if (level >= SRB_EMERG) SRBDEV_INTERNAL_DBG(EMERG, dbg, fmt, ##a)
+#define SRBDEV_LOG_DEBUG(dev, fmt, a...) \
+	if ((dev)->debug.level >= SRB_DEBUG) SRBDEV_INTERNAL_DBG(DEBUG, dev, &((dev)->debug), fmt, ##a)
+#define SRBDEV_LOG_INFO(dev, fmt, a...) \
+	if ((dev)->debug.level >= SRB_INFO) SRBDEV_INTERNAL_DBG(INFO, dev, &((dev)->debug), fmt, ##a)
+#define SRBDEV_LOG_NOTICE(dev, fmt, a...) \
+	if ((dev)->debug.level >= SRB_NOTICE) SRBDEV_INTERNAL_DBG(NOTICE, dev, &((dev)->debug), fmt, ##a)
+#define SRBDEV_LOG_WARN(dev, fmt, a...) \
+	if ((dev)->debug.level >= SRB_WARNING) SRBDEV_INTERNAL_DBG(WARNING, dev, &((dev)->debug), fmt, ##a)
+#define SRBDEV_LOG_ERR(dev, fmt, a...) \
+	if ((dev)->debug.level >= SRB_ERR) SRBDEV_INTERNAL_DBG(ERR, dev, &((dev)->debug), fmt, ##a)
+#define SRBDEV_LOG_CRIT(dev, fmt, a...) \
+	if ((dev)->debug.level >= SRB_CRIT) SRBDEV_INTERNAL_DBG(CRIT, dev, &((dev)->debug), fmt, ##a)
+#define SRBDEV_LOG_ALERT(dev, fmt, a...) \
+	if ((dev)->debug.level >= SRB_ALERT) SRBDEV_INTERNAL_DBG(ALERT, dev, &((dev)->debug), fmt, ##a)
+#define SRBDEV_LOG_EMERG(dev, fmt, a...) \
+	if ((dev)->debug.level >= SRB_EMERG) SRBDEV_INTERNAL_DBG(EMERG, dev, &((dev)->debug), fmt, ##a)
 
 
 /*

@@ -121,12 +121,11 @@ static ssize_t attr_debug_store(struct device *dv,
 	val = (int) new;
 	if (val >= 0 && val <= 7) {
 		dev->debug.level = val;
-		SRB_LOG_DEBUG(dev->debug.level, "attr_debug_store: Setting Log level to %d for device %s", 
-			val, dev->name);
+		SRBDEV_LOG_WARN(dev, "Invalid debug value (%d) for device %s in sysfs", 
+				(int)val, dev->name);
 	}
-	else
-		SRB_LOG_WARN(dev->debug.level, "attr_debug_store: Invalid debug value (%d) for device %s in sysfs", 
-			val, dev->name);
+
+	SRBDEV_LOG_DEBUG(dev, "Setting Log level to %d for device %s", (int)val, dev->name);
 
 	return count;
 }
