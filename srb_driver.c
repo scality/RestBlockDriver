@@ -1221,6 +1221,7 @@ int srb_device_attach(const char *filename, const char *devname)
 	int do_unregister = 0;
 	struct srb_cdmi_desc_s *cdmi_desc = NULL;
 	int found = 0;
+        const char *fname;
 
 	SRB_LOG_INFO(srb_log, "srb_device_attach: attaching "
 		      "filename %s as device %s",
@@ -1230,7 +1231,7 @@ int srb_device_attach(const char *filename, const char *devname)
 	spin_lock(&devtab_lock);
 	for (i = 0; i < DEV_MAX; ++i) {
 		if (!device_free_slot(&devtab[i])) {
-			const char *fname = kbasename(devtab[i].thread_cdmi_desc[0]->filename);
+			fname = kbasename(devtab[i].thread_cdmi_desc[0]->filename);
 			if (strlen(fname) == strlen(filename) && strncmp(fname, filename, strlen(filename)) == 0) {
 				found = 1;
 				dev = &devtab[i];
