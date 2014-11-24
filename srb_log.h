@@ -105,9 +105,9 @@
 
 #define SRB_INTERNAL_DBG(lvl, fmt, args...) \
 	do {\
-		srb_device_t *dev = NULL;\
-		srb_debug_t *dbg = NULL;\
-		SRBDEV_INTERNAL_DBG(lvl, dev, dbg, fmt, ##args);\
+		srb_device_t *srb_internal_dbg_dev = NULL;\
+		srb_debug_t *srb_internal_dbg_dbg = NULL;\
+		SRBDEV_INTERNAL_DBG(lvl, srb_internal_dbg_dev, srb_internal_dbg_dbg, fmt, ##args);\
 	} while (0)
 
 #define SRB_LOG_DEBUG(level, fmt, args...) \
