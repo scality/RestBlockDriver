@@ -1251,13 +1251,22 @@ int srb_device_attach(const char *filename, const char *devname)
 	}
 	spin_unlock(&devtab_lock);
 
+        if (dev == NULL) {
+            SRB_LOG_ERR(srb_log, "No device slot available to attach volume"
+                        " %s as device %s.", filename, devname);
+            rc = -ENOMEM;
+            goto cleanup;
+        }
+
 	if (1 == found) {
 		SRBDEV_LOG_ERR(dev, "Volume %s already attached as device %s", filename, dev->name);
+                // Don't release dev.
 		dev = NULL;
-		return -EEXIST;
-	} else {
-		SRB_LOG_INFO(srb_log, "Volume %s not attached yet, using device slot %d", filename, dev->id);
+                rc = -EEXIST;
+		goto cleanup;
 	}
+
+        SRB_LOG_INFO(srb_log, "Volume %s not attached yet, using device slot %d", filename, dev->id);
 
 	cdmi_desc = kmalloc(sizeof(struct srb_cdmi_desc_s), GFP_KERNEL);
 	if (cdmi_desc == NULL) {
@@ -1337,7 +1346,7 @@ cleanup:
 		unregister_blkdev(dev->major, DEV_NAME);
 	if (NULL != dev) {
 		srb_device_free(dev);
-		/* mark device as unsued == available */
+		/* mark device as unused == available */
 		spin_lock(&devtab_lock);
 		dev->state = DEV_UNUSED;
 		spin_unlock(&devtab_lock);
