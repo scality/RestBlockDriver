@@ -33,6 +33,7 @@
 #include <linux/blkdev.h>
 #include <linux/slab.h>
 #include <linux/kthread.h>
+#include <linux/version.h>
 
 #include "srb.h"
 
@@ -332,7 +333,11 @@ static int srb_thread(void *data)
 	int th_ret = 0;
 	char buff[256];
 	struct req_iterator iter;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0)
 	struct bio_vec *bvec;
+#else
+        struct bio_vec bvec;
+#endif
 	struct srb_cdmi_desc_s *cdmi_desc;
 
 	SRBDEV_LOG_DEBUG(((struct srb_device_s *)data), "Thread started with device %p", data);
