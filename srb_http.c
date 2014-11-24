@@ -59,6 +59,7 @@ int srb_http_get_status(char *buf, int len, enum srb_http_statuscode *code)
 	long status;
 	char codebuf[8];
 	int codelen = 0;
+	char savechar = 0;
 
 	if (!strncmp(buf, HTTP_VER, strlen(HTTP_VER)))
 	{
@@ -72,9 +73,13 @@ int srb_http_get_status(char *buf, int len, enum srb_http_statuscode *code)
 			codebuf[codelen] = buf[codelen];
 			codelen++;
 		}
+		// Save and set \0 for kstrtol to succeed.
+		savechar = codebuf[codelen];
 		codebuf[codelen] = 0;
 
 		ret = kstrtol(codebuf, 10, &status);
+		// Restore char
+		codebuf[codelen] = savechar;
 		if (ret != 0)
 		{
 			SRB_LOG_ERR(srb_log, "Could not retrieve HTTP status code: err %i (buf=%.*s)", ret, 5, buf);
@@ -541,28 +546,49 @@ int srb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
 	int ipos=0;
 	int keylen;
 	int span;
+	int endpos = -1;
+	char endchar = 0;
 
 	keylen = strlen(key);
 	while (ipos < len && strncasecmp(&buff[ipos], key, keylen) != 0) {
-	    ++ipos;
+		++ipos;
 	}
 	if (ipos == len)
-	    return -EIO;
+		return -EIO;
 
 	/* Skip the key and the ': ' */
 	span = 0;
 	while (ipos+keylen+span < len && buff[ipos+keylen+span] != ':')
-	    ++span;
+		++span;
 	if (ipos+keylen+span == len)
-	    return -EIO;
+		return -EIO;
 	++span;
 	while (ipos+keylen+span < len && buff[ipos+keylen+span] == ' ')
-	    ++span;
+		++span;
 	if (ipos+keylen+span == len)
-	    return -EIO;
+		return -EIO;
+
+	/*
+	 * kstrtou64 seem to return -EINVAL whenever the digits of the number
+	 * are followed by anything other than \n and \0. Because of this, we
+	 * must do a save/restore on the following byte.
+	 */
+	endpos = ipos + keylen + span;
+	while (endpos < len && buff[endpos] >= '0' && buff[endpos] <= '9')
+		endpos++
+	if (endpos < len)
+	{
+		endchar = buff[endpos];
+		buff[endpos] = 0;
+	}
 
 	/* Now, retrieve the value */
 	ret = kstrtou64(&buff[ipos+keylen+span], 10, value);
+
+	/* Now, restore the endbyte if need be */
+	if (endpos < len)
+		buff[endpos] = endchar;
+
 	if (ret != 0)
 		return -EIO;
 
