@@ -575,7 +575,7 @@ int srb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
 	 */
 	endpos = ipos + keylen + span;
 	while (endpos < len && buff[endpos] >= '0' && buff[endpos] <= '9')
-		endpos++
+		endpos++;
 	if (endpos < len)
 	{
 		endchar = buff[endpos];
