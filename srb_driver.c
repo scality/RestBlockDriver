@@ -1207,7 +1207,7 @@ int srb_device_detach(const char *devname)
 			SRBDEV_LOG_ERR(dev, "Cannot detach device %s", devname);
 		}
 	} else {
-		SRBDEV_LOG_ERR(dev, "Device %s was not found as attached", devname);
+	        SRB_LOG_ERR(srb_log, "Device %s was not found as attached", devname);
 		return -EINVAL;
 	}
 
