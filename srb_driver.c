@@ -669,7 +669,11 @@ static void srb_device_free(srb_device_t *dev)
 	if (dev->thread_cdmi_desc) {
 		for (i = 0; i < thread_pool_size; i++) {
 			if (dev->thread_cdmi_desc[i])
+			{
+				srb_cdmi_disconnect(&dev->debug,
+				                    &dev->thread_cdmi_desc[i]);
 				vfree(dev->thread_cdmi_desc[i]);
+			}
 		}
 		vfree(dev->thread_cdmi_desc);
 	}
