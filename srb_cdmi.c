@@ -348,7 +348,7 @@ static int sock_send_receive(srb_debug_t *dbg,
 		strict_rcv = 0;
 		rcv_size = SRB_XMIT_BUFFER_SIZE;
 	}
-	rcvbuf = kmalloc(rcv_size, GFP_KERNEL);
+	rcvbuf = vmalloc(rcv_size);
 	if (rcvbuf == NULL) {
 		ret = -ENOMEM;
 		goto cleanup;
@@ -427,7 +427,7 @@ retry_once:
 
 cleanup:
 	if (rcvbuf)
-		kfree(rcvbuf);
+		vfree(rcvbuf);
 	return ret;
 }
 
@@ -447,7 +447,7 @@ static int sock_send_sglist_receive(srb_debug_t *dbg,
 		strict_rcv = 0;
 		rcv_size = SRB_XMIT_BUFFER_SIZE;
 	}
-	rcvbuf = kmalloc(rcv_size, GFP_KERNEL);
+	rcvbuf = vmalloc(rcv_size);
 	if (rcvbuf == NULL) {
 		ret = -ENOMEM;
 		goto cleanup;
@@ -553,7 +553,7 @@ retry_once:
 
 cleanup:
 	if (rcvbuf)
-		kfree(rcvbuf);
+		vfree(rcvbuf);
 	return ret;
 }
 
@@ -653,7 +653,7 @@ int srb_cdmi_list(srb_debug_t *dbg,
 		goto err;
 	}
 
-	content = kmalloc(contentlen, GFP_KERNEL);
+	content = vmalloc(contentlen);
 	if (content == NULL)
 	{
 		SRB_LOG_ERR(dbg->level, "[list] Cannot allocate enough memory to"
@@ -787,7 +787,7 @@ err:
 	if (json_tokens)
 		kfree(json_tokens);
 	if (content)
-		kfree(content);
+		vfree(content);
 
 	return ret;
 }

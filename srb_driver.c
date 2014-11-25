@@ -32,8 +32,10 @@
 #include <linux/fs.h>
 #include <linux/blkdev.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h> // for vmalloc()
 #include <linux/kthread.h>
 #include <linux/version.h>
+#include <linux/string.h>
 
 #include "srb.h"
 
@@ -609,21 +611,21 @@ static int srb_device_new(const char *devname, srb_device_t *dev)
 	 *     whereas the allocation for the cdmi connection pool is an array
 	 *     of cdmi connection structure
 	 */
-	dev->thread_cdmi_desc = kmalloc_array(thread_pool_size, sizeof(struct srb_cdmi_desc_s *), GFP_KERNEL);
+	dev->thread_cdmi_desc = vmalloc(thread_pool_size * sizeof(struct srb_cdmi_desc_s *));
 	if (dev->thread_cdmi_desc == NULL) {
 		SRB_LOG_CRIT(srb_log, "srb_device_new: Unable to allocate memory for CDMI struct pointer");
 		ret = -ENOMEM;
 		goto err_mem;
 	}
 	for (i = 0; i < thread_pool_size; i++) {
-		dev->thread_cdmi_desc[i] = kmalloc(sizeof(struct srb_cdmi_desc_s), GFP_KERNEL);
+	    dev->thread_cdmi_desc[i] = vmalloc(sizeof(struct srb_cdmi_desc_s));
 		if (dev->thread_cdmi_desc[i] == NULL) {
 			SRB_LOG_CRIT(srb_log, "srb_device_new: Unable to allocate memory for CDMI struct, step %d", i);
 			ret = -ENOMEM;
 			goto err_mem;
 		}
 	}
-	dev->thread = kmalloc_array(thread_pool_size, sizeof(struct task_struct *), GFP_KERNEL);
+	dev->thread = vmalloc(thread_pool_size * sizeof(struct task_struct *));
 	if (dev->thread == NULL) {
 		SRB_LOG_CRIT(srb_log, "srb_device_new: Unable to allocate memory for kernel thread struct");
 		ret = -ENOMEM;
@@ -636,9 +638,9 @@ err_mem:
 	if (NULL != dev && NULL != dev->thread_cdmi_desc) {
 		for (i = 0; i < thread_pool_size; i++) {
 			if (dev->thread_cdmi_desc[i])
-				kfree(dev->thread_cdmi_desc[i]);
+				vfree(dev->thread_cdmi_desc[i]);
 		}
-		kfree(dev->thread_cdmi_desc);
+		vfree(dev->thread_cdmi_desc);
 	}
 out:
 	return ret;
@@ -667,12 +669,12 @@ static void srb_device_free(srb_device_t *dev)
 	if (dev->thread_cdmi_desc) {
 		for (i = 0; i < thread_pool_size; i++) {
 			if (dev->thread_cdmi_desc[i])
-				kfree(dev->thread_cdmi_desc[i]);
+				vfree(dev->thread_cdmi_desc[i]);
 		}
-		kfree(dev->thread_cdmi_desc);
+		vfree(dev->thread_cdmi_desc);
 	}
 	if (dev->thread)
-		kfree(dev->thread);
+		vfree(dev->thread);
 }
 
 static int _srb_reconstruct_url(char *url, char *name,
@@ -814,7 +816,7 @@ static void _srb_server_free(srb_server_t *server)
 
 	if (server) {
 		server->next = NULL;
-		kfree(server);
+		vfree(server);
 		server = NULL;
 	}
 }
@@ -826,12 +828,13 @@ static int _srb_server_new(srb_debug_t *dbg, const char *url, srb_server_t **ser
 
 	SRB_LOG_DEBUG(dbg->level, "_srb_server_new: creating server with url: %s, servers: %p", url, *server);
 
-	new = kcalloc(1, sizeof(struct srb_server_s), GFP_KERNEL);
+	new = vmalloc(sizeof(struct srb_server_s));
 	if (new == NULL) {
 		SRB_LOG_ERR(dbg->level, "Cannot allocate memory to add a new server.");
 		ret = -ENOMEM;
 		goto end;
 	}
+	memset(new, 0, sizeof(struct srb_server_s));
 
 	ret = srb_cdmi_init(dbg, &new->cdmi_desc, url);
 	if (ret != 0) {
@@ -1117,7 +1120,7 @@ int srb_volumes_dump(char *buf, size_t max_size)
 
 	SRB_LOG_INFO(srb_log, "srb_volumes_dump: dumping volumes: buf: %p, max_size: %ld", buf, max_size);
 
-	cdmi_desc = kmalloc(sizeof(*cdmi_desc), GFP_KERNEL);
+	cdmi_desc = vmalloc(sizeof(*cdmi_desc));
 	if (cdmi_desc == NULL) {
 		ret = -ENOMEM;
 		goto cleanup;
@@ -1155,7 +1158,7 @@ cleanup:
 	{
 		if (connected)
 			srb_cdmi_disconnect(&debug, cdmi_desc);
-		kfree(cdmi_desc);
+		vfree(cdmi_desc);
 	}
 
 	return ret < 0 ? ret : cb_data.printed;
@@ -1273,7 +1276,7 @@ int srb_device_attach(const char *filename, const char *devname)
 
         SRB_LOG_INFO(srb_log, "Volume %s not attached yet, using device slot %d", filename, dev->id);
 
-	cdmi_desc = kmalloc(sizeof(struct srb_cdmi_desc_s), GFP_KERNEL);
+	cdmi_desc = vmalloc(sizeof(struct srb_cdmi_desc_s));
 	if (cdmi_desc == NULL) {
 		SRB_LOG_ERR(srb_log, "Unable to allocate memory for cdmi struct");
 		rc = -ENOMEM;
@@ -1357,7 +1360,7 @@ cleanup:
 		spin_unlock(&devtab_lock);
 	}
 	if (NULL != cdmi_desc)
-		kfree(cdmi_desc);
+		vfree(cdmi_desc);
 
 	if (rc < 0)
 		SRB_LOG_ERR(srb_log, "Error adding device %s", filename);
@@ -1376,7 +1379,7 @@ int srb_device_create(const char *filename, unsigned long long size)
 	debug.name = NULL;
 	debug.level = srb_log;
 
-	cdmi_desc = kmalloc(sizeof(struct srb_cdmi_desc_s), GFP_KERNEL);
+	cdmi_desc = vmalloc(sizeof(struct srb_cdmi_desc_s));
 	if (cdmi_desc == NULL) {
 		rc = -ENOMEM;
 		goto err_out_mod;
@@ -1400,7 +1403,7 @@ int srb_device_create(const char *filename, unsigned long long size)
 	SRB_LOG_INFO(srb_log, "Created volume with filename %s", filename);
 
 	if (cdmi_desc)
-		kfree(cdmi_desc);
+		vfree(cdmi_desc);
 
 	return rc;
 
@@ -1408,7 +1411,7 @@ err_out_cdmi:
 	srb_cdmi_disconnect(&debug, cdmi_desc);
 err_out_alloc:
 	if (cdmi_desc)
-		kfree(cdmi_desc);
+		vfree(cdmi_desc);
 err_out_mod:
 	SRB_LOG_ERR(srb_log, "Error creating volume %s", filename);
 
@@ -1450,7 +1453,7 @@ int srb_device_extend(const char *filename, unsigned long long size)
 		return rc;
 	}
 
-	cdmi_desc = kmalloc(sizeof(struct srb_cdmi_desc_s), GFP_KERNEL);
+	cdmi_desc = vmalloc(sizeof(struct srb_cdmi_desc_s));
 	if (cdmi_desc == NULL) {
 		rc = -ENOMEM;
 		goto err_out_mod;
@@ -1475,7 +1478,7 @@ int srb_device_extend(const char *filename, unsigned long long size)
 		goto err_out_cdmi;
 
 	if (cdmi_desc)
-		kfree(cdmi_desc);
+		vfree(cdmi_desc);
 
 	// Find device (normally only 1) associated to filename and update their size
 	spin_lock(&devtab_lock);
@@ -1495,7 +1498,7 @@ err_out_cdmi:
 	srb_cdmi_disconnect(&debug, cdmi_desc);
 err_out_alloc:
 	if (cdmi_desc)
-		kfree(cdmi_desc);
+		vfree(cdmi_desc);
 err_out_mod:
 	SRB_LOG_ERR(srb_log, "Error extending device %s", filename);
 
@@ -1535,7 +1538,7 @@ int srb_device_destroy(const char *filename)
 		goto err_out_mod;
 	}
 
-	cdmi_desc = kmalloc(sizeof(struct srb_cdmi_desc_s), GFP_KERNEL);
+	cdmi_desc = vmalloc(sizeof(struct srb_cdmi_desc_s));
 	if (cdmi_desc == NULL) {
 		SRB_LOG_ERR(srb_log, "Unable to allocate memory for temporary CDMI");
 		rc = -ENOMEM;
@@ -1558,7 +1561,7 @@ int srb_device_destroy(const char *filename)
 	srb_cdmi_disconnect(&debug, cdmi_desc);
 
 	if (cdmi_desc)
-		kfree(cdmi_desc);
+		vfree(cdmi_desc);
 
 	SRB_LOG_INFO(srb_log, "Destroyed volume %s", filename);
 
@@ -1568,7 +1571,7 @@ err_out_cdmi:
 	srb_cdmi_disconnect(&debug, cdmi_desc);
 err_out_alloc:
 	if (cdmi_desc)
-		kfree(cdmi_desc);
+		vfree(cdmi_desc);
 err_out_mod:
 	SRB_LOG_ERR(srb_log, "Error destroying volume %s", filename);
 
