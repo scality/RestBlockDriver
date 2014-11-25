@@ -129,7 +129,7 @@ static int req_flags_to_str(int flags, char *buff)
 	if (flags & REQ_SYNC) {
 		strncpy(&buff[size], "REQ_SYNC|", 9);
 		size += 9;
- 	}	
+	}
 	if (flags & REQ_META) {
 		strncpy(&buff[size], "REQ_META|", 9);
 		size += 9;
@@ -338,7 +338,7 @@ static int srb_thread(void *data)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0)
 	struct bio_vec *bvec;
 #else
-        struct bio_vec bvec;
+	struct bio_vec bvec;
 #endif
 	struct srb_cdmi_desc_s *cdmi_desc;
 
@@ -1233,7 +1233,7 @@ int srb_device_attach(const char *filename, const char *devname)
 	int do_unregister = 0;
 	struct srb_cdmi_desc_s *cdmi_desc = NULL;
 	int found = 0;
-        const char *fname;
+	const char *fname;
 
 	SRB_LOG_INFO(srb_log, "srb_device_attach: attaching "
 		      "filename %s as device %s",
@@ -1263,22 +1263,22 @@ int srb_device_attach(const char *filename, const char *devname)
 	}
 	spin_unlock(&devtab_lock);
 
-        if (dev == NULL) {
-            SRB_LOG_ERR(srb_log, "No device slot available to attach volume"
-                        " %s as device %s.", filename, devname);
-            rc = -ENOMEM;
-            goto cleanup;
-        }
-
-	if (1 == found) {
-		SRBDEV_LOG_ERR(dev, "Volume %s already attached as device %s", filename, dev->name);
-                // Don't release dev.
-		dev = NULL;
-                rc = -EEXIST;
+	if (dev == NULL) {
+		SRB_LOG_ERR(srb_log, "No device slot available to attach volume"
+		            " %s as device %s.", filename, devname);
+		rc = -ENOMEM;
 		goto cleanup;
 	}
 
-        SRB_LOG_INFO(srb_log, "Volume %s not attached yet, using device slot %d", filename, dev->id);
+	if (1 == found) {
+		SRBDEV_LOG_ERR(dev, "Volume %s already attached as device %s", filename, dev->name);
+		// Don't release dev.
+		dev = NULL;
+		rc = -EEXIST;
+		goto cleanup;
+	}
+
+	SRB_LOG_INFO(srb_log, "Volume %s not attached yet, using device slot %d", filename, dev->id);
 
 	cdmi_desc = vmalloc(sizeof(struct srb_cdmi_desc_s));
 	if (cdmi_desc == NULL) {
