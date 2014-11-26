@@ -447,13 +447,24 @@ static void srb_rq_fn(struct request_queue *q)
 static int srb_open(struct block_device *bdev, fmode_t mode)
 {
 	srb_device_t *dev = (srb_device_t*)bdev->bd_disk->private_data;
+	int ret = 0;
 
 	SRBDEV_LOG_INFO(dev, "Opening device (%s)", bdev->bd_disk->disk_name);
 
+	/* Need to check if a detach command is in progress for this
+	   device*/	
 	spin_lock(&devtab_lock);
-	dev->users++;
-	spin_unlock(&devtab_lock);
+	if (dev->state == DEV_IN_USE) {
+	      SRBDEV_LOG_INFO(dev, 
+			      "Tried to open device (%s) while a detach command is in progress", 
+			      bdev->bd_disk->disk_name);
+	      ret = -ENOENT;
+	      goto out;
+	}
 
+	dev->users++;
+ out:
+	spin_unlock(&devtab_lock);
 	return 0;
 }
 
@@ -737,16 +748,16 @@ static int __srb_device_detach(srb_device_t *dev)
 		return -EINVAL;
 	}
 
-	SRBDEV_LOG_INFO(dev, "Stopping device's background processes");
-	for (i = 0; i < thread_pool_size; i++) {
-		if (dev->thread[i])
-			kthread_stop(dev->thread[i]);
-	}
-
 	/* free disk */
 	ret = srb_free_disk(dev);
 	if (0 != ret) {
 		SRBDEV_LOG_WARN(dev, "Failed to remove device: %d", ret);
+	}
+
+	SRBDEV_LOG_INFO(dev, "Stopping device's background processes");
+	for (i = 0; i < thread_pool_size; i++) {
+		if (dev->thread[i])
+			kthread_stop(dev->thread[i]);
 	}
 
 	SRB_LOG_INFO(srb_log, "Unregistering device from BLOCK Subsystem");
@@ -1185,6 +1196,8 @@ int srb_device_detach(const char *devname)
 			if (strcmp(devname, devtab[i].name) == 0) {
 				found = 1;
 				dev = &devtab[i];
+				if (devtab[i].users > 0)
+				        ret = -EBUSY;
 				if (devtab[i].state == DEV_IN_USE) {
 					ret = -EBUSY;
 				} else {
