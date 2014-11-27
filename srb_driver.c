@@ -465,7 +465,7 @@ static int srb_open(struct block_device *bdev, fmode_t mode)
 	dev->users++;
  out:
 	spin_unlock(&devtab_lock);
-	return 0;
+	return ret;
 }
 
 /*
@@ -748,6 +748,9 @@ static int __srb_device_detach(srb_device_t *dev)
 		return -EINVAL;
 	}
 
+	/* Remove device */
+	unregister_blkdev(dev->major, DEV_NAME);
+
 	/* free disk */
 	ret = srb_free_disk(dev);
 	if (0 != ret) {
@@ -761,8 +764,6 @@ static int __srb_device_detach(srb_device_t *dev)
 	}
 
 	SRB_LOG_INFO(srb_log, "Unregistering device from BLOCK Subsystem");
-	/* Remove device */
-	unregister_blkdev(dev->major, DEV_NAME);
 
 	/* Mark slot as empty */
 	if (NULL != dev)
