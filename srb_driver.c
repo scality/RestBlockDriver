@@ -748,8 +748,11 @@ static int __srb_device_detach(srb_device_t *dev)
 		return -EINVAL;
 	}
 
-	/* Remove device */
-	unregister_blkdev(dev->major, DEV_NAME);
+	SRBDEV_LOG_INFO(dev, "Stopping device's background processes");
+	for (i = 0; i < thread_pool_size; i++) {
+		if (dev->thread[i])
+			kthread_stop(dev->thread[i]);
+	}
 
 	/* free disk */
 	ret = srb_free_disk(dev);
@@ -757,13 +760,10 @@ static int __srb_device_detach(srb_device_t *dev)
 		SRBDEV_LOG_WARN(dev, "Failed to remove device: %d", ret);
 	}
 
-	SRBDEV_LOG_INFO(dev, "Stopping device's background processes");
-	for (i = 0; i < thread_pool_size; i++) {
-		if (dev->thread[i])
-			kthread_stop(dev->thread[i]);
-	}
-
 	SRB_LOG_INFO(srb_log, "Unregistering device from BLOCK Subsystem");
+
+	/* Remove device */
+	unregister_blkdev(dev->major, DEV_NAME);
 
 	/* Mark slot as empty */
 	if (NULL != dev)
@@ -1199,7 +1199,7 @@ int srb_device_detach(const char *devname)
 				dev = &devtab[i];
 				if (devtab[i].users > 0)
 				        ret = -EBUSY;
-				if (devtab[i].state == DEV_IN_USE) {
+				else if (devtab[i].state == DEV_IN_USE) {
 					ret = -EBUSY;
 				} else {
 					/* mark it as ongoing operation */
