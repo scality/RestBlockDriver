@@ -128,7 +128,7 @@ adding some. Also, since the listing of urls outputs them this way, you could
 copy and paste part of the urls listing if you wished to. In the end,
 removing server urls can be done as follows:
 
-    # echo "http://127.0.0.1:443/volumes" > /sys/class/srb/remove_url
+    # echo "http://127.0.0.1:443/volumes" > /sys/class/srb/remove_urls
 
 Please note that if a device is attached, you will not be able to remove the
 last server url. You need to detach manually every device attached by the module
@@ -226,12 +226,14 @@ Since you might not know from memory which volumes exist on your servers,
 you might want a way to list those, to attach them easily. One of the ways
 provided is to read the content of the volumes /sys file:
 
+```
  # cat /sys/class/srb/volumes
  Volume1
  Foo
  Bar
  Baz
  Qux
+```
 
 This way, you can know that you have five volumes available on your servers,
 and know their names, which will allow you to either attach, extend or destroy
