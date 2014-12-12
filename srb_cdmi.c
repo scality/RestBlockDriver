@@ -1065,12 +1065,6 @@ int srb_cdmi_putrange(srb_debug_t *dbg,
 		return len;
 	}
 
-	if (len > 512) {/* Shall not get more than that */
-		SRB_LOG_ERR(dbg->level, "Incorrect response size: %d", len);
-		ret = -EIO;
-		goto out;
-	}
-
 	if (strncmp(desc->xmit_buff, "HTTP/1.1 204 No Content",
 			strlen("HTTP/1.1 204 No Content"))) {
 			SRB_LOG_ERR(dbg->level, "Unable to get back HTTP confirmation buffer");
