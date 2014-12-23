@@ -1267,7 +1267,8 @@ int srb_device_attach(const char *filename, const char *devname)
 	}
 	if (0 == found) {
 		for (i = 0; i < DEV_MAX; ++i) {
-			if (device_free_slot(&devtab[i])) {
+			if (device_free_slot(&devtab[i]) && 
+			    (devtab[i].state != DEV_IN_USE)) {
 				dev = &devtab[i];
 				dev->id = i;
 				dev->state = DEV_IN_USE;
