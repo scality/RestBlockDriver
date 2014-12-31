@@ -42,7 +42,10 @@
 #define DEV_DEFAULT_DISKSIZE	(50 * MB)
 #define DEV_MAX			64
 #define DEV_SECTORSIZE		1 * MB
-#define DEV_NB_PHYS_SEGS	512
+/* This defines the max_hw_sectors_kb value
+ * Unit is a sector (512B)
+ */
+#define DEV_NB_PHYS_SEGS       (512 * 4 * 32)
 
 /* Device state (reduce spinlock section and avoid multiple operation on same device) */
 #define DEV_IN_USE		1
