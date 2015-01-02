@@ -230,10 +230,12 @@ static int req_flags_to_str(int flags, char *buff)
 		strncpy(&buff[size], "REQ_SECURE|", 11);
 		size += 11;
 	}
+#ifdef REQ_KERNEL /* Gone in 3.18 */
 	if (flags & REQ_KERNEL) {
 		strncpy(&buff[size], "REQ_KERNEL|", 11);
 		size += 11;
 	}
+#endif
 	if (flags & REQ_PM) {
 		strncpy(&buff[size], "REQ_PM|", 7);
 		size += 7;
