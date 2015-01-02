@@ -192,9 +192,6 @@ static void class_srb_release(struct class *cls)
 static ssize_t class_srb_create_show(struct class *c, struct class_attribute *attr,
 				      char *buf)
 {
-	(void)c;
-	(void)attr;
-
 	return scnprintf(buf, PAGE_SIZE, "# Usage: echo 'VolumeName size(bytes)' > create\n");
 }
 
@@ -209,8 +206,6 @@ static ssize_t class_srb_create_store(struct class *c,
 	char *params[2];
 	const char *delim = " ";
 	char *tmp_buf;
-	(void)c;
-	(void)attr;
 
 	SRB_LOG_INFO(srb_log, "Creating volume with params: %s (%lu)", buf, count);
 
@@ -276,9 +271,6 @@ out:
 static ssize_t class_srb_extend_show(struct class *c, struct class_attribute *attr,
 				      char *buf)
 {
-	(void)c;
-	(void)attr;
-
 	return scnprintf(buf, PAGE_SIZE,
 		 "The new size must be greater than the current size.\n"
 		 "# Usage: echo 'VolumeName size(bytes)' > extend\n");
@@ -297,8 +289,6 @@ static ssize_t class_srb_extend_store(struct class *c,
 	char *params[2];
 	const char *delim = " ";
 	char *tmp_buf;
-	(void)c;
-	(void)attr;
 
 	SRB_LOG_INFO(srb_log, "Extending volume with params: %s (%lu)", buf, count);
 
@@ -359,9 +349,6 @@ out:
 static ssize_t class_srb_destroy_show(struct class *c, struct class_attribute *attr,
 				       char *buf)
 {
-	(void)c;
-	(void)attr;
-
 	return scnprintf(buf, PAGE_SIZE, "# Usage: echo VolumeName > destroy\n");
 }
 
@@ -371,9 +358,6 @@ static ssize_t class_srb_destroy_store(struct class *c,
 {
 	ssize_t ret = 0;
 	char filename[SRB_URL_SIZE + 1];
-
-	(void)c;
-	(void)attr;
 
 	/* Sanity check URL size */
 	if ((count == 0) || (count >= SRB_URL_SIZE)) {
@@ -404,9 +388,6 @@ out:
 static ssize_t class_srb_attach_show(struct class *c, struct class_attribute *attr,
 				      char *buf)
 {
-	(void)c;
-	(void)attr;
-
 	return scnprintf(buf, PAGE_SIZE, "# Usage: echo VolumeName DeviceName > attach\n");
 }
 
@@ -479,9 +460,6 @@ out:
 static ssize_t class_srb_detach_show(struct class *c, struct class_attribute *attr,
 				      char *buf)
 {
-	(void)c;
-	(void)attr;
-
 	return scnprintf(buf, PAGE_SIZE, "# Usage: echo DeviceName > detach\n");
 }
 
@@ -516,9 +494,6 @@ static ssize_t class_srb_detach_store(struct class *c,
 static ssize_t class_srb_addurl_show(struct class *c, struct class_attribute *attr,
 					 char *buf)
 {
-	(void)c;
-	(void)attr;
-
 	return scnprintf(buf, PAGE_SIZE, "# Usage: echo server_url1,...,server_urlN > add_urls\n");
 }
 
@@ -579,9 +554,6 @@ end:
 static ssize_t class_srb_removeurl_show(struct class *c, struct class_attribute *attr,
 					    char *buf)
 {
-	(void)c;
-	(void)attr;
-
 	return scnprintf(buf, PAGE_SIZE, "# Usage: echo server_url1,...,server_urlN > remove_urls\n");
 }
 
@@ -645,9 +617,6 @@ static ssize_t class_srb_urls_show(struct class *c, struct class_attribute *attr
 {
 	ssize_t	ret = 0;
 
-	(void)c;
-	(void)attr;
-
 	ret = srb_servers_dump(buf, PAGE_SIZE);
 
 	return ret;
@@ -657,9 +626,6 @@ static ssize_t class_srb_volumes_show(struct class *c, struct class_attribute *a
 				       char *buf)
 {
 	ssize_t	ret = 0;
-
-	(void)c;
-	(void)attr;
 
 	ret = srb_volumes_dump(buf, PAGE_SIZE);
 
