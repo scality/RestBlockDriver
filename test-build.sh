@@ -57,6 +57,6 @@ function do_run() {
 check_dir $LINUX_DIR
 check_dir $LINUX_DIR/.git
 
-for i in 13 14 15 16 17 18; do
+for i in 10 11 12 13 14 15 16 17 18; do
         do_run 3.$i
 done
