@@ -385,12 +385,9 @@ static int srb_thread(void *data)
 		}
 
 		req_flags_to_str(req->cmd_flags, buff);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 13, 0)
-                SRBDEV_LOG_DEBUG(dev, "thread %d: new REQ of type %s (%d) flags: %s (%u)",
-#else
 		SRBDEV_LOG_DEBUG(dev, "thread %d: New REQ of type %s (%d) flags: %s (%llu)",
-#endif
-				 th_id, req_code_to_str(rq_data_dir(req)), rq_data_dir(req), buff, req->cmd_flags);
+				 th_id, req_code_to_str(rq_data_dir(req)), rq_data_dir(req), buff,
+                                 (unsigned long long)req->cmd_flags);
 		if (req->cmd_flags & REQ_FLUSH) {
 			SRBDEV_LOG_DEBUG(dev, "DEBUG CMD REQ_FLUSH\n");
 		}
