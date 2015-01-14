@@ -36,15 +36,12 @@ Proposed Interface
 The configuration of *srb* consists of two categories: *global* configuration,
 and per-volume settings.
 
-To create and configure a device, the following steps should be taken:
+To create a device, its name, configuration and initial list of backing URLs can
+be provided to the driver, after which it will create a block device and
+register it in the kernel.
 
-- Create a new named *srb* device
-- Configure the device, except for its backing URLs
-  At this point the device node exists, but the device size equals 0, and can't
-  be opened
-- Set up the device URL list
-  At this point, the device size (and other properties, if applicable) are
-  updated, and the device can be opened
+After creation, some volume configuration settings can be altered, or a rescan
+(to update the device size) can be triggered.
 
 To release a device, its attach count must be 0, and the corresponding call on
 the *sysfs* interface of the driver can be triggered.
@@ -65,6 +62,7 @@ Create a new named *srb* device by writing to this entry. The format is
 ::
 
     name option-list
+    urls
 
 where
 
@@ -72,7 +70,14 @@ where
     A name for the device node
 
   option-list
-    A list of options, separated by commas.
+    A list of options, separated by commas. This value is not optional.
+
+  urls
+    A list of volume URLs, on separate lines. See the `section on volume URLs`_
+    for more information about the required format.
+
+.. _section on volume URLs: `class/block/<name>/srb/urls`_
+
 
 Options are
 
@@ -81,12 +86,24 @@ Options are
     integer number of sectors by the driver). When not provided, the default as
     chosen by the kernel will be used.
 
-An example could be
+  defaults
+    Don't set any specific options. This *can* be combined with specific
+    options, although there's not much use: if an option is not set, the default
+    value will be used. To be used when no options are set at all, because the
+    `option-list` is non-optional.
 
-::
+Some examples::
 
-    $ echo "myvolume max_hw_sectors_kb=$(( 32 * 1024 * 1024))" > create
+    $ cat > create << EOF
+    myvolume max_hw_sectors_kb=$(( 32 * 1024 * 1024))
+    cdmi+http://169.254.0.1:8080/container/myvolume
+    EOF
 
+    $ cat > create << EOF
+    myvolume2 defaults
+    cdmi+http://169.254.0.1:8080/container/myvolume2
+    cdmi+http://169.254.0.2:8080/container/myvolume2
+    EOF
 
 The following errors can be returned:
 
@@ -163,9 +180,6 @@ class/block/<name>/srb/urls
 This setting is both readable and writable. When read, it returns the current
 value in the same format as expected when written to.
 
-After writing a list of URLs to this device for the first time, the device will
-be usable (can be opened).
-
 It is possible to write an empty string to this setting, which removes all
 backing URLs from the device. This is *only* possible when the device is not in
 use. When no backing URLs are present, the device can't be opened.
@@ -180,6 +194,10 @@ path portion of the URL should be properly escaped.
 To remove a URL, the whole list must be rewritten (except for the URL to be
 removed, obviously).
 
+Note this list is not treated as a set. It is possible to list a single URL
+multiple times, which would result in more connections to that URL to be used,
+providing a simple balancing mechanism.
+
 The following errors can be returned:
 
   *EINVAL*
@@ -192,12 +210,12 @@ class/block/<name>/srb/connections
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This read-only entry lists all current connections in the following format::
 
-    <TID> <URL> <local IP>:<local port> <RX> <TX>
+    <TID> <URL> <local IP>:<local port> <RX> <TX> <TTL>
 
 where the fields corresponds to the following values:
 
   TID
-    The thread ID managing the connection
+    The thread ID managing the connection. 0 if it is currently not in use.
 
   URL
     The URL used with this connection. This contains the remote IP and port.
@@ -213,3 +231,6 @@ where the fields corresponds to the following values:
 
   TX
     Bytes transmitted through the connection (including requests, headers,...)
+
+  TTL
+    Time to live for the connection, in milliseconds
