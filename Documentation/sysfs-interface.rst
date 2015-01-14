@@ -108,6 +108,12 @@ Options are
     Set the initial log level used for the device. One of `error`, `warning`,
     `info`, `debug` or `trace`. When not provided, the default is `warning`.
 
+  max_thread_pool_size
+    Set the initial max thread pool size for the volume. When not provided, the
+    default is 8. See `max_thread_pool_size`_.
+
+.. _max_thread_pool_size: `class/block/<name>/srb/max_thread_pool_size`_
+
 Some examples::
 
     $ cat > create << EOF
