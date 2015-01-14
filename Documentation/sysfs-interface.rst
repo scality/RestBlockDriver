@@ -50,10 +50,22 @@ Global Settings and Actions
 +++++++++++++++++++++++++++
 All paths are relative to where *sysfs* is mounted.
 
-bus/srb/debug
-~~~~~~~~~~~~~
-Driver debug level, readable and writable. Can be set at module loading time.
-Defaults to the numeric representation of `INFO`.
+bus/srb/loglevel
+~~~~~~~~~~~~~~~~
+Driver log level, readable and writable. Can be set at module loading time using
+a module parameter, `loglevel`.
+
+Returns the current level when read.
+
+Can be one of `error`, `warning`, `info`, `debug` or `trace`.
+
+This level applies only to the generic functionality of the driver. Logging
+related to volumes should be configured on a per-volume basis.
+
+The following errors can be returned:
+
+  *EINVAL*
+    Unable to parse value, or invalid value
 
 bus/srb/create
 ~~~~~~~~~~~~~~
@@ -91,6 +103,10 @@ Options are
     options, although there's not much use: if an option is not set, the default
     value will be used. To be used when no options are set at all, because the
     `option-list` is non-optional.
+
+  loglevel
+    Set the initial log level used for the device. One of `error`, `warning`,
+    `info`, `debug` or `trace`. When not provided, the default is `warning`.
 
 Some examples::
 
@@ -154,11 +170,12 @@ Volume Settings and Actions
 Several settings and actions are provided on *srb* devices. These are exposed in
 the *srb* directory under the device entry in *class/block*.
 
-class/block/<name>/srb/debug
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This is a readable and writable setting, specifying the debug level for messages
-originating from the device handler functions. Defaults to the numeric
-representation of `WARNING`.
+class/block/<name>/srb/loglevel
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This is a readable and writable setting, specifying the log level for messages
+originating from the device handler functions.
+
+Returns the current level when read.
 
 The following errors can be returned:
 
