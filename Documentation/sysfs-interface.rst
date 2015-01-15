@@ -50,23 +50,6 @@ Global Settings and Actions
 +++++++++++++++++++++++++++
 All paths are relative to where *sysfs* is mounted.
 
-class/srb/loglevel
-~~~~~~~~~~~~~~~~~~
-Driver log level, readable and writable. Can be set at module loading time using
-a module parameter, `loglevel`.
-
-Returns the current level when read.
-
-Can be one of `error`, `warning`, `info`, `debug` or `trace`.
-
-This level applies only to the generic functionality of the driver. Logging
-related to volumes should be configured on a per-volume basis.
-
-The following errors can be returned:
-
-  *EINVAL*
-    Unable to parse value, or invalid value
-
 class/srb/create
 ~~~~~~~~~~~~~~~~
 Create a new named *srb* device by writing to this entry. The format is
@@ -103,10 +86,6 @@ Options are
     options, although there's not much use: if an option is not set, the default
     value will be used. To be used when no options are set at all, because the
     `option-list` is non-optional.
-
-  loglevel
-    Set the initial log level used for the device. One of `error`, `warning`,
-    `info`, `debug` or `trace`. When not provided, the default is `warning`.
 
   max_thread_pool_size
     Set the initial max thread pool size for the volume. When not provided, the
@@ -175,18 +154,6 @@ Volume Settings and Actions
 +++++++++++++++++++++++++++
 Several settings and actions are provided on *srb* devices. These are exposed in
 the *srb* directory under the device entry in *class/block*.
-
-class/block/<name>/srb/loglevel
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This is a readable and writable setting, specifying the log level for messages
-originating from the device handler functions.
-
-Returns the current level when read.
-
-The following errors can be returned:
-
-  *EINVAL*
-    Unable to parse value, or invalid value
 
 class/block/<name>/srb/max_thread_pool_size
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
