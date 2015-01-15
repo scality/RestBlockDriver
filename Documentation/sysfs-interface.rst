@@ -50,8 +50,8 @@ Global Settings and Actions
 +++++++++++++++++++++++++++
 All paths are relative to where *sysfs* is mounted.
 
-bus/srb/loglevel
-~~~~~~~~~~~~~~~~
+class/srb/loglevel
+~~~~~~~~~~~~~~~~~~
 Driver log level, readable and writable. Can be set at module loading time using
 a module parameter, `loglevel`.
 
@@ -67,8 +67,8 @@ The following errors can be returned:
   *EINVAL*
     Unable to parse value, or invalid value
 
-bus/srb/create
-~~~~~~~~~~~~~~
+class/srb/create
+~~~~~~~~~~~~~~~~
 Create a new named *srb* device by writing to this entry. The format is
 
 ::
@@ -141,8 +141,8 @@ The following errors can be returned:
 Note a device is not ready for use after creation: it will only active after
 setting at least its list of backing URLs.
 
-bus/srb/destroy
-~~~~~~~~~~~~~~~
+class/srb/destroy
+~~~~~~~~~~~~~~~~~
 To destroy an *srb* device, the name of the device should be written to this
 node. The following errors can be returned:
 
@@ -159,8 +159,8 @@ Example usage::
 
     $ echo myvolume > destroy
 
-bus/srb/volumes
-~~~~~~~~~~~~~~~
+class/srb/volumes
+~~~~~~~~~~~~~~~~~
 This read-only node lists all existing *srb* devices. The names are separated by
 a newline.
 
