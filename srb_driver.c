@@ -230,10 +230,12 @@ static int req_flags_to_str(int flags, char *buff)
 		strncpy(&buff[size], "REQ_SECURE|", 11);
 		size += 11;
 	}
+#ifdef REQ_KERNEL /* Gone in 3.18 */
 	if (flags & REQ_KERNEL) {
 		strncpy(&buff[size], "REQ_KERNEL|", 11);
 		size += 11;
 	}
+#endif
 	if (flags & REQ_PM) {
 		strncpy(&buff[size], "REQ_PM|", 7);
 		size += 7;
@@ -384,7 +386,8 @@ static int srb_thread(void *data)
 
 		req_flags_to_str(req->cmd_flags, buff);
 		SRBDEV_LOG_DEBUG(dev, "thread %d: New REQ of type %s (%d) flags: %s (%llu)",
-				 th_id, req_code_to_str(rq_data_dir(req)), rq_data_dir(req), buff, req->cmd_flags);
+				 th_id, req_code_to_str(rq_data_dir(req)), rq_data_dir(req), buff,
+                                 (unsigned long long)req->cmd_flags);
 		if (req->cmd_flags & REQ_FLUSH) {
 			SRBDEV_LOG_DEBUG(dev, "DEBUG CMD REQ_FLUSH\n");
 		}
