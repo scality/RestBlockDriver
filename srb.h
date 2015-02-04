@@ -203,6 +203,8 @@ typedef struct srb_device_s {
 
 	/* Debug traces */
 	srb_debug_t		debug;
+
+        size_t bytes_since_last_flush;
 } srb_device_t;
 
 typedef struct srb_server_s {

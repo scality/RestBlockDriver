@@ -389,14 +389,16 @@ static int srb_thread(void *data)
 				 th_id, req_code_to_str(rq_data_dir(req)), rq_data_dir(req), buff,
                                  (unsigned long long)req->cmd_flags);
 		if (req->cmd_flags & REQ_FLUSH) {
-			SRBDEV_LOG_DEBUG(dev, "DEBUG CMD REQ_FLUSH\n");
+			SRBDEV_LOG_DEBUG(dev, "DEBUG CMD REQ_FLUSH: %zu bytes since last\n", dev->bytes_since_last_flush);
+                        dev->bytes_since_last_flush = 0;
 		}
 		/* XXX: Use iterator instead of internal function (cf linux/blkdev.h)
 		 *  __rq_for_each_bio(bio, req) {
 		 */
 		rq_for_each_segment(bvec, req, iter) {
 			if (iter.bio->bi_rw & REQ_FLUSH) {
-				SRBDEV_LOG_DEBUG(dev, "DEBUG VR BIO REQ_FLUSH\n");
+				SRBDEV_LOG_DEBUG(dev, "DEBUG VR BIO REQ_FLUSH: %zu bytes since last\n", dev->bytes_since_last_flush);
+                                dev->bytes_since_last_flush = 0;
 			}
 		}
 
@@ -404,6 +406,12 @@ static int srb_thread(void *data)
 		cdmi_desc = dev->thread_cdmi_desc[th_id];
 		sg_init_table(dev->thread_cdmi_desc[th_id]->sgl, DEV_NB_PHYS_SEGS);
 		dev->thread_cdmi_desc[th_id]->sgl_size = blk_rq_map_sg(dev->q, req, dev->thread_cdmi_desc[th_id]->sgl);
+
+                if(rq_data_dir(req) == WRITE) {
+                        rq_for_each_segment(bvec, req, iter) {
+                                dev->bytes_since_last_flush += bio_cur_bytes(iter.bio);
+                        }
+                }
 
 		SRBDEV_LOG_DEBUG(dev, "scatter_list size %d [nb_seg = %d,"
 		                 " sector = %lu, nr_sectors=%u w=%d]",
@@ -502,6 +510,8 @@ static int srb_init_disk(struct srb_device_s *dev)
 
 	SRB_LOG_INFO(srb_log, "srb_init_disk: initializing disk for device: %s", dev->name);
 
+        dev->bytes_since_last_flush = 0;
+
 	/* create gendisk info */
 	disk = alloc_disk(DEV_MINORS);
 	if (!disk) {
@@ -537,6 +547,8 @@ static int srb_init_disk(struct srb_device_s *dev)
 
 	//TODO: Enable flush and bio (Issue #21)
 	//blk_queue_flush(q, REQ_FLUSH);
+
+        blk_queue_flush(q, REQ_FLUSH);
 
 	for (i = 0; i < thread_pool_size; i++) {
 		//if ((ret = srb_cdmi_connect(&dev->debug, &dev->thread_cdmi_desc[i]))) {
