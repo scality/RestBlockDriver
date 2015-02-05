@@ -389,7 +389,7 @@ static int srb_thread(void *data)
 				 th_id, req_code_to_str(rq_data_dir(req)), rq_data_dir(req), buff,
                                  (unsigned long long)req->cmd_flags);
 		if (req->cmd_flags & REQ_FLUSH) {
-			SRBDEV_LOG_DEBUG(dev, "DEBUG CMD REQ_FLUSH: %zu bytes since last\n", dev->bytes_since_last_flush);
+			SRBDEV_LOG_INFO(dev, "DEBUG CMD REQ_FLUSH: %zu bytes since last\n", dev->bytes_since_last_flush);
                         dev->bytes_since_last_flush = 0;
 		}
 		/* XXX: Use iterator instead of internal function (cf linux/blkdev.h)
@@ -397,7 +397,7 @@ static int srb_thread(void *data)
 		 */
 		rq_for_each_segment(bvec, req, iter) {
 			if (iter.bio->bi_rw & REQ_FLUSH) {
-				SRBDEV_LOG_DEBUG(dev, "DEBUG VR BIO REQ_FLUSH: %zu bytes since last\n", dev->bytes_since_last_flush);
+				SRBDEV_LOG_INFO(dev, "DEBUG VR BIO REQ_FLUSH: %zu bytes since last\n", dev->bytes_since_last_flush);
                                 dev->bytes_since_last_flush = 0;
 			}
 		}
