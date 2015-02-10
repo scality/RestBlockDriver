@@ -24,6 +24,8 @@
 #include <linux/blkdev.h>
 #include <linux/string.h>
 
+#include <srb/srb-log.h>
+
 #include "srb.h"
 
 
@@ -238,7 +240,7 @@ static ssize_t class_srb_create_store(struct class *c,
 	parse_params(tmp_buf, delim, params, 2, count);
 	/* sanity check */
 	len = strlen(params[0]);
-	if (len >= SRB_URL_SIZE) {
+	if (len >= SRB_CDMI_URL_SIZE) {
 		SRB_LOG_ERR(srb_log, "Invalid volume name (too long: %lu)", len);
 		ret = -EINVAL;
 		goto out;
@@ -317,7 +319,7 @@ static ssize_t class_srb_extend_store(struct class *c,
 	parse_params(tmp_buf, delim, params, 2, count);
 	/* sanity check */
 	len = strlen(params[0]);
-	if (len >= SRB_URL_SIZE) {
+	if (len >= SRB_CDMI_URL_SIZE) {
 		SRB_LOG_ERR(srb_log, "Invalid volume name (too long: %lu)", len);
 		ret = -EINVAL;
 		goto out;
@@ -357,10 +359,10 @@ static ssize_t class_srb_destroy_store(struct class *c,
 					const char *buf, size_t count)
 {
 	ssize_t ret = 0;
-	char filename[SRB_URL_SIZE + 1];
+	char filename[SRB_CDMI_URL_SIZE + 1];
 
 	/* Sanity check URL size */
-	if ((count == 0) || (count >= SRB_URL_SIZE)) {
+	if ((count == 0) || (count >= SRB_CDMI_URL_SIZE)) {
 		SRB_LOG_ERR(srb_log, "Invalid parameter (too long: %lu)", count);
 		ret = -EINVAL;
 		goto out;
@@ -427,7 +429,7 @@ static ssize_t class_srb_attach_store(struct class *c,
 	}
 
 	/* Sanity check params sizes */
-	if (NULL == *filename || strlen(*filename) > SRB_URL_SIZE) {
+	if (NULL == *filename || strlen(*filename) > SRB_CDMI_URL_SIZE) {
 		SRB_LOG_ERR(srb_log, "Invalid parameter #1: "
 			     "'%s'(%lu characters)", *filename,
 			     strlen(*filename));
@@ -503,7 +505,7 @@ static ssize_t class_srb_addurl_store(struct class *c,
 					  size_t count)
 {
 	ssize_t		ret = 0;
-	char		url[SRB_URL_SIZE+1];
+	char		url[SRB_CDMI_URL_SIZE+1];
 	const char	*tmp = buf;
 	const char	*tmpend = tmp;
 	int		errcount = 0;
@@ -523,7 +525,7 @@ static ssize_t class_srb_addurl_store(struct class *c,
 			while (*tmpend && *tmpend != '\n')
 				tmpend++;
 
-			if ((tmpend - tmp) > SRB_URL_SIZE) {
+			if ((tmpend - tmp) > SRB_CDMI_URL_SIZE) {
 				SRB_LOG_ERR(srb_log, "Url too big: '%s'", tmp);
 				ret = -EINVAL;
 				goto end;
@@ -532,7 +534,7 @@ static ssize_t class_srb_addurl_store(struct class *c,
 			url[(tmpend - tmp)] = 0;
 			tmpend = NULL;
 		}
-		url[SRB_URL_SIZE] = 0;
+		url[SRB_CDMI_URL_SIZE] = 0;
 
 		ret = srb_server_add(url);
 		if (ret < 0)
@@ -563,7 +565,7 @@ static ssize_t class_srb_removeurl_store(struct class *c,
 					     size_t count)
 {
 	ssize_t		ret = 0;
-	char		url[SRB_URL_SIZE];
+	char		url[SRB_CDMI_URL_SIZE];
 	const char	*tmp = buf;
 	const char	*tmpend = tmp;
 
@@ -585,7 +587,7 @@ static ssize_t class_srb_removeurl_store(struct class *c,
 			while (*tmpend && *tmpend != '\n')
 				tmpend++;
 
-			if ((tmpend - tmp) > SRB_URL_SIZE)
+			if ((tmpend - tmp) > SRB_CDMI_URL_SIZE)
 			{
 				SRB_LOG_ERR(srb_log, "Url too big: '%s'", tmp);
 				ret = -EINVAL;

@@ -37,6 +37,9 @@
 #include <linux/version.h>
 #include <linux/string.h>
 
+#include <srb/srb-cdmi.h>
+#include <srb/srb-log.h>
+
 #include "srb.h"
 
 
@@ -712,16 +715,16 @@ static int _srb_reconstruct_url(char *url, char *name,
 
 	if (seplen)
 	{
-		urllen = snprintf(url, SRB_URL_SIZE, "%s/%s", baseurl, filename);
-		namelen = snprintf(name, SRB_URL_SIZE, "%s/%s", basepath, filename);
+		urllen = snprintf(url, SRB_CDMI_URL_SIZE, "%s/%s", baseurl, filename);
+		namelen = snprintf(name, SRB_CDMI_URL_SIZE, "%s/%s", basepath, filename);
 	}
 	else
 	{
-		urllen = snprintf(url, SRB_URL_SIZE, "%s%s", baseurl, filename);
-		namelen = snprintf(name, SRB_URL_SIZE, "%s%s", basepath, filename);
+		urllen = snprintf(url, SRB_CDMI_URL_SIZE, "%s%s", baseurl, filename);
+		namelen = snprintf(name, SRB_CDMI_URL_SIZE, "%s%s", basepath, filename);
 	}
 
-	if (urllen >= SRB_URL_SIZE || namelen >= SRB_URL_SIZE)
+	if (urllen >= SRB_CDMI_URL_SIZE || namelen >= SRB_CDMI_URL_SIZE)
 		return -EINVAL;
 
 	return 0;
@@ -880,8 +883,8 @@ end:
  */
 static int _srb_server_pick(const char *filename, struct srb_cdmi_desc_s *pick)
 {
-	char url[SRB_URL_SIZE];
-	char name[SRB_URL_SIZE];
+	char url[SRB_CDMI_URL_SIZE];
+	char name[SRB_CDMI_URL_SIZE];
 	int ret;
 	int found = 0;
 	srb_server_t *server = NULL;
@@ -899,8 +902,8 @@ static int _srb_server_pick(const char *filename, struct srb_cdmi_desc_s *pick)
 		SRB_LOG_INFO(srb_log, "Dewb reconstruct url yielded %s, %i", url, ret);
 		if (ret == 0) {
 			memcpy(pick, &server->cdmi_desc, sizeof(struct srb_cdmi_desc_s));
-			strncpy(pick->url, url, SRB_URL_SIZE);
-			strncpy(pick->filename, name, SRB_URL_SIZE);
+			strncpy(pick->url, url, SRB_CDMI_URL_SIZE);
+			strncpy(pick->filename, name, SRB_CDMI_URL_SIZE);
 			SRB_LOG_INFO(srb_log, "Copied into pick: url=%s, name=%s", pick->url, pick->filename);
 			found = 1;
 			break ;
@@ -941,7 +944,7 @@ int srb_server_add(const char *url)
 	debug.name = "<Server-Url-Adder>";
 	debug.level = srb_log;
 
-	if (strlen(url) >= SRB_URL_SIZE) {
+	if (strlen(url) >= SRB_CDMI_URL_SIZE) {
 		SRB_LOG_ERR(srb_log, "Url too big: '%s'", url);
 		ret = -EINVAL;
 		goto err_out_dev;
@@ -1039,7 +1042,7 @@ int srb_server_remove(const char *url)
 
 	SRB_LOG_INFO(srb_log, "srb_server_remove: removing server %s", url);
 
-	if (strlen(url) >= SRB_URL_SIZE) {
+	if (strlen(url) >= SRB_CDMI_URL_SIZE) {
 		SRB_LOG_ERR(srb_log, "Url too big: '%s'", url);
 		ret = -EINVAL;
 		goto end;

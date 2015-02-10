@@ -21,6 +21,8 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 
+#include <srb/srb-http.h>
+#include <srb/srb-log.h>
 #include "srb.h"
 
 #define HTTP_VER	"HTTP/1.1"
@@ -108,6 +110,7 @@ int srb_http_get_status(char *buf, int len, enum srb_http_statuscode *code)
 
 	return -1;
 }
+EXPORT_SYMBOL(srb_http_get_status);
 
 
 enum srb_http_statusrange srb_http_get_status_range(enum srb_http_statuscode status)
@@ -127,6 +130,7 @@ enum srb_http_statusrange srb_http_get_status_range(enum srb_http_statuscode sta
 
 	return range;
 }
+EXPORT_SYMBOL(srb_http_get_status_range);
 
 #if 0
 // Add a \0 at the end of the buffer
@@ -176,6 +180,7 @@ int srb_http_check_response_complete(char *buff, int len)
 
 	return hdr_end + contentlen <= len;
 }
+EXPORT_SYMBOL(srb_http_check_response_complete);
 
 int srb_http_mkhead(char *buff, int len, char *host, char *page)
 {
@@ -218,6 +223,7 @@ int srb_http_mkhead(char *buff, int len, char *host, char *page)
 
 	return (len - mylen);
 }
+EXPORT_SYMBOL(srb_http_mkhead);
 
 int srb_http_mkcreate(char *buff, int len, char *host, char *page)
 {
@@ -268,6 +274,7 @@ int srb_http_mkcreate(char *buff, int len, char *host, char *page)
 
 	return (len - mylen);
 }
+EXPORT_SYMBOL(srb_http_mkcreate);
 
 int srb_http_mktruncate(char *buff, int len, char *host, char *page, unsigned long long size)
 {
@@ -321,6 +328,7 @@ int srb_http_mktruncate(char *buff, int len, char *host, char *page, unsigned lo
 
 	return (len - mylen);
 }
+EXPORT_SYMBOL(srb_http_mktruncate);
 
 int srb_http_mkdelete(char *buff, int len, char *host, char *page)
 {
@@ -363,6 +371,7 @@ int srb_http_mkdelete(char *buff, int len, char *host, char *page)
 
 	return (len - mylen);
 }
+EXPORT_SYMBOL(srb_http_mkdelete);
 
 int srb_http_mkmetadata(char *buff, int len, char *host, char *page)
 {
@@ -405,6 +414,7 @@ int srb_http_mkmetadata(char *buff, int len, char *host, char *page)
 
 	return (len - mylen);
 }
+EXPORT_SYMBOL(srb_http_mkmetadata);
 
 int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 		uint64_t start, uint64_t end)
@@ -478,6 +488,7 @@ int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 
 	return (len - mylen);
 }
+EXPORT_SYMBOL(srb_http_mkrange);
 
 int srb_http_mklist(char *buff, int len, char *host, char *page)
 {
@@ -539,6 +550,7 @@ int srb_http_mklist(char *buff, int len, char *host, char *page)
 
 	return (len - mylen);
 }
+EXPORT_SYMBOL(srb_http_mklist);
 
 int srb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
 {
@@ -594,6 +606,7 @@ int srb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
 
 	return 0;
 }
+EXPORT_SYMBOL(srb_http_header_get_uint64);
 
 int srb_http_skipheader(char **buff, int *len)
 {
@@ -615,3 +628,4 @@ int srb_http_skipheader(char **buff, int *len)
 
 	return -1;
 }
+EXPORT_SYMBOL(srb_http_skipheader);

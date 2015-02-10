@@ -29,6 +29,8 @@
 #include <linux/tcp.h>
 #include "srb.h"
 
+#include <srb/srb-http.h>
+#include <srb/srb-log.h>
 #include <srb-jsmn/srb-jsmn.h>
 
 /* TODO: add username and password support */
@@ -116,9 +118,9 @@ int srb_cdmi_init(srb_debug_t *dbg,
 	desc->filename[0] = 0;
 	*ip = 0;
 
-	strncpy(desc->url, url, SRB_URL_SIZE);
+	strncpy(desc->url, url, SRB_CDMI_URL_SIZE);
 
-	desc->url[SRB_URL_SIZE] = 0;
+	desc->url[SRB_CDMI_URL_SIZE] = 0;
 	/* Only 'http://' supported for the moment */
 	if (strncmp(url, PROTO_HTTP, strlen(PROTO_HTTP)))
 		return -EINVAL;
@@ -346,7 +348,7 @@ static int sock_send_receive(srb_debug_t *dbg,
 
 	if (rcv_size == 0) {
 		strict_rcv = 0;
-		rcv_size = SRB_XMIT_BUFFER_SIZE;
+		rcv_size = SRB_CDMI_XMIT_BUFFER_SIZE;
 	}
 	rcvbuf = vmalloc(rcv_size);
 	if (rcvbuf == NULL) {
@@ -445,7 +447,7 @@ static int sock_send_sglist_receive(srb_debug_t *dbg,
 
 	if (rcv_size == 0) {
 		strict_rcv = 0;
-		rcv_size = SRB_XMIT_BUFFER_SIZE;
+		rcv_size = SRB_CDMI_XMIT_BUFFER_SIZE;
 	}
 	rcvbuf = vmalloc(rcv_size);
 	if (rcvbuf == NULL) {
@@ -603,7 +605,7 @@ int srb_cdmi_list(srb_debug_t *dbg,
 	unsigned int	n_tokens = 0;
 	jsmnerr_t	json_err = JSMN_ERROR_NOMEM;
 
-	char filename[SRB_URL_SIZE+1];
+	char filename[SRB_CDMI_URL_SIZE+1];
 	char *buff = desc->xmit_buff;
 
 	enum srb_http_statuscode code;
@@ -619,7 +621,7 @@ int srb_cdmi_list(srb_debug_t *dbg,
 		return 0;
 
 	// Construct HTTTP GET (for listing container)
-	len = srb_http_mklist(buff, SRB_XMIT_BUFFER_SIZE,
+	len = srb_http_mklist(buff, SRB_CDMI_XMIT_BUFFER_SIZE,
 			       desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 
@@ -763,8 +765,8 @@ int srb_cdmi_list(srb_debug_t *dbg,
 							   &content[json_tokens[array+ret].start]);
 						strncpy(filename,
 							&content[json_tokens[array+ret].start],
-							SRB_MIN(SRB_URL_SIZE, len));
-						filename[SRB_MIN(SRB_URL_SIZE, len)] = 0;
+							SRB_MIN(SRB_CDMI_URL_SIZE, len));
+						filename[SRB_MIN(SRB_CDMI_URL_SIZE, len)] = 0;
 
 						if (volume_cb(cb_data, filename) != 0) {
 							cb_errcount += 1;
@@ -806,7 +808,7 @@ int srb_cdmi_flush(srb_debug_t *dbg,
 		return 0;
 
 	/* Construct HTTP truncate */
-	len = srb_http_mktruncate(buff, SRB_XMIT_BUFFER_SIZE,
+	len = srb_http_mktruncate(buff, SRB_CDMI_XMIT_BUFFER_SIZE,
 				desc->ip_addr, desc->filename, flush_size);
 	if (len <= 0) return len;
 	
@@ -860,7 +862,7 @@ int srb_cdmi_extend(srb_debug_t *dbg,
 	}
 
 	/* Construct/send HTTP truncate */
-	len = srb_http_mktruncate(buff, SRB_XMIT_BUFFER_SIZE,
+	len = srb_http_mktruncate(buff, SRB_CDMI_XMIT_BUFFER_SIZE,
 				   desc->ip_addr, desc->filename, trunc_size);
 	if (len <= 0) return len;
 
@@ -894,7 +896,7 @@ int srb_cdmi_create(srb_debug_t *dbg,
 		return -EINVAL;
 
 	/* Construct/send HTTP create */
-	len = srb_http_mkcreate(buff, SRB_XMIT_BUFFER_SIZE,
+	len = srb_http_mkcreate(buff, SRB_CDMI_XMIT_BUFFER_SIZE,
 				 desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 
@@ -913,7 +915,7 @@ int srb_cdmi_create(srb_debug_t *dbg,
 	}
 
 	/* Construct/send HTTP truncate */
-	len = srb_http_mktruncate(buff, SRB_XMIT_BUFFER_SIZE,
+	len = srb_http_mktruncate(buff, SRB_CDMI_XMIT_BUFFER_SIZE,
 				   desc->ip_addr, desc->filename, trunc_size);
 	if (len <= 0) return len;
 
@@ -945,7 +947,7 @@ int srb_cdmi_delete(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc)
 		return -EINVAL;
 
 	/* Construct HTTP delete */
-	len = srb_http_mkdelete(buff, SRB_XMIT_BUFFER_SIZE,
+	len = srb_http_mkdelete(buff, SRB_CDMI_XMIT_BUFFER_SIZE,
 				desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 	
@@ -1003,7 +1005,7 @@ int srb_cdmi_getsize(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
 	int ret, len;
 
 	/* Construct a GET (?metadata) command */
-	len = srb_http_mkmetadata(buff, SRB_XMIT_BUFFER_SIZE,
+	len = srb_http_mkmetadata(buff, SRB_CDMI_XMIT_BUFFER_SIZE,
 			desc->ip_addr, desc->filename);
 	if (len <= 0) return len;
 
@@ -1051,7 +1053,7 @@ int srb_cdmi_putrange(srb_debug_t *dbg,
 	end   = offset + size - 1;
 
 	/* Construct a PUT request with range info */
-	ret = srb_http_mkrange("PUT", xmit_buff, SRB_XMIT_BUFFER_SIZE,
+	ret = srb_http_mkrange("PUT", xmit_buff, SRB_CDMI_XMIT_BUFFER_SIZE,
 				desc->ip_addr, desc->filename,
 				start, end);
 	if (ret <= 0) return ret;
@@ -1096,7 +1098,7 @@ int srb_cdmi_getrange(srb_debug_t *dbg,
 	end   = offset + size - 1;
 
 	/* Construct a PUT request with range info */
-	len = srb_http_mkrange("GET", xmit_buff, SRB_XMIT_BUFFER_SIZE,
+	len = srb_http_mkrange("GET", xmit_buff, SRB_CDMI_XMIT_BUFFER_SIZE,
 				desc->ip_addr, desc->filename,
 				start, end);
 	if (len <= 0)

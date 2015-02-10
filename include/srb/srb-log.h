@@ -18,8 +18,13 @@
  *
  */
 
-#ifndef __SRBLOCK_LOG_H__
-# define __SRBLOCK_LOG_H__
+#ifndef __SRB_LOG_H__
+#define __SRB_LOG_H__
+
+typedef struct srb_debug_s {
+	const char		*name;
+	int			level;
+} srb_debug_t;
 
 /*
  * Standard Kernel value for log level
@@ -153,4 +158,4 @@
 	printk(KERN_ERR "srb: " fmt "\n" , ##a)
 */
 
-#endif /* ! __SRBLOCK_LOG_H__ */
+#endif /* ! __SRB_LOG_H__ */
