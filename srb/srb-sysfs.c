@@ -61,7 +61,6 @@ static int parse_params(char *params, const char *delim, char **param_tbl, int p
  *                   srb_debug	 Sets verbosity
  *                   srb_urls	 Gets device CDMI url
  *                   srb_name   Gets device's on-storage filename
- *                   srb_size   Gets device size
  *******************************************************************/
 static ssize_t attr_debug_store(struct device *dv,
 				struct device_attribute *attr,
@@ -120,20 +119,9 @@ static ssize_t attr_disk_name_show(struct device *dv,
 	return scnprintf(buff, PAGE_SIZE, "%s\n", kbasename(dev->thread_cdmi_desc[0]->url));
 }
 
-static ssize_t attr_disk_size_show(struct device *dv,
-				struct device_attribute *attr, char *buff)
-{
-	struct gendisk *disk	  = dev_to_disk(dv);
-	struct srb_device_s *dev = disk->private_data;
-	
-	return scnprintf(buff, PAGE_SIZE, "%llu\n", dev->disk_size);
-}
-
 static DEVICE_ATTR(srb_debug, S_IWUSR | S_IRUGO, &attr_debug_show, &attr_debug_store);
 static DEVICE_ATTR(srb_urls, S_IRUGO, &attr_urls_show, NULL);
 static DEVICE_ATTR(srb_name, S_IRUGO, &attr_disk_name_show, NULL);
-static DEVICE_ATTR(srb_size, S_IRUGO, &attr_disk_size_show, NULL);
-
 
 /************************************************************************
  * /sys/class/srb/
@@ -395,7 +383,6 @@ void srb_sysfs_device_init(srb_device_t *dev)
 	device_create_file(disk_to_dev(dev->disk), &dev_attr_srb_debug);
 	device_create_file(disk_to_dev(dev->disk), &dev_attr_srb_urls);
 	device_create_file(disk_to_dev(dev->disk), &dev_attr_srb_name);
-	device_create_file(disk_to_dev(dev->disk), &dev_attr_srb_size);
 }
 
 static struct class_attribute class_srb_attrs[] = {
