@@ -37,7 +37,7 @@
 #include <linux/version.h>
 #include <linux/string.h>
 
-#include <srb/srb.h>
+#include "srb.h"
 
 
 // LKM information

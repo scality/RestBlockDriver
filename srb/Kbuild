@@ -1,5 +1,5 @@
 obj-m := srb.o
 
-srb-y := srb-driver.o srb-sysfs.o srb-cdmi.o srb-http.o jsmn/jsmn.o
+srb-y := srb-driver.o srb-sysfs.o srb-cdmi.o srb-http.o
 
-EXTRA_CFLAGS := -ggdb3 -Wall -Wextra -Werror -Wno-unused-parameter -I$(src)/../include -DJSMN_PARENT_LINKS
+EXTRA_CFLAGS := -ggdb3 -Wall -Wextra -Werror -Wno-unused-parameter -I$(src)/../include

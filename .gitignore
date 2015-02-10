@@ -22,6 +22,6 @@
 Module.symvers
 .tmp_versions/
 modules.order
-srb.mod.c
+*.mod.c
 linux/
 linux-clones/

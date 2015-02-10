@@ -27,9 +27,9 @@
 #include <linux/sched.h>
 #include <linux/socket.h>
 #include <linux/tcp.h>
-#include <srb/srb.h>
+#include "srb.h"
 
-#include "jsmn/jsmn.h"
+#include <srb-jsmn/srb-jsmn.h>
 
 /* TODO: add username and password support */
 #define CDMI_DISCONNECTED	0
@@ -690,7 +690,7 @@ int srb_cdmi_list(srb_debug_t *dbg,
 
 	// Now retrieve the list of objects...
 #define SRB_N_JSON_TOKENS	128
-	jsmn_init(&json_parser);
+	srb_jsmn_init(&json_parser);
 	n_tokens = SRB_N_JSON_TOKENS;
 	do
 	{
@@ -701,8 +701,8 @@ int srb_cdmi_list(srb_debug_t *dbg,
 				       GFP_KERNEL);
 		if (json_tokens != NULL)
 		{
-			json_err = jsmn_parse(&json_parser, content, contentlen,
-					      json_tokens, n_tokens);
+			json_err = srb_jsmn_parse(&json_parser, content, contentlen,
+				        	      json_tokens, n_tokens);
 		} else {
 			/* krealloc doesn't free the original */
 			kfree(json_tokens2);

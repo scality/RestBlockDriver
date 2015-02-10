@@ -1,0 +1,6 @@
+obj-m := srb-jsmn.o
+
+srb-jsmn-y := srb-jsmn-exports.o jsmn.o
+
+EXTRA_CFLAGS := -ggdb3 -Wall -Wextra -Werror -Wno-unused-parameter -I$(src)/../include -I$(src)/../include/srb-jsmn
+CFLAGS_jsmn.o := -D_REENTRANT -DJSMN_PARENT_LINKS
