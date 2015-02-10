@@ -490,68 +490,6 @@ int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 }
 EXPORT_SYMBOL(srb_http_mkrange);
 
-int srb_http_mklist(char *buff, int len, char *host, char *page)
-{
-	char *bufp = buff;
-	int mylen = len;
-	int ret;
-
-	*buff = 0;
-	ret = add_buffer(&bufp, &mylen, "GET ");
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, " ");
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, page);
-	if (ret)
-		return -ENOMEM;
-
-	if (page[strlen(page) - 1] != '/')
-	{
-		ret = add_buffer(&bufp, &mylen, "/");
-		if (ret)
-			return -ENOMEM;
-	}
-
-	ret = add_buffer(&bufp, &mylen, " " HTTP_VER CRLF);
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, HTTP_KEEPALIVE CRLF);
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, HTTP_USER_AGENT CRLF);
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, "Host: ");
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, host);
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen,  CRLF);
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen,  HTTP_CDMI_VERS CRLF);
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, CRLF);
-	if (ret)
-		return -ENOMEM;
-
-	return (len - mylen);
-}
-EXPORT_SYMBOL(srb_http_mklist);
-
 int srb_http_header_get_uint64(char *buff, int len, char *key, uint64_t *value)
 {
 	int ret;
