@@ -62,21 +62,4 @@ int srb_cdmi_getrange(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
 
 int srb_cdmi_putrange(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
 		uint64_t offset, int size);
-
-int srb_cdmi_flush(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
-		unsigned long flush_size);
-
-int srb_cdmi_truncate(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
-		unsigned long trunc_size);
-
-int srb_cdmi_create(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
-		     unsigned long long trunc_size);
-int srb_cdmi_extend(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
-		     unsigned long long trunc_size);
-int srb_cdmi_delete(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc);
-
-typedef int (*srb_cdmi_list_cb)(void * data, const char *);
-int srb_cdmi_list(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
-		   srb_cdmi_list_cb cb, void *cb_data);
-
 #endif

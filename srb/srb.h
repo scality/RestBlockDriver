@@ -121,23 +121,16 @@ typedef struct srb_server_s {
 	struct srb_cdmi_desc_s	cdmi_desc;
 } srb_server_t;
 
-
 /* srb.c */
-int srb_device_create(const char *filename, unsigned long long size);
-int srb_device_extend(const char *filename, unsigned long long size);
-int srb_device_destroy(const char *filename);
-
 int srb_device_attach(const char *filename, const char *devname);
 int srb_device_detach(const char *devname);
 
 int srb_server_add(const char *url);
 int srb_server_remove(const char *url);
 ssize_t srb_servers_dump(char *buf, ssize_t max_size);
-int srb_volumes_dump(char *buf, size_t max_size);
 
 /* srb_sysfs.c*/
 int srb_sysfs_init(void);
 void srb_sysfs_device_init(srb_device_t *dev);
 void srb_sysfs_cleanup(void);
-
 #endif
