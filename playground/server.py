@@ -350,11 +350,16 @@ class Root(object):
         else:
             data = "<html><head><title>Listing of the volumes"
             data += "</title></head><body><li>"
-        for entry in entries:
+        for entry in entries[:-1]:
             if do_json:
                 data += "\"%s\"," % (str(entry))
             else:
                 data += "<ul>%s</ul>" % (str(entry))
+        if do_json:
+            data += "\"%s\"" % (str(entries[-1]))
+        else:
+            data += "<ul>%s</ul>" % (str(entry))
+
         if do_json:
             data += """],
   "childrenrange": ""
