@@ -1,1 +1,1 @@
-obj-y := srb-jsmn/ srb/
+obj-y := srb/

@@ -31,7 +31,6 @@
 
 #include <srb/srb-http.h>
 #include <srb/srb-log.h>
-#include <srb-jsmn/srb-jsmn.h>
 
 /* TODO: add username and password support */
 #define CDMI_DISCONNECTED	0
