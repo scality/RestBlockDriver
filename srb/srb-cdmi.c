@@ -27,7 +27,7 @@
 #include <linux/sched.h>
 #include <linux/socket.h>
 #include <linux/tcp.h>
-#include "srb.h"
+#include <srb/srb.h>
 
 #include "jsmn/jsmn.h"
 

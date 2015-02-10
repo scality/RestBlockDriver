@@ -21,7 +21,7 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 
-#include "srb.h"
+#include <srb/srb.h>
 
 #define HTTP_VER	"HTTP/1.1"
 #define HTTP_OK		"HTTP/1.1 200 OK"

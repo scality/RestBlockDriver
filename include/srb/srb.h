@@ -208,7 +208,7 @@ typedef struct srb_server_s {
 } srb_server_t;
 
 
-#include "srb_log.h"
+#include <srb/srb-log.h>
 
 /* srb.c */
 int srb_device_create(const char *filename, unsigned long long size);

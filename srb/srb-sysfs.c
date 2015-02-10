@@ -24,7 +24,7 @@
 #include <linux/blkdev.h>
 #include <linux/string.h>
 
-#include "srb.h"
+#include <srb/srb.h>
 
 
 /* Function for parsing params and reading humand readable size format
