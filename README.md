@@ -66,12 +66,6 @@ the servers:
  * add\_urls: allows adding one or more server urls to the driver
  * remove\_urls: allows removing one or more server urls from the driver
 
-Then, the following management files are available:
- * create: allows creating a volume file on the storage
- * extend: allows extending a volume (increasing size), whether it is attached
- or not
- * destroy: deletes the volume file from the storage
-
 The way those files work is described in the following sections, each dedicated
 to one management (/sys) file. Please mind that each one of theses files can be
 displayed (using cat on them) to show a simple usage text.
@@ -138,69 +132,6 @@ Note also that when unloading the module, the devices are detached
 automatically before the module can actually be unloaded.
 
 
-Creating a new volume
----------------------
-
-To create a volume, just give the name of the file to create to the driver,
-accompanied by a byte size, such as in the following example:
-
-    # echo "filename human\_readable\_size" > /sys/class/srb/create
-
-The volume will be created on the storage with the requested size.
-But beware:
-  * The human readable size formats understood by the LKM are the following:
-    * [integer number]: size in bytes
-    * [integer number]k: size in Kilobytes
-    * [integer number]M: size in Megabytes
-    * [integer number]G: size in Gigabytes
-  * At least one server url must exist and be valid for the volume to be
-created
-  * Created volume are not automatically attached as a device on the system.
-
-Before you can use the volume, you have to attach it through the attach /sys
-file (see below).
-
-Extending a volume
-------------------
-
-Sometimes, a volume might look to be provisionned too small for the actual
-need. For this reason, you can actually extend it through the extend /sys
-control file. This command follows the same usage as the create command, thus
-using it is simple:
-
-    # echo "volumename human\_readable\_size" > /sys/class/srb/extend
-
-Be aware that this command can only extend a volume, meaning the size you give
-must be higher than the current size. Also, this is a supported operation
-on an attached volume, though any file-system formatted onto the volume should
-be extended to the new volume's size manually since most of the filesystems
-don't support flexible partition or volume extension (unless you are using LVM
-underneath).
-
-Once the operation is complete, the new size will be properly reported to the
-system without any additional administrative task. For instance, displaying the
-contents of the file /proc/partitions will show you the updated size of the
-volume.
-
-Note that the human readable size format of the extend command follows the
-same rules as that of the create command.
-
-Destruction of an existing volume
----------------------------------
-
-Destroying a volume means that it volume will no longer be accessible after
-a successful operation. To destroy a volume, give the driver the name of the
-file to remove from the storage as the following example shows:
-
-    # echo filename > /sys/class/srb/destroy
-
-The volume is then removed from storage and is no longer accessible.
-But beware:
-  * The destroyed volume must exist beforehand
-  * Destroying a volume used by other drivers on other machines srb
-can lead to errors and unexpected behaviors; this is untested.
-
-
 Attaching and Detaching devices
 ===============================
 
@@ -218,26 +149,6 @@ the three following management files are available:
 (does not delete the volume)
 
 They are described in detail in the following sections.
-
-Listing the volumes
--------------------
-
-Since you might not know from memory which volumes exist on your servers,
-you might want a way to list those, to attach them easily. One of the ways
-provided is to read the content of the volumes /sys file:
-
-```
- # cat /sys/class/srb/volumes
- Volume1
- Foo
- Bar
- Baz
- Qux
-```
-
-This way, you can know that you have five volumes available on your servers,
-and know their names, which will allow you to either attach, extend or destroy
-them.
 
 Attaching a device
 ------------------
