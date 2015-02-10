@@ -22,6 +22,9 @@
 #define __SRB_H__
 
 #define SRB_DEV_SECTORSIZE (1 * 1024 * 1024)
-#define SRB_DEV_NB_PHYS_SEGS (512)
+/* This defines the max_hw_sectors_kb value
+ * Unit is a sector (512B)
+ */
+#define SRB_DEV_NB_PHYS_SEGS (512 * 4 * 32)
 
 #endif
