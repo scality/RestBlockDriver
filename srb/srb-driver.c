@@ -489,7 +489,7 @@ static int srb_init_disk(struct srb_device_s *dev)
 {
 	struct gendisk *disk = NULL;
 	struct request_queue *q;
-	int i;
+	unsigned int i;
 	int ret = 0;
 
 	SRB_LOG_INFO(srb_log, "srb_init_disk: initializing disk for device: %s", dev->name);
@@ -586,7 +586,7 @@ err_kthread:
 static int srb_device_new(const char *devname, srb_device_t *dev)
 {
 	int ret = -EINVAL;
-	int i;
+	unsigned int i;
 
 	SRB_LOG_INFO(srb_log, "srb_device_new: creating new device %s"
 		      " with %d threads", devname, thread_pool_size);
@@ -666,7 +666,7 @@ static void __srb_device_free(srb_device_t *dev)
 
 static void srb_device_free(srb_device_t *dev)
 {
-	int i = 0;
+	unsigned int i = 0;
 
 	SRB_LOG_INFO(srb_log, "srb_device_free: freeing device: %s", dev->name);
 
@@ -721,7 +721,7 @@ static int _srb_reconstruct_url(char *url, char *name,
 
 static int __srb_device_detach(srb_device_t *dev)
 {
-	int i;
+	unsigned int i;
 	int ret = 0;
 
 	SRB_LOG_DEBUG(srb_log, "detaching device (%p)", dev);
@@ -1152,7 +1152,7 @@ int srb_device_attach(const char *filename, const char *devname)
 {
 	srb_device_t *dev = NULL;
 	int rc = 0;
-	int i;
+	unsigned int i;
 	int do_unregister = 0;
 	struct srb_cdmi_desc_s *cdmi_desc = NULL;
 	int found = 0;
