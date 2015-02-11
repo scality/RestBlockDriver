@@ -3,3 +3,7 @@ obj-m := srb.o
 srb-y := srb-driver.o srb-sysfs.o srb-cdmi.o srb-http.o
 
 EXTRA_CFLAGS := -ggdb3 -Wall -Wextra -Werror -Wno-unused-parameter -I$(src)/../include
+
+ifeq ($(shell $(HOSTCC) -v 2>&1 | grep -c "clang version"), 1)
+EXTRA_CFLAGS += -Wno-unknown-attributes -Wno-error=sign-compare -Wno-error=unused-function
+endif
