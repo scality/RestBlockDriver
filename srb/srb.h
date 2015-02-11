@@ -21,14 +21,8 @@
 #ifndef __SRBLOCK_H__
 # define  __SRBLOCK_H__
 
-#include <linux/inet.h>
-#include <linux/socket.h>
-#include <linux/net.h>	     // for in_aton()
-#include <linux/in.h>
-#include <linux/net.h>
-#include <linux/scatterlist.h>
-#include <net/sock.h>
 #include <linux/genhd.h>
+#include <linux/scatterlist.h>
 
 #include <srb/srb.h>
 #include <srb/srb-cdmi.h>

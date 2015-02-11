@@ -18,12 +18,6 @@
  *
  */
 
-#include <linux/module.h>    // included for all kernel modules
-#include <linux/kernel.h>    // included for KERN_INFO
-#include <linux/device.h>
-#include <linux/blkdev.h>
-#include <linux/string.h>
-
 #include <srb/srb-log.h>
 
 #include "srb.h"

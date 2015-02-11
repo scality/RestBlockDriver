@@ -18,9 +18,6 @@
  *
  */
 
-#include <linux/string.h>
-#include <linux/errno.h>
-
 #include <srb/srb-http.h>
 #include <srb/srb-log.h>
 #include "srb.h"

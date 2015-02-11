@@ -20,13 +20,12 @@
  *
  */
 
-#include <linux/module.h>    // included for all kernel modules
-#include <linux/kernel.h>    // included for KERN_INFO
-#include <linux/types.h>     // for uintx_t
-#include <linux/signal.h>
+#include <linux/inet.h>
+#include <linux/net.h>
 #include <linux/sched.h>
-#include <linux/socket.h>
 #include <linux/tcp.h>
+#include <net/sock.h>
+
 #include "srb.h"
 
 #include <srb/srb-http.h>

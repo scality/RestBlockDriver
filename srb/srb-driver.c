@@ -21,21 +21,10 @@
 // Linux Kernel/LKM headers: module.h is needed by all modules and
 // kernel.h is needed for KERN_INFO.
 
-#include <linux/module.h>    // included for all kernel modules
-#include <linux/kernel.h>    // included for KERN_INFO
-#include <linux/moduleparam.h>	// included for LKM parameters
-#include <linux/init.h>      // included for __init and __exit macros
-#include <linux/device.h>
-#include <linux/spinlock.h>
-#include <linux/wait.h>
-#include <linux/mutex.h>
-#include <linux/fs.h>
 #include <linux/blkdev.h>
-#include <linux/slab.h>
-#include <linux/vmalloc.h> // for vmalloc()
 #include <linux/kthread.h>
+#include <linux/module.h>
 #include <linux/version.h>
-#include <linux/string.h>
 
 #include <srb/srb-cdmi.h>
 #include <srb/srb-log.h>
