@@ -108,7 +108,7 @@ static int get_port(const char *url, int *port)
  *
  */
 int srb_cdmi_init(srb_debug_t *dbg,
-		struct srb_cdmi_desc_s *desc,
+		struct srb_cdmi_desc *desc,
 		const char *url)
 {
 	/*          1    1 */
@@ -168,7 +168,7 @@ int srb_cdmi_init(srb_debug_t *dbg,
  * Returns 0 if successfull or a negative value depending the error.
  */
 int srb_cdmi_connect(srb_debug_t *dbg,
-		struct srb_cdmi_desc_s *desc)
+		struct srb_cdmi_desc *desc)
 {
 	int ret;
 	int arg = 1;
@@ -244,7 +244,7 @@ out_error:
  *
  */
 int srb_cdmi_disconnect(srb_debug_t *dbg,
-			struct srb_cdmi_desc_s *desc)
+			struct srb_cdmi_desc *desc)
 {
 	if (!desc)
 		return -EINVAL;
@@ -264,7 +264,7 @@ int srb_cdmi_disconnect(srb_debug_t *dbg,
  *  Send or receive packet.
  */
 static int sock_xmit(srb_debug_t *dbg,
-		struct srb_cdmi_desc_s *desc,
+		struct srb_cdmi_desc *desc,
 		int send,
 		void *buf, int size,
 		int strict_receive)
@@ -339,7 +339,7 @@ static int sock_xmit(srb_debug_t *dbg,
 }
 
 static int sock_send_receive(srb_debug_t *dbg,
-			struct srb_cdmi_desc_s *desc,
+			struct srb_cdmi_desc *desc,
 			int send_size, int rcv_size)
 {
 	char *buff = desc->xmit_buff;
@@ -437,7 +437,7 @@ cleanup:
 }
 
 static int sock_send_sglist_receive(srb_debug_t *dbg,
-				struct srb_cdmi_desc_s *desc,
+				struct srb_cdmi_desc *desc,
 				int send_size, int rcv_size)
 {
 	char *buff = desc->xmit_buff;
@@ -563,7 +563,7 @@ cleanup:
 }
 
 static int retried_send_receive(srb_debug_t *dbg,
-				struct srb_cdmi_desc_s *desc,
+				struct srb_cdmi_desc *desc,
 				int send_size, int rcv_size,
 				int do_sglist, int attempts)
 {
@@ -624,7 +624,7 @@ int srb_cdmi_getsize(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
 }
 #endif
 
-int srb_cdmi_getsize(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
+int srb_cdmi_getsize(srb_debug_t *dbg, struct srb_cdmi_desc *desc,
 		uint64_t *size)
 {
 	char *buff = desc->xmit_buff;
@@ -667,7 +667,7 @@ int srb_cdmi_getsize(srb_debug_t *dbg, struct srb_cdmi_desc_s *desc,
  * at specified "offset" writing "size" bytes from "buff".
  */
 int srb_cdmi_putrange(srb_debug_t *dbg,
-		struct srb_cdmi_desc_s *desc,
+		struct srb_cdmi_desc *desc,
 		uint64_t offset, int size)
 {
 	char *xmit_buff = desc->xmit_buff;
@@ -712,7 +712,7 @@ out:
  * at specified "offset" reading "size" bytes from "buff".
  */
 int srb_cdmi_getrange(srb_debug_t *dbg,
-		struct srb_cdmi_desc_s *desc,
+		struct srb_cdmi_desc *desc,
 		uint64_t offset, int size)
 {
 	char *xmit_buff = desc->xmit_buff;

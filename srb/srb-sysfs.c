@@ -61,7 +61,7 @@ static ssize_t attr_debug_store(struct device *dv,
 				const char *buff, size_t count)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
-	struct srb_device_s *dev = disk->private_data;
+	struct srb_device *dev = disk->private_data;
 	long int val;
 	int ret;
 
@@ -73,12 +73,12 @@ static ssize_t attr_debug_store(struct device *dv,
 	if ((int)val < 0 || (int)val > 7)
 	{
 		SRBDEV_LOG_WARN(dev, "Invalid debug value (%d) for device %s in sysfs",
-				(int)val, dev->name);
+				(int)val, srb_device_get_name(dev));
 		return -EINVAL;
 	}
 
-	dev->debug.level = (int)val;
-	SRBDEV_LOG_DEBUG(dev, "Setting Log level to %d for device %s", (int)val, dev->name);
+        srb_device_set_debug_level(dev, (int)val);
+	SRBDEV_LOG_DEBUG(dev, "Setting Log level to %d for device %s", (int)val, srb_device_get_name(dev));
 
 	return count;
 }
@@ -87,9 +87,9 @@ static ssize_t attr_debug_show(struct device *dv,
 			struct device_attribute *attr, char *buff)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
-	struct srb_device_s *dev = disk->private_data;
+	struct srb_device *dev = disk->private_data;
 	
-	return scnprintf(buff, PAGE_SIZE, "%d\n", dev->debug.level);
+	return scnprintf(buff, PAGE_SIZE, "%d\n", srb_device_get_debug_level(dev));
 }
 
 
@@ -97,20 +97,20 @@ static ssize_t attr_urls_show(struct device *dv,
 			struct device_attribute *attr, char *buff)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
-	struct srb_device_s *dev = disk->private_data;
+	struct srb_device *dev = disk->private_data;
 	
 	//snprintf(buff, PAGE_SIZE, "%s\n", dev->thread_cdmi_desc[0].url);
-	return scnprintf(buff, PAGE_SIZE, "%s\n", dev->thread_cdmi_desc[0]->url);
+	return scnprintf(buff, PAGE_SIZE, "%s\n", srb_device_get_thread_cdmi_desc(dev, 0)->url);
 }
 
 static ssize_t attr_disk_name_show(struct device *dv,
 				   struct device_attribute *attr, char *buff)
 {
 	struct gendisk *disk	  = dev_to_disk(dv);
-	struct srb_device_s *dev = disk->private_data;
+	struct srb_device *dev = disk->private_data;
 
 	//snprintf(buff, PAGE_SIZE, "%s\n", kbasename(dev->thread_cdmi_desc[0].url));
-	return scnprintf(buff, PAGE_SIZE, "%s\n", kbasename(dev->thread_cdmi_desc[0]->url));
+	return scnprintf(buff, PAGE_SIZE, "%s\n", kbasename(srb_device_get_thread_cdmi_desc(dev, 0)->url));
 }
 
 static DEVICE_ATTR(srb_debug, S_IWUSR | S_IRUGO, &attr_debug_show, &attr_debug_store);
@@ -372,11 +372,13 @@ static ssize_t class_srb_urls_show(struct class *c, struct class_attribute *attr
 	return ret;
 }
 
-void srb_sysfs_device_init(srb_device_t *dev)
+void srb_sysfs_device_init(struct srb_device *dev)
 {
-	device_create_file(disk_to_dev(dev->disk), &dev_attr_srb_debug);
-	device_create_file(disk_to_dev(dev->disk), &dev_attr_srb_urls);
-	device_create_file(disk_to_dev(dev->disk), &dev_attr_srb_name);
+        struct gendisk *disk = srb_device_get_disk(dev);
+
+	device_create_file(disk_to_dev(disk), &dev_attr_srb_debug);
+	device_create_file(disk_to_dev(disk), &dev_attr_srb_urls);
+	device_create_file(disk_to_dev(disk), &dev_attr_srb_name);
 }
 
 static struct class_attribute class_srb_attrs[] = {

@@ -46,39 +46,6 @@ enum device_state {
 extern unsigned short srb_log;
 extern unsigned short nb_req_retries;
 
-typedef struct srb_device_s {
-	/* Device subsystem related data */
-	int			id;		/* device ID */
-	int			major;		/* blkdev assigned major */
-
-	/* NOTE: use const from ./linux/genhd.h */
-	char			name[DISK_NAME_LEN];	/* blkdev name, e.g. srba */
-	struct gendisk		*disk;
-	uint64_t		disk_size;	/* Size in bytes */
-	int			users;		/* Number of users who
-						 * opened dev */
-	enum device_state			state; 		/* for create extend attach detach destroy purpose */
-
-	struct request_queue	*q;
-	spinlock_t		rq_lock;	/* request queue lock */
-
-	struct task_struct	**thread;	/* allow dynamic allocation during device creation */
-	int			nb_threads;
-
-	/* Dewpoint specific data */
-	struct srb_cdmi_desc_s	 **thread_cdmi_desc;	/* allow dynamic allocation during device creation*/
-
-	/*
-	** List of requests received by the drivers, but still to be
-	** processed. This due to network latency.
-	*/
-	spinlock_t		waiting_lock;	/* wait_queue lock */
-	wait_queue_head_t	waiting_wq;
-	struct list_head	waiting_queue;  /* Requests to be sent */
-
-	/* Debug traces */
-	srb_debug_t		debug;
-} srb_device_t;
 
 /* srb.c */
 int srb_device_attach(const char *filename, const char *devname);
@@ -87,6 +54,16 @@ int srb_device_detach(const char *devname);
 int srb_server_add(const char *url);
 int srb_server_remove(const char *url);
 ssize_t srb_servers_dump(char *buf, ssize_t max_size);
+
+struct srb_device;
+typedef struct srb_device srb_device_t;
+const srb_debug_t * srb_device_get_debug(const struct srb_device *dev);
+int srb_device_get_debug_level(const struct srb_device *dev);
+int srb_device_get_major(const struct srb_device *dev);
+const char * srb_device_get_name(const struct srb_device *dev);
+void srb_device_set_debug_level(struct srb_device *dev, int level);
+struct srb_cdmi_desc * srb_device_get_thread_cdmi_desc(const struct srb_device *dev, int idx);
+struct gendisk * srb_device_get_disk(const struct srb_device *dev);
 
 /* srb_sysfs.c*/
 int srb_sysfs_init(void);

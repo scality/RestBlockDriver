@@ -58,7 +58,7 @@ typedef struct srb_debug_s {
 #define SRB_LOGFMT_LVL(lvl)	"[" SRB_LVLSTR_##lvl "]"
 #define SRB_LOGFMT_NAME		DEV_NAME ": "
 #define SRB_LOGFMT_DEVICE	"device %i: "
-#define SRB_LOGARG_DEVICE(dev)  (dev)->major
+#define SRB_LOGARG_DEVICE(dev)  srb_device_get_major(dev)
 #define SRB_LOGFMT_MODULE	"%s: "
 #define SRB_LOGARG_MODULE(dbg)  dbg ? (dbg)->name : NULL
 #define SRB_LOGFMT_DBG		"@%s(l.%i): "
@@ -133,22 +133,56 @@ typedef struct srb_debug_s {
 	if (level >= SRB_EMERG) SRB_INTERNAL_DBG(EMERG, fmt, ##args)
 
 #define SRBDEV_LOG_DEBUG(dev, fmt, a...) \
-	if ((dev)->debug.level >= SRB_DEBUG) SRBDEV_INTERNAL_DBG(DEBUG, dev, &((dev)->debug), fmt, ##a)
+        do { \
+        const srb_debug_t *debug = srb_device_get_debug(dev); \
+	if (debug->level >= SRB_DEBUG) SRBDEV_INTERNAL_DBG(DEBUG, dev, debug, fmt, ##a); \
+        } while(0)
 #define SRBDEV_LOG_INFO(dev, fmt, a...) \
-	if ((dev)->debug.level >= SRB_INFO) SRBDEV_INTERNAL_DBG(INFO, dev, &((dev)->debug), fmt, ##a)
+        do { \
+        const srb_debug_t *debug = srb_device_get_debug(dev); \
+	if (debug->level >= SRB_INFO) SRBDEV_INTERNAL_DBG(INFO, dev, debug, fmt, ##a) \
+        } while(0)
 #define SRBDEV_LOG_NOTICE(dev, fmt, a...) \
-	if ((dev)->debug.level >= SRB_NOTICE) SRBDEV_INTERNAL_DBG(NOTICE, dev, &((dev)->debug), fmt, ##a)
+        do { \
+        const srb_debug_t *debug = srb_device_get_debug(dev); \
+	if (debug->level >= SRB_NOTICE) SRBDEV_INTERNAL_DBG(NOTICE, dev, debug, fmt, ##a) \
+        } while(0)
 #define SRBDEV_LOG_WARN(dev, fmt, a...) \
-	if ((dev)->debug.level >= SRB_WARNING) SRBDEV_INTERNAL_DBG(WARNING, dev, &((dev)->debug), fmt, ##a)
+        do { \
+        const srb_debug_t *debug = srb_device_get_debug(dev); \
+	if (debug->level >= SRB_WARNING) SRBDEV_INTERNAL_DBG(WARNING, dev, debug, fmt, ##a) \
+        } while(0)
 #define SRBDEV_LOG_ERR(dev, fmt, a...) \
-	if ((dev)->debug.level >= SRB_ERR) SRBDEV_INTERNAL_DBG(ERR, dev, &((dev)->debug), fmt, ##a)
+        do { \
+        const srb_debug_t *debug = srb_device_get_debug(dev); \
+	if (debug->level >= SRB_ERR) SRBDEV_INTERNAL_DBG(ERR, dev, debug, fmt, ##a) \
+        } while(0)
 #define SRBDEV_LOG_CRIT(dev, fmt, a...) \
-	if ((dev)->debug.level >= SRB_CRIT) SRBDEV_INTERNAL_DBG(CRIT, dev, &((dev)->debug), fmt, ##a)
+        do { \
+        const srb_debug_t *debug = srb_device_get_debug(dev); \
+	if (debug->level >= SRB_CRIT) SRBDEV_INTERNAL_DBG(CRIT, dev, debug, fmt, ##a) \
+        } while(0)
 #define SRBDEV_LOG_ALERT(dev, fmt, a...) \
-	if ((dev)->debug.level >= SRB_ALERT) SRBDEV_INTERNAL_DBG(ALERT, dev, &((dev)->debug), fmt, ##a)
+        do { \
+        const srb_debug_t *debug = srb_device_get_debug(dev); \
+	if (debug->level >= SRB_ALERT) SRBDEV_INTERNAL_DBG(ALERT, dev, debug, fmt, ##a) \
+        } while(0)
 #define SRBDEV_LOG_EMERG(dev, fmt, a...) \
-	if ((dev)->debug.level >= SRB_EMERG) SRBDEV_INTERNAL_DBG(EMERG, dev, &((dev)->debug), fmt, ##a)
+        do { \
+        const srb_debug_t *debug = srb_device_get_debug(dev); \
+	if (debug->level >= SRB_EMERG) SRBDEV_INTERNAL_DBG(EMERG, dev, debug, fmt, ##a) \
+        } while(0)
 
+#if 0
+#define SRBDEV_LOG_DEBUG(dev, fmt, a...)
+#define SRBDEV_LOG_INFO(dev, fmt, a...)
+#define SRBDEV_LOG_NOTICE(dev, fmt, a...)
+#define SRBDEV_LOG_WARN(dev, fmt, a...)
+#define SRBDEV_LOG_ERR(dev, fmt, a...)
+#define SRBDEV_LOG_CRIT(dev, fmt, a...)
+#define SRBDEV_LOG_ALERT(dev, fmt, a...)
+#define SRBDEV_LOG_EMERG(dev, fmt, a...)
+#endif
 
 /*
 #define SRB_INFO(fmt, a...) \
