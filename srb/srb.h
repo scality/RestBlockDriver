@@ -28,16 +28,10 @@
 #include <srb/srb-cdmi.h>
 #include <srb/srb-log.h>
 
-/* Constants */
-#define kB			1024
-#define MB			(1024 * kB)
-#define GB			(1024 * MB)
-
 /* Unix device constants */
 #define DEV_NAME		"srb"
 #define DEV_REL_VERSION		"0.6.1"		// Set version of srb LKM
 #define DEV_MINORS		256
-#define DEV_DEFAULT_DISKSIZE	(50 * MB)
 #define DEV_MAX			64
 #define DEV_SECTORSIZE		SRB_DEV_SECTORSIZE
 #define DEV_NB_PHYS_SEGS	SRB_DEV_NB_PHYS_SEGS
@@ -74,7 +68,6 @@ extern unsigned int thread_pool_size;
 			     * by default */
 
 #define SRB_MIN(x, y) ((x) < (y) ? (x) : (y))
-#define SRB_N_JSON_TOKENS	128
 
 typedef struct srb_device_s {
 	/* Device subsystem related data */
