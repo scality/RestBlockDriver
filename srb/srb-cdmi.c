@@ -31,6 +31,11 @@
 #include <srb/srb-http.h>
 #include <srb/srb-log.h>
 
+#define SRB_REUSE_LIMIT	100 /* Max number of requests sent to
+				     * a single HTTP connection before
+				     * restarting a new one.
+				     */
+
 /* TODO: add username and password support */
 #define CDMI_DISCONNECTED	0
 #define CDMI_CONNECTED		1

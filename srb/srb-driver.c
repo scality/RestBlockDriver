@@ -31,6 +31,17 @@
 
 #include "srb.h"
 
+#define DEV_MAX			64
+#define DEV_MINORS		256
+
+/*
+ * Default values for ScalityRestBlock LKM parameters
+ */
+#define SRB_REQ_TIMEOUT_DFLT		30
+#define SRB_NB_REQ_RETRIES_DFLT	3
+#define SRB_CONN_TIMEOUT_DFLT		30
+#define SRB_LOG_LEVEL_DFLT		SRB_INFO
+#define SRB_THREAD_POOL_SIZE_DFLT	8
 
 // LKM information
 MODULE_AUTHOR("Laurent Meyer <laurent.meyer@digitam.net>");
@@ -38,6 +49,11 @@ MODULE_AUTHOR("David Pineau <david.pineau@scality.com>");
 MODULE_DESCRIPTION("Block Device Driver for REST-based storage");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(DEV_REL_VERSION);
+
+typedef struct srb_server_s {
+	struct srb_server_s   	*next;
+	struct srb_cdmi_desc_s	cdmi_desc;
+} srb_server_t;
 
 static srb_device_t	devtab[DEV_MAX];
 static srb_server_t	*servers = NULL;

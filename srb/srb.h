@@ -31,8 +31,6 @@
 /* Unix device constants */
 #define DEV_NAME		"srb"
 #define DEV_REL_VERSION		"0.6.1"		// Set version of srb LKM
-#define DEV_MINORS		256
-#define DEV_MAX			64
 #define DEV_SECTORSIZE		SRB_DEV_SECTORSIZE
 #define DEV_NB_PHYS_SEGS	SRB_DEV_NB_PHYS_SEGS
 
@@ -42,34 +40,11 @@ enum device_state {
         DEV_UNUSED,
 };
 
-/* Dewpoint server related constants */
-#define SRB_REUSE_LIMIT	100 /* Max number of requests sent to
-				     * a single HTTP connection before
-				     * restarting a new one.
-				     */
-
 /*
  * Linux Kernel Module (LKM) parameters
  */
 extern unsigned short srb_log;
-extern unsigned short req_timeout;
 extern unsigned short nb_req_retries;
-extern unsigned short server_conn_timeout;
-extern unsigned int thread_pool_size;
-
-/*
- * Default values for ScalityRestBlock LKM parameters
- */
-#define SRB_REQ_TIMEOUT_DFLT		30
-#define SRB_NB_REQ_RETRIES_DFLT	3
-#define SRB_CONN_TIMEOUT_DFLT		30
-#define SRB_LOG_LEVEL_DFLT		SRB_INFO
-#define SRB_THREAD_POOL_SIZE_DFLT	8
-
-#define SRB_DEBUG_LEVEL	0   /* We do not want to be polluted
-			     * by default */
-
-#define SRB_MIN(x, y) ((x) < (y) ? (x) : (y))
 
 typedef struct srb_device_s {
 	/* Device subsystem related data */
@@ -104,11 +79,6 @@ typedef struct srb_device_s {
 	/* Debug traces */
 	srb_debug_t		debug;
 } srb_device_t;
-
-typedef struct srb_server_s {
-	struct srb_server_s   	*next;
-	struct srb_cdmi_desc_s	cdmi_desc;
-} srb_server_t;
 
 /* srb.c */
 int srb_device_attach(const char *filename, const char *devname);
