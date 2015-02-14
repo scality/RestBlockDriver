@@ -37,8 +37,10 @@
 #define DEV_NB_PHYS_SEGS	SRB_DEV_NB_PHYS_SEGS
 
 /* Device state (reduce spinlock section and avoid multiple operation on same device) */
-#define DEV_IN_USE		1
-#define DEV_UNUSED		0
+enum device_state {
+        DEV_IN_USE,
+        DEV_UNUSED,
+};
 
 /* Dewpoint server related constants */
 #define SRB_REUSE_LIMIT	100 /* Max number of requests sent to
@@ -80,7 +82,7 @@ typedef struct srb_device_s {
 	uint64_t		disk_size;	/* Size in bytes */
 	int			users;		/* Number of users who
 						 * opened dev */
-	int			state; 		/* for create extend attach detach destroy purpose */
+	enum device_state			state; 		/* for create extend attach detach destroy purpose */
 
 	struct request_queue	*q;
 	spinlock_t		rq_lock;	/* request queue lock */
