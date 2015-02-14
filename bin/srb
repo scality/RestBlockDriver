@@ -2,15 +2,18 @@
 
 import sys
 import argparse
-import httplib
-import json
 import subprocess
-import urllib2
+
+import requests
 
 MODULE_NAME = 'srb'
+DEFAULT_HEADERS = {
+    'User-Agent': 'srb/0.0.1',
+}
 
 def call_silent(cmd):
-    return subprocess.call(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    with open('/dev/null', 'w') as fd:
+        return subprocess.call(cmd, stdout=fd, stderr=fd)
 
 def stdout(msg, *args):
     sys.stdout.writelines([msg % args, '\n'])
@@ -30,27 +33,65 @@ def handle_module_load(args):
     else:
         stderr('Failed to load module \'%s\'', MODULE_NAME)
 
+def make_headers(extra=None):
+    result = DEFAULT_HEADERS.copy()
+    if extra:
+        result.update(extra)
+
+    return result
+
 def handle_volume_list(args):
-    req = urllib2.Request(args.url)
-    req.add_header('X-CDMI-Specification-Version', '1.0.1')
+    headers = make_headers({
+        'X-CDMI-Specification-Version': '1.0.1',
+    })
 
-    resp = urllib2.urlopen(req)
-    if resp.code != httplib.OK:
-        raise Exception('Server returned code: %d' % resp.code)
+    response = requests.get(args.url, headers=headers)
+    response.raise_for_status()
 
-    result = json.load(resp)
-
-    for child in result['children']:
+    for child in response.json()['children']:
         print child
 
 def handle_volume_create(args):
-    raise NotImplementedError
+    headers = make_headers({
+        'If-None-Match': '*',
+    })
+
+    response = requests.put(args.url, headers=headers)
+    response.raise_for_status()
+
+    headers = make_headers({
+        'X-Scal-Truncate': args.size,
+    })
+
+    response = requests.put(args.url, headers=headers)
+    response.raise_for_status()
 
 def handle_volume_delete(args):
-    raise NotImplementedError
+    headers = make_headers()
+
+    response = requests.delete(args.url, headers=headers)
+    response.raise_for_status()
 
 def handle_volume_extend(args):
-    raise NotImplementedError
+    headers = make_headers()
+    params = {
+        'metadata': 1,
+    }
+
+    response = requests.get(args.url, params=params)
+    response.raise_for_status()
+
+    current_size = response.json()['metadata']['cdmi_size']
+
+    if current_size > args.size:
+        raise ValueError('Can\'t shrink volumes')
+
+    headers == make_headers({
+        'X-Scal-Truncate': args.size,
+    })
+
+    response = requests.put(args.url, headers=headers)
+    response.raise_for_status()
 
 def main(args):
     parser = argparse.ArgumentParser(
@@ -65,16 +106,26 @@ def main(args):
     parser_volume_list = subparser.add_parser('volume-list')
     parser_volume_list.set_defaults(func=handle_volume_list)
     parser_volume_list.add_argument('url', metavar='URL', type=str,
-        help='CDMI server URL')
+        help='CDMI container URL')
 
     parser_volume_create = subparser.add_parser('volume-create')
     parser_volume_create.set_defaults(func=handle_volume_create)
+    parser_volume_create.add_argument('url', metavar='URL', type=str,
+        help='CDMI object URL')
+    parser_volume_create.add_argument('size', metavar='SIZE', type=int,
+        help='Object size (in bytes)')
 
     parser_volume_delete = subparser.add_parser('volume-delete')
     parser_volume_delete.set_defaults(func=handle_volume_delete)
+    parser_volume_delete.add_argument('url', metavar='URL', type=str,
+        help='CDMI object URL')
 
     parser_volume_extend = subparser.add_parser('volume-extend')
     parser_volume_extend.set_defaults(func=handle_volume_extend)
+    parser_volume_extend.add_argument('url', metavar='URL', type=str,
+        help='CDMI object URL')
+    parser_volume_extend.add_argument('size', metavar='SIZE', type=int,
+        help='Object size (in bytes)')
 
     args = parser.parse_args(args)
 
