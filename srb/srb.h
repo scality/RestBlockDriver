@@ -34,18 +34,11 @@
 #define DEV_SECTORSIZE		SRB_DEV_SECTORSIZE
 #define DEV_NB_PHYS_SEGS	SRB_DEV_NB_PHYS_SEGS
 
-/* Device state (reduce spinlock section and avoid multiple operation on same device) */
-enum device_state {
-        DEV_IN_USE,
-        DEV_UNUSED,
-};
-
 /*
  * Linux Kernel Module (LKM) parameters
  */
 extern unsigned short srb_log;
 extern unsigned short nb_req_retries;
-
 
 /* srb.c */
 int srb_device_attach(const char *filename, const char *devname);

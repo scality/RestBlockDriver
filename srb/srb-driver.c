@@ -55,6 +55,12 @@ typedef struct srb_server_s {
 	struct srb_cdmi_desc	cdmi_desc;
 } srb_server_t;
 
+/* Device state (reduce spinlock section and avoid multiple operation on same device) */
+enum device_state {
+        DEV_IN_USE,
+        DEV_UNUSED,
+};
+
 struct srb_device {
 	/* Device subsystem related data */
 	int			id;		/* device ID */
