@@ -19,14 +19,5 @@ KDIR ?= /lib/modules/$(shell uname -r)/build
 
 default: modules
 
-modules:
-	$(MAKE) -C $(KDIR) M=$$PWD $@
-
-modules_install:
-	$(MAKE) -C $(KDIR) M=$$PWD $@
-
-clean:
-	$(MAKE) -C $(KDIR) M=$$PWD $@
-
-help:
+modules modules_install clean help:
 	$(MAKE) -C $(KDIR) M=$$PWD $@
