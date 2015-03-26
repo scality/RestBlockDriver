@@ -179,49 +179,6 @@ int srb_http_check_response_complete(char *buff, int len)
 }
 EXPORT_SYMBOL(srb_http_check_response_complete);
 
-int srb_http_mkhead(char *buff, int len, char *host, char *page)
-{
-	char *bufp = buff;
-	int mylen = len;
-	int ret;
-
-	*buff = 0;
-	ret = add_buffer(&bufp, &mylen, "HEAD ");
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, page);
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, " " HTTP_VER CRLF);
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, HTTP_KEEPALIVE CRLF);
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, HTTP_USER_AGENT CRLF);
-	if (ret)
-		return -ENOMEM;
-	
-	ret = add_buffer(&bufp, &mylen, "Host: ");
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, host);
-	if (ret)
-		return -ENOMEM;
-
-	ret = add_buffer(&bufp, &mylen, CRLF CRLF);
-	if (ret)
-		return -ENOMEM;
-
-	return (len - mylen);
-}
-EXPORT_SYMBOL(srb_http_mkhead);
-
 int srb_http_mkcreate(char *buff, int len, char *host, char *page)
 {
 	char *bufp = buff;

@@ -85,7 +85,6 @@ enum srb_http_statuscode
 };
 
 int srb_http_check_response_complete(char *buff, int len);
-int srb_http_mkhead(char *buff, int len, char *host, char *page);
 int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 		uint64_t start, uint64_t end);
 
