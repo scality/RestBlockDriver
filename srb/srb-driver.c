@@ -70,7 +70,7 @@ struct srb_device {
 	char			name[DISK_NAME_LEN];	/* blkdev name, e.g. srba */
 	struct gendisk		*disk;
 	uint64_t		disk_size;	/* Size in bytes */
-	int			users;		/* Number of users who
+	atomic_t                users;		/* Number of users who
 						 * opened dev */
 	enum device_state			state; 		/* for create extend attach detach destroy purpose */
 
@@ -540,7 +540,7 @@ static int srb_open(struct block_device *bdev, fmode_t mode)
 	      goto out;
 	}
 
-	dev->users++;
+        atomic_inc(&dev->users);
  out:
 	spin_unlock(&devtab_lock);
 	return ret;
@@ -557,7 +557,7 @@ static void srb_release(struct gendisk *disk, fmode_t mode)
 	dev = disk->private_data;
 	SRBDEV_LOG_INFO(dev, "Releasing device (%s)", disk->disk_name);
 	spin_lock(&devtab_lock);
-	dev->users--;
+        atomic_dec(&dev->users);
 	spin_unlock(&devtab_lock);
 }
 
@@ -692,7 +692,7 @@ static int srb_device_new(const char *devname, srb_device_t *dev)
 	 */
 	dev->debug.name = &dev->name[0];
 	dev->debug.level = srb_log;
-	dev->users = 0;
+        atomic_set(&dev->users, 0);
 	strncpy(dev->name, devname, strlen(devname));
 
 	/* XXX: dynamic allocation of thread pool and cdmi connection pool
@@ -804,7 +804,7 @@ static int _srb_reconstruct_url(char *url, char *name,
 
 static int __srb_device_detach(srb_device_t *dev)
 {
-	unsigned int i;
+	unsigned int i, users = 0;
 	int ret = 0;
 
 	SRB_LOG_DEBUG(srb_log, "detaching device (%p)", dev);
@@ -816,8 +816,9 @@ static int __srb_device_detach(srb_device_t *dev)
 
 	SRBDEV_LOG_DEBUG(dev, "Detaching device (%s)", dev->name);
 
-	if (dev->users > 0) {
-		SRBDEV_LOG_ERR(dev, "Unable to remove, device still opened (#users: %d)", dev->users);
+        users = atomic_read(&dev->users);
+	if (users > 0) {
+		SRBDEV_LOG_ERR(dev, "Unable to remove, device still opened (#users: %d)", users);
 		return -EBUSY;
 	}
 
@@ -1189,7 +1190,7 @@ int srb_device_detach(const char *devname)
 			if (strcmp(devname, devtab[i].name) == 0) {
 				found = 1;
 				dev = &devtab[i];
-				if (devtab[i].users > 0)
+				if (atomic_read(&devtab[i].users) > 0)
 				        ret = -EBUSY;
 				else if (devtab[i].state == DEV_IN_USE) {
 					ret = -EBUSY;
