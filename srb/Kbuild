@@ -1,6 +1,6 @@
 obj-m := srb.o
 
-srb-y := srb-driver.o srb-sysfs.o srb-cdmi.o srb-http.o
+srb-y := srb-driver.o srb-sysfs.o srb-cdmi.o srb-http.o srb-trace.o
 
 EXTRA_CFLAGS := -ggdb3 -Wall -Wextra -Werror -Wno-unused-parameter -I$(src)/../include
 
