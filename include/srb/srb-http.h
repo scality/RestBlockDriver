@@ -88,10 +88,6 @@ int srb_http_check_response_complete(char *buff, int len);
 int srb_http_mkrange(char *cmd, char *buff, int len, char *host, char *page,
 		uint64_t start, uint64_t end);
 
-int srb_http_mkcreate(char *buff, int len, char *host, char *page);
-int srb_http_mktruncate(char *buff, int len, char *host, char *page,
-			unsigned long long size);
-int srb_http_mkdelete(char *buff, int len, char *host, char *page);
 int srb_http_header_get_uint64(char *buff, int len, char *key,
 			uint64_t *value);
 int srb_http_skipheader(char **buff, int *len);
