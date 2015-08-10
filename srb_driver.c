@@ -418,7 +418,6 @@ static int srb_thread(void *data)
 		SRBDEV_LOG_DEBUG(dev, "thread %d: REQ done with returned code %d",
 		                 th_id, th_ret);
 	
-		/* No IO error testing for the moment */
 		if (th_ret < 0) {
 			blk_end_request_all(req, -EIO);
 		} else {
