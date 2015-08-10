@@ -419,7 +419,11 @@ static int srb_thread(void *data)
 		                 th_id, th_ret);
 	
 		/* No IO error testing for the moment */
-		blk_end_request_all(req, 0);
+		if (th_ret < 0) {
+			blk_end_request_all(req, -EIO);
+		} else {
+			blk_end_request_all(req, 0);
+		}
 	}
 
 	return 0;
