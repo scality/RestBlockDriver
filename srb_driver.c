@@ -502,6 +502,12 @@ static int srb_init_disk(struct srb_device_s *dev)
 
 	SRB_LOG_INFO(srb_log, "srb_init_disk: initializing disk for device: %s", dev->name);
 
+	/* Check for existing device nodes */
+	if (blk_lookup_devt(dev->name, 0)) {
+		SRB_LOG_ERR(srb_log, "Device already exists: %s", dev->name);
+		return -EINVAL;
+	}
+
 	/* create gendisk info */
 	disk = alloc_disk(DEV_MINORS);
 	if (!disk) {
