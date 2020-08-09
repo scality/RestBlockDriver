@@ -3,3 +3,5 @@ chaussette >= 1.2
 gevent >= 1.0
 circus >= 0.11
 circus-web >= 0.5
+
+tornado>=5.1.0 # not directly required, pinned by Snyk to avoid a vulnerability
